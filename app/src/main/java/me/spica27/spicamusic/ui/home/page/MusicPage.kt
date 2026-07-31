@@ -55,6 +55,7 @@ import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Scanner
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
@@ -656,6 +657,12 @@ fun MusicPage() {
                         },
                     sortAnchor = sortAnchor,
                     onSortClick = ::openSortMenu,
+                    showCloudRefresh =
+                        selectedTab == MusicBrowserTab.Songs &&
+                            selectedSource != SongLibrarySource.Local &&
+                            cloudCatalog.availableSources.isNotEmpty(),
+                    cloudRefreshing = cloudCatalog.isRefreshing,
+                    onCloudRefresh = cloudCatalogViewModel::refreshCatalog,
                     modifier =
                         Modifier.animateItem(
                             fadeInSpec = ListItemFadeInSpec,
@@ -1295,6 +1302,9 @@ private fun MusicSectionHeader(
     count: Int,
     sortAnchor: PopupMenuAnchorState,
     onSortClick: () -> Unit,
+    showCloudRefresh: Boolean,
+    cloudRefreshing: Boolean,
+    onCloudRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -1320,24 +1330,59 @@ private fun MusicSectionHeader(
                 maxLines = 1,
             )
         }
-        // 排序锚点：点击后图标原地过渡成排序菜单（SortMenuScene）
-        Box(
-            modifier =
-                Modifier
-                    .popupMenuAnchor(sortAnchor)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer)
-                    .clickHighlight(
-                        onClickLabel = stringResource(R.string.music_sort_cd),
-                        onClick = onSortClick,
-                    ).padding(Spacing.Small),
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.Sort,
-                contentDescription = stringResource(R.string.music_sort_cd),
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp),
-            )
+            if (showCloudRefresh) {
+                Box(
+                    modifier =
+                        Modifier
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer)
+                            .clickHighlight(
+                                onClickLabel = stringResource(R.string.music_refresh_cloud_cd),
+                                onClick = {
+                                    if (!cloudRefreshing) onCloudRefresh()
+                                },
+                            ).padding(Spacing.Small),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (cloudRefreshing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = stringResource(R.string.music_refresh_cloud_cd),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+            }
+            // 排序锚点：点击后图标原地过渡成排序菜单（SortMenuScene）
+            Box(
+                modifier =
+                    Modifier
+                        .popupMenuAnchor(sortAnchor)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .clickHighlight(
+                            onClickLabel = stringResource(R.string.music_sort_cd),
+                            onClick = onSortClick,
+                        ).padding(Spacing.Small),
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Sort,
+                    contentDescription = stringResource(R.string.music_sort_cd),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
     }
 }

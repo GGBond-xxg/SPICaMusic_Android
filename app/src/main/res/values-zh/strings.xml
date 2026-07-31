@@ -401,6 +401,7 @@
   <string name="music_search_albums_hint">搜索专辑…</string>
   <string name="music_search_artists_hint">搜索歌手…</string>
   <string name="music_sort_cd">排序</string>
+  <string name="music_refresh_cloud_cd">刷新云端歌曲</string>
   <string name="sort_song_title_az">标题 A–Z</string>
   <string name="sort_song_title_za">标题 Z–A</string>
   <string name="sort_song_artist_az">歌手 A–Z</string>

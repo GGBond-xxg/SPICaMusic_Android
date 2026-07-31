@@ -82,6 +82,7 @@ data class CloudMusicCatalogState(
     val loadingSources: Set<CloudSongSource> = emptySet(),
     val errors: Map<CloudSongSource, String> = emptyMap(),
     val sourcesWithMore: Set<CloudSongSource> = emptySet(),
+    val isRefreshing: Boolean = false,
 )
 
 /**
@@ -138,6 +139,25 @@ class CloudMusicCatalogViewModel(
         loadMore()
     }
 
+    /**
+     * Discards every cloud cursor and reloads the first page from each configured source.
+     * Local MediaStore songs are owned by HomeViewModel and are intentionally unaffected.
+     */
+    fun refreshCatalog() {
+        if (_state.value.isRefreshing) return
+        val desired = buildEndpoints()
+        catalogGeneration += 1
+        endpoints.clear()
+        endpoints.putAll(desired)
+        loadingEndpoints.clear()
+        _state.value =
+            CloudMusicCatalogState(
+                availableSources = desired.values.mapTo(linkedSetOf()) { endpoint -> endpoint.source },
+                isRefreshing = desired.isNotEmpty(),
+            )
+        loadMore()
+    }
+
     fun loadMore(source: CloudSongSource? = null) {
         endpoints.values
             .filter { endpoint ->
@@ -146,6 +166,9 @@ class CloudMusicCatalogViewModel(
                     (source == null || endpoint.source == source) &&
                     (endpoint.source != CloudSongSource.TELEGRAM || telegramReady)
             }.forEach(::loadEndpoint)
+        if (_state.value.isRefreshing && loadingEndpoints.isEmpty()) {
+            _state.update { it.copy(isRefreshing = false) }
+        }
     }
 
     fun play(
@@ -239,6 +262,7 @@ class CloudMusicCatalogViewModel(
                 availableSources = available,
                 loadingSources = loading,
                 sourcesWithMore = withMore,
+                isRefreshing = it.isRefreshing && loading.isNotEmpty(),
             )
         }
     }
