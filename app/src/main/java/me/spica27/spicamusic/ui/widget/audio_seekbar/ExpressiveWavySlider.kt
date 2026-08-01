@@ -147,7 +147,9 @@ fun ExpressiveWavySlider(
         contentAlignment = Alignment.Center,
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val centerY = size.height / 2f
+            // Align the animated track with the bottom-anchored dynamic waveform so switching
+            // styles changes only the drawing, not its distance from the time labels.
+            val trackCenterY = (size.height - thumbRadiusPx).coerceAtLeast(thumbRadiusPx)
             val trackStart = thumbRadiusPx
             val trackEnd = size.width - thumbRadiusPx
             val trackWidth = (trackEnd - trackStart).coerceAtLeast(1f)
@@ -160,8 +162,8 @@ fun ExpressiveWavySlider(
             if (inactiveStart < trackEnd) {
                 drawLine(
                     color = inactiveColor,
-                    start = Offset(inactiveStart, centerY),
-                    end = Offset(trackEnd, centerY),
+                    start = Offset(inactiveStart, trackCenterY),
+                    end = Offset(trackEnd, trackCenterY),
                     strokeWidth = strokeWidthPx,
                     cap = StrokeCap.Round,
                 )
@@ -175,7 +177,7 @@ fun ExpressiveWavySlider(
                     val angle =
                         ((x - trackStart) / wavelengthPx * (2f * PI).toFloat()) -
                             phase * (2f * PI).toFloat()
-                    val y = centerY + sin(angle.toDouble()).toFloat() * amplitudePx * waveStrength
+                    val y = trackCenterY + sin(angle.toDouble()).toFloat() * amplitudePx * waveStrength
                     if (first) {
                         path.moveTo(x, y)
                         first = false
@@ -186,7 +188,7 @@ fun ExpressiveWavySlider(
                 }
                 path.lineTo(
                     activeEnd,
-                    centerY +
+                    trackCenterY +
                         sin(
                             (
                                 (activeEnd - trackStart) / wavelengthPx * (2f * PI).toFloat() -
@@ -201,7 +203,7 @@ fun ExpressiveWavySlider(
             val thumbHeight = thumbRadiusPx * 2f + interactionFraction * thumbRadiusPx
             drawRoundRect(
                 color = thumbColor,
-                topLeft = Offset(thumbX - thumbWidth / 2f, centerY - thumbHeight / 2f),
+                topLeft = Offset(thumbX - thumbWidth / 2f, trackCenterY - thumbHeight / 2f),
                 size = Size(thumbWidth, thumbHeight),
                 cornerRadius = CornerRadius(thumbWidth / 2f),
             )

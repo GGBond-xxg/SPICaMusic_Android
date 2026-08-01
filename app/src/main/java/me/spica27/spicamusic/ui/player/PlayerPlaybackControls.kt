@@ -75,6 +75,8 @@ import me.spica27.spicamusic.ui.widget.audio_seekbar.AudioDynamicWaveSlider
 import me.spica27.spicamusic.ui.widget.audio_seekbar.AudioWaveSlider
 import me.spica27.spicamusic.ui.widget.audio_seekbar.ExpressiveWavySlider
 
+private val PlayerProgressTrackHeight = 64.dp
+
 /** 播放器与歌词页共用的三样式进度区。 */
 @Composable
 fun PlayerProgressSection(
@@ -103,7 +105,7 @@ fun PlayerProgressSection(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .height(48.dp),
+                            .height(PlayerProgressTrackHeight),
                 )
 
             ProgressBarStyle.DynamicWaveform -> {
@@ -119,7 +121,7 @@ fun PlayerProgressSection(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .height(64.dp),
+                                .height(PlayerProgressTrackHeight),
                     )
                 }
             }
@@ -135,7 +137,7 @@ fun PlayerProgressSection(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .height(64.dp),
+                            .height(PlayerProgressTrackHeight),
                 )
         }
         Spacer(modifier = Modifier.height(Spacing.Small))

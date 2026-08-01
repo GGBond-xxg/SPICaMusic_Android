@@ -1,5 +1,6 @@
 package me.spica27.spicamusic.ui.player
 
+import android.net.Uri
 import android.os.FileUtils
 import android.text.TextUtils
 import androidx.activity.compose.BackHandler
@@ -108,6 +109,10 @@ import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinActivityViewModel
 import timber.log.Timber
 import java.io.File
+import java.io.FilterInputStream
+import java.io.InputStream
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
@@ -1429,7 +1434,7 @@ private suspend fun loadAmplitudeData(
         Timber.tag("ExpandedPlayerScreen").d("没有缓存的波形数据，开始提取...")
         return@withContext try {
             val uri = config.uri
-            App.getInstance().contentResolver.openInputStream(uri)?.use { inputStream ->
+            openWaveformInputStream(uri)?.use { inputStream ->
                 val tempFile =
                     File.createTempFile("amplitude_cache", null, App.getInstance().cacheDir)
 
@@ -1446,10 +1451,15 @@ private suspend fun loadAmplitudeData(
                         },
                         { result = emptyList() },
                     )
-                    songUseCases.updateSongWaveform(
-                        mediaId = mediaItem.mediaId.toLongOrNull() ?: 0L,
-                        waveformData = result.joinToString(","),
-                    )
+                    mediaItem.mediaId
+                        .toLongOrNull()
+                        ?.takeIf { it > 0L }
+                        ?.let { mediaStoreId ->
+                            songUseCases.updateSongWaveform(
+                                mediaId = mediaStoreId,
+                                waveformData = result.joinToString(","),
+                            )
+                        }
                     mediaItem.mediaMetadata.extras?.putString(
                         "waveformData",
                         result.joinToString(","),
@@ -1459,7 +1469,46 @@ private suspend fun loadAmplitudeData(
                     tempFile.delete()
                 }
             } ?: emptyList()
-        } catch (_: Throwable) {
+        } catch (error: Throwable) {
+            Timber
+                .tag("ExpandedPlayerScreen")
+                .w(error, "Unable to extract waveform for ${mediaItem.mediaId}")
             emptyList()
         }
+    }
+
+private fun openWaveformInputStream(uri: Uri): InputStream? =
+    when (uri.scheme?.lowercase(Locale.ROOT)) {
+        "http", "https" -> {
+            val connection =
+                (URL(uri.toString()).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 15_000
+                    readTimeout = 120_000
+                    instanceFollowRedirects = true
+                    setRequestProperty("Accept-Encoding", "identity")
+                    requestMethod = "GET"
+                }
+            try {
+                val responseCode = connection.responseCode
+                if (responseCode !in 200..299) {
+                    connection.disconnect()
+                    null
+                } else {
+                    object : FilterInputStream(connection.inputStream) {
+                        override fun close() {
+                            try {
+                                super.close()
+                            } finally {
+                                connection.disconnect()
+                            }
+                        }
+                    }
+                }
+            } catch (error: Throwable) {
+                connection.disconnect()
+                throw error
+            }
+        }
+
+        else -> App.getInstance().contentResolver.openInputStream(uri)
     }
