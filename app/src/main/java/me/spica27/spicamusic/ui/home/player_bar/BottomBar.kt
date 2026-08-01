@@ -89,6 +89,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.common.MediaItem
 import com.skydoves.landscapist.components.rememberImageComponent
 import com.skydoves.landscapist.crossfade.CrossfadePlugin
 import com.skydoves.landscapist.image.LandscapistImage
@@ -330,6 +331,7 @@ fun BottomMediaBar(bottomBarScrollConnection: BottomBarScrollConnection = LocalB
                         ) {
                             // 实际播放条
                             LargeBottomPlayerBar(
+                                mediaItem = currentMediaItem,
                                 coverShape = coverShape,
                                 coverModifier =
                                     Modifier.sharedElement(
@@ -554,10 +556,10 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
     val navigationPath = LocalNavigationPath.current
 
     val currentHomePage = homeViewModel.currentPage.collectAsStateWithLifecycle().value
-    val nowPlayingSong = playerViewModel.currentMediaItem.collectAsStateWithLifecycle().value
-
     val currentMediaItem by playerViewModel.currentMediaItem.collectAsStateWithLifecycle()
-    val metadata = currentMediaItem?.mediaMetadata
+    val displayedMediaItem = rememberRetainedMediaItem(currentMediaItem)
+    val nowPlayingSong = displayedMediaItem
+    val metadata = displayedMediaItem?.mediaMetadata
     val title = metadata?.title?.toString() ?: stringResource(R.string.unknown_song)
     val artworkUri = metadata?.artworkUri ?: metadata?.albumCoverFallbackUri()
     var stableCoverPainter by remember { mutableStateOf<Painter?>(null) }
@@ -671,6 +673,7 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                                         ),
                             )
                             LargeBottomPlayerBar(
+                                mediaItem = displayedMediaItem,
                                 coverShape = coverShape,
                                 coverModifier =
                                     Modifier
@@ -962,6 +965,26 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
         }
     }
 }
+
+@Composable
+private fun rememberRetainedMediaItem(currentMediaItem: MediaItem?): MediaItem? {
+    val usableCurrent = currentMediaItem?.takeIf { it.hasReadableMetadata() }
+    var retainedMediaItem by remember { mutableStateOf<MediaItem?>(usableCurrent) }
+    LaunchedEffect(currentMediaItem) {
+        if (usableCurrent != null) {
+            retainedMediaItem = usableCurrent
+        } else {
+            // Media3 may briefly publish an empty item during a queue transition. Keeping the
+            // previous metadata for the same grace period as the cover avoids an "unknown song"
+            // flash while still clearing a genuinely empty queue after process/service restart.
+            delay(COVER_CLEAR_GRACE_PERIOD_MS)
+            retainedMediaItem = null
+        }
+    }
+    return usableCurrent ?: retainedMediaItem
+}
+
+private fun MediaItem.hasReadableMetadata(): Boolean = !mediaMetadata.title.isNullOrBlank() || !mediaMetadata.displayTitle.isNullOrBlank()
 
 @Composable
 private fun StableHeroCover(

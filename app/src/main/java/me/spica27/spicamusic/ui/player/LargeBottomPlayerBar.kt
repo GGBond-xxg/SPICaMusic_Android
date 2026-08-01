@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.common.MediaItem
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.ui.theme.rememberThemeRevealOriginState
 import me.spica27.spicamusic.ui.theme.themeRevealOrigin
@@ -67,16 +68,17 @@ fun LargeBottomPlayerBar(
     onCoverPainterReady: (Painter) -> Unit = {},
     onCoverPainterFailed: () -> Unit = {},
     viewModel: PlayerViewModel = LocalPlayerViewModel.current,
+    mediaItem: MediaItem?,
     onExpand: () -> Unit,
     onNext: () -> Unit = viewModel::skipToNext,
 ) {
-    val currentMediaItem by viewModel.currentMediaItem.collectAsStateWithLifecycle()
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
 
-    val metadata = currentMediaItem?.mediaMetadata
+    val metadata = mediaItem?.mediaMetadata
     val title = metadata?.title?.toString() ?: stringResource(R.string.unknown_song)
     val artist = metadata?.artist?.toString() ?: stringResource(R.string.unknown_artist)
     val artworkUri = metadata?.artworkUri ?: metadata?.albumCoverFallbackUri()
+    val hasMediaItem = mediaItem != null
     val nextRevealOrigin = rememberThemeRevealOriginState()
     Box(
         modifier =
@@ -85,7 +87,7 @@ fun LargeBottomPlayerBar(
                 // 点击态的 indication 默认按整个矩形布局绘制；先裁成胶囊，
                 // 避免按下时出现没有圆角的长方形灰影。
                 .clip(CircleShape)
-                .clickable { onExpand() },
+                .clickable(enabled = hasMediaItem) { onExpand() },
     ) {
         Column {
             // 进度条
@@ -128,27 +130,38 @@ fun LargeBottomPlayerBar(
                 // 歌曲信息
                 Column(
                     modifier =
-                        infoModifier
+                        (if (hasMediaItem) infoModifier else Modifier)
                             .weight(1f)
                             .clipToBounds(),
                 ) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = titleModifier,
-                    )
-                    Text(
-                        text = artist,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = artistModifier,
-                    )
+                    if (hasMediaItem) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = titleModifier,
+                        )
+                        Text(
+                            text = artist,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = artistModifier,
+                        )
+                    } else {
+                        Text(
+                            text = stringResource(R.string.no_song_playing),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(8.dp))
@@ -156,6 +169,7 @@ fun LargeBottomPlayerBar(
                 // 播放/暂停按钮
                 IconButton(
                     onClick = { viewModel.togglePlayPause() },
+                    enabled = hasMediaItem,
                     modifier = playButtonModifier.size(40.dp),
                 ) {
                     MorphingPlayPauseIcon(
@@ -172,6 +186,7 @@ fun LargeBottomPlayerBar(
                         nextRevealOrigin.armFromCenter()
                         onNext()
                     },
+                    enabled = hasMediaItem,
                     modifier =
                         nextButtonModifier
                             .size(40.dp)
