@@ -844,60 +844,56 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                                             animatedVisibilityScope = this@AnimatedContent,
                                         ).fillMaxHeight()
                                         .aspectRatio(1f)
-                                        .clip(coverShape),
+                                        .clip(coverShape)
+                                        .background(MaterialTheme.colorScheme.tertiaryContainer),
                                 placeHolder = {
                                     MusicCoverPlaceholder(
-                                        modifier =
-                                            Modifier
-                                                .fillMaxSize()
-                                                .background(MaterialTheme.colorScheme.tertiaryContainer),
+                                        modifier = Modifier.fillMaxSize(),
+                                        containerColor = androidx.compose.ui.graphics.Color.Transparent,
                                         contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
                                         contentDescription = stringResource(R.string.cover_placeholder),
                                     )
                                 },
                             )
-                            if (nowPlayingSong != null) {
-                                Row(
-                                    modifier =
-                                        Modifier
-                                            .weight(1f)
-                                            .padding(end = 8.dp)
-                                            .sharedBounds(
-                                                sharedContentState =
-                                                    rememberSharedContentState("player_info_bounds"),
-                                                animatedVisibilityScope = this@AnimatedContent,
-                                                resizeMode =
-                                                    SharedTransitionScope.ResizeMode.RemeasureToBounds,
-                                            ).clipToBounds()
-                                            .clip(CircleShape),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text(
-                                        text = title,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier =
-                                            Modifier
-                                                .sharedElement(
-                                                    sharedContentState = rememberSharedContentState("player_title"),
-                                                    animatedVisibilityScope = this@AnimatedContent,
-                                                ).weight(1f),
-                                    )
-                                }
-                            } else {
+                            Row(
+                                modifier =
+                                    Modifier
+                                        .weight(1f)
+                                        .padding(end = 8.dp)
+                                        .sharedBounds(
+                                            sharedContentState =
+                                                rememberSharedContentState("player_info_bounds"),
+                                            animatedVisibilityScope = this@AnimatedContent,
+                                            resizeMode =
+                                                SharedTransitionScope.ResizeMode.RemeasureToBounds,
+                                        ).clipToBounds()
+                                        .clip(CircleShape),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
                                 Text(
-                                    text = stringResource(R.string.no_song_playing),
+                                    text =
+                                        if (nowPlayingSong != null) {
+                                            title
+                                        } else {
+                                            stringResource(R.string.no_song_playing)
+                                        },
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = FontWeight.Medium,
+                                    color =
+                                        if (nowPlayingSong != null) {
+                                            MaterialTheme.colorScheme.onSurface
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
                                     maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                     modifier =
                                         Modifier
-                                            .weight(1f)
-                                            .padding(end = 8.dp)
-                                            .basicMarquee(repeatDelayMillis = 0),
+                                            .sharedElement(
+                                                sharedContentState = rememberSharedContentState("player_title"),
+                                                animatedVisibilityScope = this@AnimatedContent,
+                                            ).weight(1f)
+                                            .clipToBounds(),
                                 )
                             }
                             Box(modifier = Modifier.size(40.dp)) {

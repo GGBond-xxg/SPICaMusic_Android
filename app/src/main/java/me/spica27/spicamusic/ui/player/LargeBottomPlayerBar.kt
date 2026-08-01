@@ -130,7 +130,7 @@ fun LargeBottomPlayerBar(
                 // 歌曲信息
                 Column(
                     modifier =
-                        (if (hasMediaItem) infoModifier else Modifier)
+                        infoModifier
                             .weight(1f)
                             .clipToBounds(),
                 ) {
@@ -160,6 +160,7 @@ fun LargeBottomPlayerBar(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = titleModifier,
                         )
                     }
                 }
