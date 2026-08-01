@@ -454,6 +454,21 @@ fun MusicPage() {
                 .filterBrowserSongsBy(searchQuery)
                 .sortedWith(songSortMode.browserComparator())
         }
+    val knownCloudSongCount = cloudCatalog.songCounts.values.sum()
+    val knownAllSongCount = allSongs.size + knownCloudSongCount
+    val displayedSongCount =
+        if (searchQuery.isNotBlank()) {
+            filteredSongs.size
+        } else {
+            when (selectedSource) {
+                SongLibrarySource.All -> knownAllSongCount
+                SongLibrarySource.Local -> allSongs.size
+                else ->
+                    selectedSource.cloudSource
+                        ?.let(cloudCatalog.songCounts::get)
+                        ?: filteredSongs.size
+            }
+        }
     val visibleQueue =
         remember(filteredSongs) {
             filteredSongs.map {
@@ -574,7 +589,7 @@ fun MusicPage() {
             item(key = "masthead", contentType = "masthead") {
                 val entrance = rememberEntrance(order = 0, play = playEntrance)
                 MusicMasthead(
-                    songsCount = allSongs.size + cloudCatalog.songs.size,
+                    songsCount = knownAllSongCount,
                     albumsCount = albums.size,
                     artistsCount = artists.size,
                     modifier =
@@ -596,7 +611,7 @@ fun MusicPage() {
                 val entrance = rememberEntrance(order = 1, play = playEntrance)
                 MusicTabStrip(
                     selectedTab = selectedTab,
-                    songsCount = allSongs.size + cloudCatalog.songs.size,
+                    songsCount = knownAllSongCount,
                     albumsCount = albums.size,
                     artistsCount = artists.size,
                     onSelect = {
@@ -651,7 +666,7 @@ fun MusicPage() {
                     tab = selectedTab,
                     count =
                         when (selectedTab) {
-                            MusicBrowserTab.Songs -> filteredSongs.size
+                            MusicBrowserTab.Songs -> displayedSongCount
                             MusicBrowserTab.Albums -> filteredAlbums.size
                             MusicBrowserTab.Artists -> filteredArtists.size
                         },

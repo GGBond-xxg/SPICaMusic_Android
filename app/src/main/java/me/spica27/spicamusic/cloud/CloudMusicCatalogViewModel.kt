@@ -78,6 +78,7 @@ sealed interface CatalogQueueItem {
 @Immutable
 data class CloudMusicCatalogState(
     val songs: List<CloudCatalogSong> = emptyList(),
+    val songCounts: Map<CloudSongSource, Int> = emptyMap(),
     val availableSources: Set<CloudSongSource> = emptySet(),
     val loadingSources: Set<CloudSongSource> = emptySet(),
     val errors: Map<CloudSongSource, String> = emptyMap(),
@@ -91,6 +92,7 @@ data class CloudMusicCatalogState(
  */
 class CloudMusicCatalogViewModel(
     private val accountStore: CloudAccountStore,
+    private val countStore: CloudCatalogCountStore,
     private val mediaServerClient: MediaServerClient,
     private val remoteClients: RemoteMusicClientRegistry,
     private val remoteProxy: RemoteMusicStreamProxy,
@@ -129,9 +131,18 @@ class CloudMusicCatalogViewModel(
             endpoints.clear()
             endpoints.putAll(desired)
             loadingEndpoints.clear()
-            _state.update {
-                CloudMusicCatalogState(
+            countStore.retain(desired.keys)
+            _state.update { current ->
+                current.copy(
+                    songs =
+                        current.songs.filter { song ->
+                            song.endpointKey() in desired
+                        },
                     availableSources = desired.values.mapTo(linkedSetOf()) { endpoint -> endpoint.source },
+                    loadingSources = emptySet(),
+                    errors = emptyMap(),
+                    sourcesWithMore = emptySet(),
+                    isRefreshing = false,
                 )
             }
         }
@@ -140,22 +151,68 @@ class CloudMusicCatalogViewModel(
     }
 
     /**
-     * Discards every cloud cursor and reloads the first page from each configured source.
-     * Local MediaStore songs are owned by HomeViewModel and are intentionally unaffected.
+     * Fully enumerates every configured endpoint in the background. The currently visible
+     * catalog and its last confirmed counts stay in place until the refresh succeeds, so a
+     * 94-song library never temporarily regresses to Telegram's 60-song page size.
      */
     fun refreshCatalog() {
         if (_state.value.isRefreshing) return
         val desired = buildEndpoints()
         catalogGeneration += 1
+        val generation = catalogGeneration
         endpoints.clear()
         endpoints.putAll(desired)
         loadingEndpoints.clear()
-        _state.value =
-            CloudMusicCatalogState(
+        countStore.retain(desired.keys)
+        loadingEndpoints +=
+            desired.values
+                .filter { endpoint ->
+                    endpoint.source != CloudSongSource.TELEGRAM || telegramReady
+                }.map(CatalogEndpoint::key)
+        _state.update { current ->
+            current.copy(
+                songs = current.songs.filter { it.endpointKey() in desired },
                 availableSources = desired.values.mapTo(linkedSetOf()) { endpoint -> endpoint.source },
-                isRefreshing = desired.isNotEmpty(),
+                errors = emptyMap(),
+                isRefreshing = loadingEndpoints.isNotEmpty(),
             )
-        loadMore()
+        }
+        publishStatus()
+        if (loadingEndpoints.isEmpty()) return
+
+        viewModelScope.launch {
+            val refreshed = linkedMapOf<String, List<CloudCatalogSong>>()
+            val refreshErrors = linkedMapOf<CloudSongSource, String>()
+            desired.values.forEach { endpoint ->
+                if (endpoint.key !in loadingEndpoints) return@forEach
+                runCatching { endpoint.loadAll() }
+                    .onSuccess { songs ->
+                        refreshed[endpoint.key] = songs
+                        countStore.put(endpoint.key, songs.size)
+                    }.onFailure { error ->
+                        endpoint.hasMore = false
+                        refreshErrors[endpoint.source] =
+                            error.message ?: "Unable to refresh cloud songs"
+                    }
+            }
+            if (generation != catalogGeneration) return@launch
+
+            loadingEndpoints.clear()
+            _state.update { current ->
+                val currentByEndpoint = current.songs.groupBy(CloudCatalogSong::endpointKey)
+                current.copy(
+                    songs =
+                        desired.values
+                            .flatMap { endpoint ->
+                                refreshed[endpoint.key]
+                                    ?: currentByEndpoint[endpoint.key].orEmpty()
+                            }.distinctBy(CloudCatalogSong::stableId),
+                    errors = refreshErrors,
+                    isRefreshing = false,
+                )
+            }
+            publishStatus()
+        }
     }
 
     fun loadMore(source: CloudSongSource? = null) {
@@ -206,11 +263,16 @@ class CloudMusicCatalogViewModel(
                     endpoint.hasMore = page.hasMore
                     _state.update { current ->
                         current.copy(
-                            songs =
-                                (current.songs + page.songs)
-                                    .distinctBy(CloudCatalogSong::stableId),
+                            songs = mergeCatalogSongs(current.songs, page.songs),
                             errors = current.errors - endpoint.source,
                         )
+                    }
+                    if (!page.hasMore) {
+                        val endpointCount =
+                            _state.value.songs.count { song ->
+                                song.endpointKey() == endpoint.key
+                            }
+                        countStore.put(endpoint.key, endpointCount)
                     }
                 }.onFailure { error ->
                     if (generation != catalogGeneration) return@onFailure
@@ -257,8 +319,24 @@ class CloudMusicCatalogViewModel(
             endpoints.values
                 .filter(CatalogEndpoint::hasMore)
                 .mapTo(linkedSetOf()) { it.source }
+        val loadedCounts =
+            _state.value.songs
+                .groupingBy(CloudCatalogSong::endpointKey)
+                .eachCount()
+        val knownCounts =
+            endpoints.values
+                .groupBy(CatalogEndpoint::source)
+                .mapValues { (_, sourceEndpoints) ->
+                    sourceEndpoints.sumOf { endpoint ->
+                        maxOf(
+                            countStore.get(endpoint.key) ?: 0,
+                            loadedCounts[endpoint.key] ?: 0,
+                        )
+                    }
+                }
         _state.update {
             it.copy(
+                songCounts = knownCounts,
                 availableSources = available,
                 loadingSources = loading,
                 sourcesWithMore = withMore,
@@ -274,6 +352,19 @@ class CloudMusicCatalogViewModel(
         var hasMore: Boolean = true
 
         abstract suspend fun load(): CatalogPage
+
+        suspend fun loadAll(): List<CloudCatalogSong> {
+            val collected = linkedMapOf<String, CloudCatalogSong>()
+            var pagesLoaded = 0
+            do {
+                val page = load()
+                page.songs.forEach { song -> collected[song.stableId] = song }
+                hasMore = page.hasMore
+                pagesLoaded += 1
+            } while (hasMore && page.songs.isNotEmpty() && pagesLoaded < MAX_REFRESH_PAGES)
+            check(!hasMore) { "Cloud catalog refresh exceeded its safe page limit" }
+            return collected.values.toList()
+        }
     }
 
     private inner class TelegramEndpoint(
@@ -510,5 +601,29 @@ class CloudMusicCatalogViewModel(
 
     private companion object {
         const val REMOTE_PAGE_SIZE = 80
+        const val MAX_REFRESH_PAGES = 1_000
     }
+}
+
+internal fun CloudCatalogSong.endpointKey(): String =
+    when (val value = payload) {
+        is CloudCatalogPayload.Telegram -> "telegram:${value.song.chatId}"
+        is CloudCatalogPayload.MediaServer -> "media:${value.account.id}"
+        is CloudCatalogPayload.Remote -> "remote:${value.account.id}"
+    }
+
+internal fun mergeCatalogSongs(
+    current: List<CloudCatalogSong>,
+    incoming: List<CloudCatalogSong>,
+): List<CloudCatalogSong> {
+    if (incoming.isEmpty()) return current
+    val incomingById = incoming.associateBy(CloudCatalogSong::stableId)
+    val merged =
+        current
+            .map { song ->
+                incomingById[song.stableId] ?: song
+            }.toMutableList()
+    val existingIds = current.mapTo(hashSetOf(), CloudCatalogSong::stableId)
+    incoming.filterTo(merged) { song -> song.stableId !in existingIds }
+    return merged
 }

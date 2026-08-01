@@ -5,6 +5,7 @@ import com.skydoves.sandwich.retrofit.adapters.ApiResponseCallAdapterFactory
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import me.spica27.spicamusic.cloud.CloudAccountStore
+import me.spica27.spicamusic.cloud.CloudCatalogCountStore
 import me.spica27.spicamusic.cloud.CloudMusicCatalogViewModel
 import me.spica27.spicamusic.cloud.MediaServerClient
 import me.spica27.spicamusic.cloud.MediaServerType
@@ -74,6 +75,7 @@ object AppModule {
             // PreferencesManager
             single { PreferencesManager(androidContext()) }
             single { CloudAccountStore(androidContext()) }
+            single { CloudCatalogCountStore(androidContext()) }
 
             single<OkHttpClient>(
                 createdAtStart = true,
@@ -143,6 +145,7 @@ object AppModule {
             viewModel {
                 CloudMusicCatalogViewModel(
                     accountStore = get(),
+                    countStore = get(),
                     mediaServerClient = get(),
                     remoteClients = get(),
                     remoteProxy = get(),
