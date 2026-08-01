@@ -33,6 +33,7 @@ class PreferencesManager(
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val THEME_COLOR_STYLE = stringPreferencesKey("theme_color_style")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
+        val LYRICON_ENABLED = booleanPreferencesKey("lyricon_enabled")
         val DYNAMIC_SPECTRUM_BACKGROUND = stringPreferencesKey("dynamic_spectrum_background")
         val DYNAMIC_COVER_TYPE = stringPreferencesKey("dynamic_cover_type")
         val PROGRESS_BAR_STYLE = stringPreferencesKey("progress_bar_style")

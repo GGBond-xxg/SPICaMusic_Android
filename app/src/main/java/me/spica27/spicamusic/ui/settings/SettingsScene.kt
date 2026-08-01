@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LensBlur
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Percent
+import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -97,6 +98,7 @@ class SettingsScene : StackScene() {
         val themeModeValue by viewModel.themeMode.collectAsStateWithLifecycle()
         val themeMode = ThemeMode.fromString(themeModeValue)
         val keepScreenOn by viewModel.keepScreenOn.collectAsStateWithLifecycle()
+        val lyriconEnabled by viewModel.lyriconEnabled.collectAsStateWithLifecycle()
         val spectrumValue by viewModel.dynamicSpectrumBackground.collectAsStateWithLifecycle()
         val coverTypeValue by viewModel.dynamicCoverType.collectAsStateWithLifecycle()
         val progressBarStyleValue by viewModel.progressBarStyle.collectAsStateWithLifecycle()
@@ -275,6 +277,14 @@ class SettingsScene : StackScene() {
                                 icon = Icons.Default.Visibility,
                                 checked = keepScreenOn,
                                 onCheckedChange = viewModel::setKeepScreenOn,
+                            )
+                            SettingsItemDivider()
+                            ModernSettingsSwitchItem(
+                                title = stringResource(R.string.settings_lyricon_title),
+                                subtitle = stringResource(R.string.settings_lyricon_subtitle),
+                                icon = Icons.Default.Subtitles,
+                                checked = lyriconEnabled,
+                                onCheckedChange = viewModel::setLyriconEnabled,
                             )
                         }
                     }

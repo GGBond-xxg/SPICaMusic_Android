@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import me.spica27.spicamusic.common.entity.Song
 import me.spica27.spicamusic.common.entity.getCoverUri
 import me.spica27.spicamusic.feature.player.domain.PlayerUseCases
@@ -233,9 +235,23 @@ class CloudMusicCatalogViewModel(
         visibleQueue: List<CatalogQueueItem>,
     ) {
         viewModelScope.launch {
-            val queue =
+            val visibleCloudSongs =
                 visibleQueue
-                    .distinctBy(CatalogQueueItem::stableId)
+                    .filterIsInstance<CatalogQueueItem.Cloud>()
+                    .map(CatalogQueueItem.Cloud::song)
+            val endpointKeys = visibleCloudSongs.mapTo(linkedSetOf(), CloudCatalogSong::endpointKey)
+            val completedSongs = completeEndpointsForPlayback(endpointKeys)
+            val visibleIds = visibleQueue.mapTo(hashSetOf(), CatalogQueueItem::stableId)
+            val queue =
+                (
+                    visibleQueue +
+                        completedSongs
+                            .asSequence()
+                            .filter { it.endpointKey() in endpointKeys }
+                            .filterNot { it.stableId in visibleIds }
+                            .map(CatalogQueueItem::Cloud)
+                            .toList()
+                ).distinctBy(CatalogQueueItem::stableId)
                     .ifEmpty {
                         _state.value.songs
                             .firstOrNull { it.stableId == selectedStableId }
@@ -252,12 +268,59 @@ class CloudMusicCatalogViewModel(
         }
     }
 
+    /**
+     * A paged catalog is sufficient for rendering, but a playback queue must represent the whole
+     * selected cloud library. Complete only the endpoints visible in the current filter, merge the
+     * result into the catalog cache, and keep the already-rendered order at the head of the queue.
+     */
+    private suspend fun completeEndpointsForPlayback(endpointKeys: Set<String>): List<CloudCatalogSong> {
+        if (endpointKeys.isEmpty()) return _state.value.songs
+        val completedByEndpoint = linkedMapOf<String, List<CloudCatalogSong>>()
+        endpointKeys.forEach { key ->
+            val endpoint = endpoints[key] ?: return@forEach
+            if (!endpoint.hasMore) return@forEach
+            runCatching { endpoint.loadRemaining() }
+                .onSuccess { songs ->
+                    completedByEndpoint[key] = songs
+                    val total =
+                        mergeCatalogSongs(
+                            _state.value.songs.filter { it.endpointKey() == key },
+                            songs,
+                        ).size
+                    countStore.put(key, total)
+                }.onFailure { error ->
+                    _state.update { current ->
+                        current.copy(
+                            errors =
+                                current.errors +
+                                    (
+                                        endpoint.source to
+                                            (error.message ?: "Unable to complete cloud queue")
+                                    ),
+                        )
+                    }
+                }
+        }
+        if (completedByEndpoint.isNotEmpty()) {
+            _state.update { current ->
+                current.copy(
+                    songs =
+                        completedByEndpoint.values.fold(current.songs) { songs, incoming ->
+                            mergeCatalogSongs(songs, incoming)
+                        },
+                )
+            }
+            publishStatus()
+        }
+        return _state.value.songs
+    }
+
     private fun loadEndpoint(endpoint: CatalogEndpoint) {
         val generation = catalogGeneration
         loadingEndpoints += endpoint.key
         publishStatus()
         viewModelScope.launch {
-            runCatching { endpoint.load() }
+            runCatching { endpoint.loadNextPage() }
                 .onSuccess { page ->
                     if (generation != catalogGeneration) return@onSuccess
                     endpoint.hasMore = page.hasMore
@@ -350,10 +413,26 @@ class CloudMusicCatalogViewModel(
         val source: CloudSongSource,
     ) {
         var hasMore: Boolean = true
+        private val loadMutex = Mutex()
 
         abstract suspend fun load(): CatalogPage
 
-        suspend fun loadAll(): List<CloudCatalogSong> {
+        suspend fun loadNextPage(): CatalogPage =
+            loadMutex.withLock {
+                load()
+            }
+
+        suspend fun loadAll(): List<CloudCatalogSong> =
+            loadMutex.withLock {
+                loadPages()
+            }
+
+        suspend fun loadRemaining(): List<CloudCatalogSong> =
+            loadMutex.withLock {
+                if (!hasMore) emptyList() else loadPages()
+            }
+
+        private suspend fun loadPages(): List<CloudCatalogSong> {
             val collected = linkedMapOf<String, CloudCatalogSong>()
             var pagesLoaded = 0
             do {

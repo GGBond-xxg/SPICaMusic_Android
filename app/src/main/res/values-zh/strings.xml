@@ -334,6 +334,8 @@
   <string name="settings_sound_effects_subtitle">均衡器、混响等音效设置</string>
   <string name="settings_keep_screen_on">屏幕常亮</string>
   <string name="settings_keep_screen_on_subtitle">播放时保持屏幕常亮</string>
+  <string name="settings_lyricon_title">状态栏歌词</string>
+  <string name="settings_lyricon_subtitle">通过 Lyricon 显示时间轴歌词；需要安装并启用 Lyricon，未安装时不影响正常播放。</string>
   <string name="settings_dynamic_spectrum">动态频谱背景</string>
   <string name="settings_dynamic_cover">动态封面</string>
   <string name="settings_dynamic_cover_subtitle">播放器封面点击翻转后的背面效果</string>
@@ -496,6 +498,9 @@
   <string name="info_file_path">文件路径</string>
   <string name="info_file_size">文件大小</string>
   <string name="info_file_format">文件格式</string>
+  <string name="info_cloud_source">云端来源</string>
+  <string name="info_cloud_account">账号 / 频道</string>
+  <string name="info_media_id">媒体 ID</string>
 
   <!-- Scanner -->
   <string name="scanner_hero_title">让 SPICa 发现你的音乐</string>

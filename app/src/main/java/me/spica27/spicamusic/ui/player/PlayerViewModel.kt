@@ -34,6 +34,7 @@ import me.spica27.spicamusic.common.entity.Song
 import me.spica27.spicamusic.core.preferences.PreferencesManager
 import me.spica27.spicamusic.feature.library.domain.SongUseCases
 import me.spica27.spicamusic.feature.player.domain.PlayerUseCases
+import me.spica27.spicamusic.lyricon.LyriconProviderManager
 import me.spica27.spicamusic.player.api.PlayMode
 import me.spica27.spicamusic.player.api.PlayerAction
 import me.spica27.spicamusic.utils.albumCoverFallbackUri
@@ -50,6 +51,7 @@ class PlayerViewModel(
     private val player: PlayerUseCases,
     private val songRepository: SongUseCases,
     private val preferencesManager: PreferencesManager,
+    private val lyriconManager: LyriconProviderManager,
 ) : ViewModel() {
     // ==================== 播放状态 ====================
 
@@ -109,7 +111,9 @@ class PlayerViewModel(
     val currentPosition: StateFlow<Long> =
         flow {
             while (currentCoroutineContext().isActive) {
-                emit(player.currentPosition)
+                val position = player.currentPosition
+                lyriconManager.updatePosition(position)
+                emit(position)
                 kotlinx.coroutines.delay(1000)
             }
         }.conflate()

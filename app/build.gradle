@@ -205,6 +205,8 @@ ktlint {
 tasks.getByPath("preBuild").dependsOn("ktlintFormat")
 
 dependencies {
+  implementation "io.github.proify.lyricon:provider:0.1.70"
+
   // 模块依赖
   implementation project(':common')
   implementation project(':core-preferences')

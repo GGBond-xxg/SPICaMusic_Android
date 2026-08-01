@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,6 +19,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -61,15 +64,21 @@ import me.spica27.navkit.path.LocalScene
 import me.spica27.navkit.scene.DialogScene
 import me.spica27.spicamusic.App
 import me.spica27.spicamusic.R
+import me.spica27.spicamusic.cloud.CloudCatalogPayload
+import me.spica27.spicamusic.cloud.CloudCatalogSong
 import me.spica27.spicamusic.common.entity.Song
 import me.spica27.spicamusic.common.entity.getAlbumCoverUri
 import me.spica27.spicamusic.common.entity.getCoverUri
 import me.spica27.spicamusic.ui.player.formatTime
 import me.spica27.spicamusic.ui.widget.CoverFallback
 
-class SongInfoScene(
-    val song: Song,
+class SongInfoScene private constructor(
+    private val details: SongInfoDetails,
 ) : DialogScene() {
+    constructor(song: Song) : this(SongInfoDetails.from(song))
+
+    constructor(song: CloudCatalogSong) : this(SongInfoDetails.from(song))
+
     /**
      * 重写 Content()，将默认的"从中心缩放"替换为"从底部上滑 + 淡入/淡出"。
      * enterProgress 由父类 DialogScene 驱动（push→1f，pop→0f），无需额外声明。
@@ -128,10 +137,12 @@ class SongInfoScene(
                 LocalWindowInfo.current.containerSize.height
                     .toDp()
             }
+        val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
         Surface(
             modifier =
                 Modifier
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .heightIn(max = screenHeight - statusBarTop - 8.dp),
             shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp,
@@ -166,11 +177,11 @@ class SongInfoScene(
                         tonalElevation = 3.dp,
                     ) {
                         LandscapistImage(
-                            imageModel = { song.getCoverUri() },
+                            imageModel = { details.artworkUri },
                             modifier = Modifier.fillMaxSize(),
                             failure = {
                                 CoverFallback(
-                                    fallbackUri = song.getAlbumCoverUri(),
+                                    fallbackUri = details.fallbackArtworkUri,
                                     modifier = Modifier.fillMaxSize(),
                                 )
                             },
@@ -183,7 +194,7 @@ class SongInfoScene(
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         Text(
-                            text = song.displayName,
+                            text = details.title,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -207,43 +218,45 @@ class SongInfoScene(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .heightIn(max = screenHeight * 0.8f)
+                            .weight(1f, fill = false)
                             .verticalScroll(rememberScrollState())
                             .padding(top = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    InfoItem(
-                        Icons.Default.MusicNote,
-                        stringResource(R.string.song_displayname),
-                        song.displayName,
-                    )
-                    InfoItem(
-                        Icons.Default.Person,
-                        stringResource(R.string.song_artist),
-                        song.artist,
-                    )
-                    InfoItem(Icons.Default.Album, stringResource(R.string.song_album), song.album)
-                    InfoItem(
-                        Icons.Default.Schedule,
-                        stringResource(R.string.song_duration),
-                        formatTime(song.duration),
-                    )
-                    InfoItem(
-                        Icons.Default.Folder,
-                        stringResource(R.string.info_file_path),
-                        song.path,
-                        isMultiline = true,
-                    )
-                    InfoItem(
-                        Icons.Default.DataUsage,
-                        stringResource(R.string.info_file_size),
-                        "${song.size / 1024 / 1024} MB",
-                    )
-                    InfoItem(
-                        Icons.Default.Info,
-                        stringResource(R.string.info_file_format),
-                        song.codec,
-                    )
+                    InfoItem(Icons.Default.MusicNote, stringResource(R.string.song_displayname), details.title)
+                    InfoItem(Icons.Default.Person, stringResource(R.string.song_artist), details.artist)
+                    InfoItem(Icons.Default.Album, stringResource(R.string.song_album), details.album)
+                    InfoItem(Icons.Default.Schedule, stringResource(R.string.song_duration), formatTime(details.durationMs))
+                    details.source?.let {
+                        InfoItem(Icons.Default.DataUsage, stringResource(R.string.info_cloud_source), it)
+                    }
+                    details.account?.let {
+                        InfoItem(Icons.Default.Folder, stringResource(R.string.info_cloud_account), it)
+                    }
+                    details.location?.let {
+                        InfoItem(
+                            Icons.Default.Folder,
+                            stringResource(R.string.info_file_path),
+                            it,
+                            isMultiline = true,
+                        )
+                    }
+                    details.fileSizeBytes?.let {
+                        InfoItem(
+                            Icons.Default.DataUsage,
+                            stringResource(R.string.info_file_size),
+                            "${it / 1024 / 1024} MB",
+                        )
+                    }
+                    InfoItem(Icons.Default.Info, stringResource(R.string.info_file_format), details.format)
+                    details.stableId?.let {
+                        InfoItem(
+                            Icons.Default.Info,
+                            stringResource(R.string.info_media_id),
+                            it,
+                            isMultiline = true,
+                        )
+                    }
                 }
                 Spacer(Modifier.height(14.dp))
                 Button(
@@ -255,6 +268,78 @@ class SongInfoScene(
                 }
                 Spacer(Modifier.navigationBarsPadding())
             }
+        }
+    }
+}
+
+private data class SongInfoDetails(
+    val title: String,
+    val artist: String,
+    val album: String,
+    val durationMs: Long,
+    val artworkUri: android.net.Uri?,
+    val fallbackArtworkUri: android.net.Uri?,
+    val source: String?,
+    val account: String?,
+    val location: String?,
+    val fileSizeBytes: Long?,
+    val format: String,
+    val stableId: String?,
+) {
+    companion object {
+        fun from(song: Song): SongInfoDetails =
+            SongInfoDetails(
+                title = song.displayName,
+                artist = song.artist,
+                album = song.album,
+                durationMs = song.duration,
+                artworkUri = song.getCoverUri(),
+                fallbackArtworkUri = song.getAlbumCoverUri(),
+                source = null,
+                account = null,
+                location = song.path,
+                fileSizeBytes = song.size,
+                format = song.codec.ifBlank { song.mimeType },
+                stableId = song.mediaStoreId.toString(),
+            )
+
+        fun from(song: CloudCatalogSong): SongInfoDetails {
+            val provider: String
+            val format: String
+            val fileSize: Long?
+            when (val payload = song.payload) {
+                is CloudCatalogPayload.Telegram -> {
+                    provider = "Telegram"
+                    format = payload.song.mimeType
+                    fileSize = payload.song.fileSize
+                }
+
+                is CloudCatalogPayload.MediaServer -> {
+                    provider = payload.account.type.name
+                    format = payload.song.mimeType
+                    fileSize = null
+                }
+
+                is CloudCatalogPayload.Remote -> {
+                    provider = payload.account.provider.name
+                    format = payload.song.mimeType
+                    fileSize = null
+                }
+            }
+            return SongInfoDetails(
+                title = song.title,
+                artist = song.artist,
+                album = song.album,
+                durationMs = song.durationMs,
+                artworkUri = song.artworkUri,
+                fallbackArtworkUri = null,
+                source = provider,
+                account = song.accountName,
+                location = null,
+                fileSizeBytes = fileSize,
+                format = format,
+                stableId = song.stableId,
+            )
         }
     }
 }

@@ -61,6 +61,19 @@
         android:usesCleartextTraffic="true"
         tools:targetApi="33">
 
+        <meta-data
+            android:name="lyricon_module"
+            android:value="true" />
+        <meta-data
+            android:name="lyricon_module_author"
+            android:value="GGBond-xxg" />
+        <meta-data
+            android:name="lyricon_module_description"
+            android:value="为 Lyricon 提供当前播放歌曲、时间轴歌词与播放状态" />
+        <meta-data
+            android:name="lyricon_module_tags"
+            android:resource="@array/lyricon_module_tags" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

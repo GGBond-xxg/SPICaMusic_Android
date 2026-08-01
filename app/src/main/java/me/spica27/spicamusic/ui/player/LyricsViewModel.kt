@@ -9,6 +9,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -19,6 +20,7 @@ import me.spica27.spicamusic.common.entity.LyricItem
 import me.spica27.spicamusic.common.utils.LrcParser
 import me.spica27.spicamusic.feature.lyrics.domain.LyricsUseCases
 import me.spica27.spicamusic.feature.player.domain.PlayerUseCases
+import me.spica27.spicamusic.lyricon.LyriconProviderManager
 import me.spica27.spicamusic.player.api.PlayerAction
 import timber.log.Timber
 
@@ -31,6 +33,7 @@ class LyricsViewModel(
     context: Context,
     private val player: PlayerUseCases,
     private val lyricsUseCases: LyricsUseCases,
+    private val lyriconManager: LyriconProviderManager,
 ) : ViewModel() {
     private val embeddedLyricsReader = EmbeddedLyricsReader(context.applicationContext)
 
@@ -43,6 +46,7 @@ class LyricsViewModel(
         val allParsedLyrics: List<List<LyricItem>> = emptyList(),
         val currentSourceIndex: Int = 0,
         val currentMediaStoreId: Long = 0L,
+        val currentMediaId: String? = null,
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -66,6 +70,20 @@ class LyricsViewModel(
                     )
                 }
         }
+        viewModelScope.launch {
+            combine(player.currentMediaItem, _uiState) { mediaItem, state ->
+                mediaItem to state
+            }.collect { (mediaItem, state) ->
+                val mediaId = mediaItem?.mediaId ?: return@collect
+                if (state.currentMediaId != mediaId) return@collect
+                lyriconManager.updateLyrics(
+                    mediaId = mediaId,
+                    lyrics = state.lyrics,
+                    durationMs = mediaItem.mediaMetadata.durationMs ?: 0L,
+                    offsetMs = state.lyricsOffsetMs,
+                )
+            }
+        }
     }
 
     private fun loadLyrics(
@@ -87,6 +105,7 @@ class LyricsViewModel(
                 UiState(
                     isLoading = true,
                     currentMediaStoreId = mediaStoreId,
+                    currentMediaId = mediaId,
                 )
             }
 

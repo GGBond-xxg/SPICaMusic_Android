@@ -34,6 +34,7 @@ import me.spica27.spicamusic.feature.library.domain.SongUseCases
 import me.spica27.spicamusic.feature.lyrics.domain.LyricsUseCases
 import me.spica27.spicamusic.feature.player.domain.PlayerUseCases
 import me.spica27.spicamusic.feature.settings.domain.SettingsUseCases
+import me.spica27.spicamusic.lyricon.LyriconProviderManager
 import me.spica27.spicamusic.ui.album.AlbumViewModel
 import me.spica27.spicamusic.ui.albumdetail.AlbumDetailViewModel
 import me.spica27.spicamusic.ui.allsong.AllSongsViewModel
@@ -76,6 +77,7 @@ object AppModule {
             single { PreferencesManager(androidContext()) }
             single { CloudAccountStore(androidContext()) }
             single { CloudCatalogCountStore(androidContext()) }
+            single { LyriconProviderManager(androidContext(), get()) }
 
             single<OkHttpClient>(
                 createdAtStart = true,
@@ -181,6 +183,7 @@ object AppModule {
                     player = get<PlayerUseCases>(),
                     songRepository = get<SongUseCases>(),
                     preferencesManager = get<PreferencesManager>(),
+                    lyriconManager = get(),
                 )
             }
 
@@ -190,6 +193,7 @@ object AppModule {
                     context = androidContext(),
                     player = get<PlayerUseCases>(),
                     lyricsUseCases = get<LyricsUseCases>(),
+                    lyriconManager = get(),
                 )
             }
 

@@ -69,6 +69,17 @@ class SettingsViewModel(
         }
     }
 
+    val lyriconEnabled =
+        settingsUseCases
+            .getBoolean(SettingsUseCases.Keys.LYRICON_ENABLED, true)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setLyriconEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsUseCases.setBoolean(SettingsUseCases.Keys.LYRICON_ENABLED, enabled)
+        }
+    }
+
     // 动态频谱
     val dynamicSpectrumBackground =
         settingsUseCases

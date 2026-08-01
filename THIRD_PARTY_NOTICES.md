@@ -9,6 +9,16 @@ The in-app open-source licenses page lists the libraries distributed with the
 application. The following additional notices cover adapted concepts and
 reference-only projects.
 
+## Lyricon Provider
+
+The optional status-bar lyrics integration uses
+[tomakino/lyricon](https://github.com/tomakino/lyricon), version 0.1.70.
+
+Copyright 2026 Proify, Tomakino
+
+Licensed under the Apache License, Version 2.0. You may obtain a copy at
+<https://www.apache.org/licenses/LICENSE-2.0>.
+
 ## CircularRevealSwitch
 
 The Compose theme transition in this project adapts the screenshot and circular

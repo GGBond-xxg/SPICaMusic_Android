@@ -158,6 +158,12 @@ val ossLibraries: List<OssLibrary> =
             "LGPL-2.1",
             "https://github.com/Kyant0/taglib",
         ),
+        OssLibrary(
+            "Lyricon Provider",
+            "io.github.proify.lyricon:provider",
+            "Apache-2.0",
+            "https://github.com/tomakino/lyricon",
+        ),
         // ---------- DI ----------
         OssLibrary(
             "Koin",
