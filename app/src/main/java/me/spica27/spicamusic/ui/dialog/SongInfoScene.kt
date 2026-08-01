@@ -2,8 +2,14 @@ package me.spica27.spicamusic.ui.dialog
 
 import android.content.ClipData
 import android.widget.Toast
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,8 +49,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -90,6 +99,32 @@ class SongInfoScene private constructor(
         val density = LocalDensity.current
         // 预先在 Composition 阶段把 dp 转成 px，避免在 graphicsLayer 里读取 CompositionLocal
         val slideOffsetPx = with(density) { 72.dp.toPx() }
+        val dismissDistancePx = with(density) { 72.dp.toPx() }
+        val dismissVelocityPx = with(density) { 1_250.dp.toPx() }
+        val screenHeightPx = LocalWindowInfo.current.containerSize.height.toFloat()
+        var dragOffsetPx by remember { mutableFloatStateOf(0f) }
+        val handleDragState =
+            rememberDraggableState { delta ->
+                dragOffsetPx = (dragOffsetPx + delta).coerceAtLeast(0f)
+            }
+        val handleDragModifier =
+            Modifier.draggable(
+                state = handleDragState,
+                orientation = Orientation.Vertical,
+                onDragStopped = { velocity ->
+                    if (dragOffsetPx >= dismissDistancePx || velocity >= dismissVelocityPx) {
+                        path.pop(scene)
+                    } else {
+                        animate(
+                            initialValue = dragOffsetPx,
+                            targetValue = 0f,
+                            animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+                        ) { value, _ ->
+                            dragOffsetPx = value
+                        }
+                    }
+                },
+            )
 
         Box(
             Modifier
@@ -102,7 +137,12 @@ class SongInfoScene private constructor(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .graphicsLayer { alpha = enterProgress.value }
+                        .graphicsLayer {
+                            val dragProgress =
+                                (dragOffsetPx / (screenHeightPx * 0.65f))
+                                    .coerceIn(0f, 1f)
+                            alpha = enterProgress.value * (1f - dragProgress)
+                        }
                         .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.42f))
                         .clickable(
                             interactionSource = interactionSource,
@@ -119,16 +159,21 @@ class SongInfoScene private constructor(
                             val p = enterProgress.value
                             alpha = p
                             // p=0 时向下偏移 slideOffsetPx，p=1 时归位
-                            translationY = (1f - p) * slideOffsetPx
+                            translationY = (1f - p) * slideOffsetPx + dragOffsetPx
                         },
             ) {
-                DialogContent()
+                SongInfoSheet(handleDragModifier)
             }
         }
     }
 
     @Composable
     override fun DialogContent() {
+        SongInfoSheet()
+    }
+
+    @Composable
+    private fun SongInfoSheet(handleDragModifier: Modifier = Modifier) {
         val path = LocalNavigationPath.current
         val scene = LocalScene.current
         val density = LocalDensity.current
@@ -156,18 +201,25 @@ class SongInfoScene private constructor(
                 Box(
                     modifier =
                         Modifier
-                            .padding(top = 10.dp)
-                            .width(44.dp)
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(MaterialTheme.colorScheme.onSurface)
-                            .align(Alignment.CenterHorizontally),
-                )
+                            .fillMaxWidth()
+                            .height(32.dp)
+                            .then(handleDragModifier),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .width(44.dp)
+                                .height(5.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)),
+                    )
+                }
                 Row(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(top = 18.dp, bottom = 18.dp),
+                            .padding(top = 6.dp, bottom = 18.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
