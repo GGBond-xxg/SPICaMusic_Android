@@ -16,13 +16,11 @@ import io.github.proify.lyricon.provider.LyriconProvider
 import io.github.proify.lyricon.provider.service.addConnectionListener
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import me.spica27.spicamusic.common.entity.LyricItem
 import me.spica27.spicamusic.common.entity.getSentenceContent
-import me.spica27.spicamusic.core.preferences.PreferencesManager
 import timber.log.Timber
 
 /**
@@ -33,14 +31,12 @@ import timber.log.Timber
  */
 class LyriconProviderManager(
     context: Context,
-    private val preferences: PreferencesManager,
 ) {
     private val appContext = context.applicationContext
     private var provider: LyriconProvider? = null
     private var connectionListener: ConnectionListener? = null
     private var player: Player? = null
     private var scope: CoroutineScope? = null
-    private var preferenceJob: Job? = null
     private var enabled = false
     private var started = false
     private var currentLyricsMediaId: String? = null
@@ -97,20 +93,12 @@ class LyriconProviderManager(
         this.player = player
         player.addListener(playerListener)
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-        preferenceJob =
-            scope?.launch {
-                preferences
-                    .getBoolean(PreferencesManager.Keys.LYRICON_ENABLED, true)
-                    .collect(::setEnabled)
-            }
     }
 
     @Synchronized
     fun release() {
         player?.removeListener(playerListener)
         player = null
-        preferenceJob?.cancel()
-        preferenceJob = null
         scope?.cancel()
         scope = null
         provider?.let { activeProvider ->
@@ -179,7 +167,13 @@ class LyriconProviderManager(
     }
 
     @Synchronized
-    private fun setEnabled(value: Boolean) {
+    fun clearLyrics() {
+        currentLyricsMediaId = null
+        currentLyrics = emptyList()
+    }
+
+    @Synchronized
+    fun setEnabled(value: Boolean) {
         if (enabled == value && (value.not() || provider != null)) return
         enabled = value
         if (!value) {
@@ -244,7 +238,7 @@ class LyriconProviderManager(
     }
 
     @Synchronized
-    private fun syncCurrentState() {
+    fun syncCurrentState() {
         if (!enabled) return
         val activePlayer = player ?: return
         val item = activePlayer.currentMediaItem

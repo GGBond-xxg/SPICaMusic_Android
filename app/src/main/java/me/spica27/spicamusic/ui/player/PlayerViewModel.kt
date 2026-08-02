@@ -34,9 +34,9 @@ import me.spica27.spicamusic.common.entity.Song
 import me.spica27.spicamusic.core.preferences.PreferencesManager
 import me.spica27.spicamusic.feature.library.domain.SongUseCases
 import me.spica27.spicamusic.feature.player.domain.PlayerUseCases
-import me.spica27.spicamusic.lyricon.LyriconProviderManager
 import me.spica27.spicamusic.player.api.PlayMode
 import me.spica27.spicamusic.player.api.PlayerAction
+import me.spica27.spicamusic.topdisplay.TopDisplayModeController
 import me.spica27.spicamusic.utils.albumCoverFallbackUri
 import me.spica27.spicamusic.utils.extractDominantColorFromUri
 import timber.log.Timber
@@ -51,7 +51,7 @@ class PlayerViewModel(
     private val player: PlayerUseCases,
     private val songRepository: SongUseCases,
     private val preferencesManager: PreferencesManager,
-    private val lyriconManager: LyriconProviderManager,
+    private val topDisplayModeController: TopDisplayModeController,
 ) : ViewModel() {
     // ==================== 播放状态 ====================
 
@@ -112,7 +112,7 @@ class PlayerViewModel(
         flow {
             while (currentCoroutineContext().isActive) {
                 val position = player.currentPosition
-                lyriconManager.updatePosition(position)
+                topDisplayModeController.updatePosition(position)
                 emit(position)
                 kotlinx.coroutines.delay(1000)
             }
@@ -267,6 +267,7 @@ class PlayerViewModel(
      */
     fun seekTo(positionMs: Long) {
         player.doAction(PlayerAction.SeekTo(positionMs))
+        topDisplayModeController.updatePosition(positionMs, force = true)
     }
 
     // ==================== 播放模式 ====================

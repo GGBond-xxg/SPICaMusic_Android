@@ -56,6 +56,11 @@ sealed class PlayerAction {
      */
     data class AddToNext(val mediaId: String) : PlayerAction()
 
+    /** 添加已经解析好的云端媒体项到下一首。 */
+    data class AddMediaItemToNext(
+        val item: MediaItem,
+    ) : PlayerAction()
+
     /**
      * 从播放列表移除
      */
@@ -67,6 +72,11 @@ sealed class PlayerAction {
     data class AddToQueue(
         val mediaIds: List<String>,
     ): PlayerAction()
+
+    /** 添加已经解析好的云端媒体项到队列末尾。 */
+    data class AddMediaItemsToQueue(
+        val items: List<MediaItem>,
+    ) : PlayerAction()
 
 
     /**

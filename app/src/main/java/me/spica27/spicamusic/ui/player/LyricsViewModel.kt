@@ -20,7 +20,7 @@ import me.spica27.spicamusic.common.entity.LyricItem
 import me.spica27.spicamusic.common.utils.LrcParser
 import me.spica27.spicamusic.feature.lyrics.domain.LyricsUseCases
 import me.spica27.spicamusic.feature.player.domain.PlayerUseCases
-import me.spica27.spicamusic.lyricon.LyriconProviderManager
+import me.spica27.spicamusic.topdisplay.TopDisplayModeController
 import me.spica27.spicamusic.player.api.PlayerAction
 import timber.log.Timber
 
@@ -33,7 +33,7 @@ class LyricsViewModel(
     context: Context,
     private val player: PlayerUseCases,
     private val lyricsUseCases: LyricsUseCases,
-    private val lyriconManager: LyriconProviderManager,
+    private val topDisplayModeController: TopDisplayModeController,
 ) : ViewModel() {
     private val embeddedLyricsReader = EmbeddedLyricsReader(context.applicationContext)
 
@@ -76,7 +76,7 @@ class LyricsViewModel(
             }.collect { (mediaItem, state) ->
                 val mediaId = mediaItem?.mediaId ?: return@collect
                 if (state.currentMediaId != mediaId) return@collect
-                lyriconManager.updateLyrics(
+                topDisplayModeController.updateLyrics(
                     mediaId = mediaId,
                     lyrics = state.lyrics,
                     durationMs = mediaItem.mediaMetadata.durationMs ?: 0L,

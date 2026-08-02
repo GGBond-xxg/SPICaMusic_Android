@@ -52,6 +52,7 @@ fun FloatingLyricsToolbar(
     onOffsetChange: (Long) -> Unit,
     onOpenLyricsSwitcher: () -> Unit,
     hasMultipleSources: Boolean,
+    onInteraction: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var isExpanded by remember { mutableStateOf(false) }
@@ -84,13 +85,17 @@ fun FloatingLyricsToolbar(
                 // 偏移量调节栏
                 OffsetAdjustBar(
                     offsetMs = offsetMs,
-                    onOffsetChange = onOffsetChange,
+                    onOffsetChange = {
+                        onInteraction()
+                        onOffsetChange(it)
+                    },
                 )
 
                 // 切换歌词按钮
                 if (hasMultipleSources) {
                     SwitchLyricsButton(
                         onClick = {
+                            onInteraction()
                             isExpanded = false
                             onOpenLyricsSwitcher()
                         },
@@ -101,7 +106,10 @@ fun FloatingLyricsToolbar(
 
         // 主按钮（展开/收起）
         LyricsCircleButton(
-            onClick = { isExpanded = !isExpanded },
+            onClick = {
+                onInteraction()
+                isExpanded = !isExpanded
+            },
             size = 44.dp,
         ) {
             Icon(

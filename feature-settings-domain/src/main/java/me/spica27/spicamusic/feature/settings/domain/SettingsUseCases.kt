@@ -13,6 +13,7 @@ class SettingsUseCases(
         val THEME_COLOR_STYLE = PreferencesManager.Keys.THEME_COLOR_STYLE
         val KEEP_SCREEN_ON = PreferencesManager.Keys.KEEP_SCREEN_ON
         val LYRICON_ENABLED = PreferencesManager.Keys.LYRICON_ENABLED
+        val TOP_DISPLAY_MODE = PreferencesManager.Keys.TOP_DISPLAY_MODE
         val DYNAMIC_SPECTRUM_BACKGROUND = PreferencesManager.Keys.DYNAMIC_SPECTRUM_BACKGROUND
         val DYNAMIC_COVER_TYPE = PreferencesManager.Keys.DYNAMIC_COVER_TYPE
         val PROGRESS_BAR_STYLE = PreferencesManager.Keys.PROGRESS_BAR_STYLE

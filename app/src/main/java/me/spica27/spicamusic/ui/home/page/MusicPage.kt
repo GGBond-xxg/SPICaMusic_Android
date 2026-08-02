@@ -122,8 +122,8 @@ import me.spica27.spicamusic.common.entity.getAlbumCoverUri
 import me.spica27.spicamusic.common.entity.getCoverUri
 import me.spica27.spicamusic.ui.albumdetail.AlbumDetailScene
 import me.spica27.spicamusic.ui.artistdetail.ArtistDetailScene
-import me.spica27.spicamusic.ui.dialog.SongInfoScene
 import me.spica27.spicamusic.ui.dialog.SongMenuScene
+import me.spica27.spicamusic.ui.dialog.CloudSongMenuScene
 import me.spica27.spicamusic.ui.dialog.SortMenuOption
 import me.spica27.spicamusic.ui.dialog.SortMenuScene
 import me.spica27.spicamusic.ui.home.HomeViewModel
@@ -767,7 +767,7 @@ fun MusicPage() {
                                 onLongClick = {
                                     when (item) {
                                         is BrowserSongItem.Local -> path.push(SongMenuScene(item.song))
-                                        is BrowserSongItem.Cloud -> path.push(SongInfoScene(item.song))
+                                        is BrowserSongItem.Cloud -> path.push(CloudSongMenuScene(item.song))
                                     }
                                 },
                                 onClick = {

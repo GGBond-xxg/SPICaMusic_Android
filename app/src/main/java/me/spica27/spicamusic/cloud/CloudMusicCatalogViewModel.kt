@@ -268,6 +268,24 @@ class CloudMusicCatalogViewModel(
         }
     }
 
+    fun addToNext(song: CloudCatalogSong) {
+        viewModelScope.launch {
+            CatalogQueueItem
+                .Cloud(song)
+                .toMediaItem()
+                ?.let { player.doAction(PlayerAction.AddMediaItemToNext(it)) }
+        }
+    }
+
+    fun addToQueue(song: CloudCatalogSong) {
+        viewModelScope.launch {
+            CatalogQueueItem
+                .Cloud(song)
+                .toMediaItem()
+                ?.let { player.doAction(PlayerAction.AddMediaItemsToQueue(listOf(it))) }
+        }
+    }
+
     /**
      * A paged catalog is sufficient for rendering, but a playback queue must represent the whole
      * selected cloud library. Complete only the endpoints visible in the current filter, merge the

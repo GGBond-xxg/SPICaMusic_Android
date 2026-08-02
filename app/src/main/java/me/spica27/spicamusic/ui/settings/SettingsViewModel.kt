@@ -13,6 +13,8 @@ import me.spica27.spicamusic.common.entity.ProgressBarStyle
 import me.spica27.spicamusic.common.entity.ThemeColorStyle
 import me.spica27.spicamusic.common.entity.ThemeMode
 import me.spica27.spicamusic.feature.settings.domain.SettingsUseCases
+import me.spica27.spicamusic.topdisplay.TopDisplayMode
+import me.spica27.spicamusic.topdisplay.TopDisplayModeController
 
 /**
  * 设置页面 ViewModel
@@ -20,6 +22,7 @@ import me.spica27.spicamusic.feature.settings.domain.SettingsUseCases
 @Stable
 class SettingsViewModel(
     private val settingsUseCases: SettingsUseCases,
+    private val topDisplayModeController: TopDisplayModeController,
 ) : ViewModel() {
     // 主题模式；旧版本只有 DARK_MODE 布尔值，首次读取时自动兼容。
     val themeMode =
@@ -69,14 +72,32 @@ class SettingsViewModel(
         }
     }
 
-    val lyriconEnabled =
-        settingsUseCases
-            .getBoolean(SettingsUseCases.Keys.LYRICON_ENABLED, true)
-            .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val topDisplayMode =
+        combine(
+            settingsUseCases.getString(SettingsUseCases.Keys.TOP_DISPLAY_MODE, ""),
+            settingsUseCases.getBoolean(SettingsUseCases.Keys.LYRICON_ENABLED, true),
+        ) { savedMode, legacyLyriconEnabled ->
+            if (savedMode.isBlank()) {
+                if (legacyLyriconEnabled) {
+                    TopDisplayMode.STATUS_LYRIC.value
+                } else {
+                    TopDisplayMode.OFF.value
+                }
+            } else {
+                TopDisplayMode.fromString(savedMode).value
+            }
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            TopDisplayMode.STATUS_LYRIC.value,
+        )
 
-    fun setLyriconEnabled(enabled: Boolean) {
+    val liveUpdateSupported: Boolean = topDisplayModeController.isLiveUpdateSupported()
+    val promotedNotificationAllowed: Boolean = topDisplayModeController.canPostPromotedNotification()
+
+    fun setTopDisplayMode(value: String) {
         viewModelScope.launch {
-            settingsUseCases.setBoolean(SettingsUseCases.Keys.LYRICON_ENABLED, enabled)
+            topDisplayModeController.applyMode(TopDisplayMode.fromString(value))
         }
     }
 

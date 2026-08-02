@@ -36,9 +36,9 @@ import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LensBlur
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Percent
-import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -79,6 +79,7 @@ import me.spica27.spicamusic.common.entity.DynamicSpectrumBackground
 import me.spica27.spicamusic.common.entity.ProgressBarStyle
 import me.spica27.spicamusic.common.entity.ThemeColorStyle
 import me.spica27.spicamusic.common.entity.ThemeMode
+import me.spica27.spicamusic.topdisplay.TopDisplayMode
 import me.spica27.spicamusic.ui.about.AboutScene
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.theme.Shapes
@@ -98,7 +99,7 @@ class SettingsScene : StackScene() {
         val themeModeValue by viewModel.themeMode.collectAsStateWithLifecycle()
         val themeMode = ThemeMode.fromString(themeModeValue)
         val keepScreenOn by viewModel.keepScreenOn.collectAsStateWithLifecycle()
-        val lyriconEnabled by viewModel.lyriconEnabled.collectAsStateWithLifecycle()
+        val topDisplayModeValue by viewModel.topDisplayMode.collectAsStateWithLifecycle()
         val spectrumValue by viewModel.dynamicSpectrumBackground.collectAsStateWithLifecycle()
         val coverTypeValue by viewModel.dynamicCoverType.collectAsStateWithLifecycle()
         val progressBarStyleValue by viewModel.progressBarStyle.collectAsStateWithLifecycle()
@@ -150,6 +151,31 @@ class SettingsScene : StackScene() {
                         SelectOption(ProgressBarStyle.TimeDomainWaveform.value, timeDomainWaveformLabel),
                     ),
                 )
+            }
+        val topDisplayOffLabel = stringResource(R.string.top_display_mode_off)
+        val topDisplayLyricLabel = stringResource(R.string.top_display_mode_status_lyric)
+        val topDisplayLiveLabel = stringResource(R.string.top_display_mode_live_update)
+        val topDisplayModeOptions =
+            remember(topDisplayOffLabel, topDisplayLyricLabel, topDisplayLiveLabel) {
+                ImmutableList.copyOf(
+                    listOf(
+                        SelectOption(TopDisplayMode.OFF.value, topDisplayOffLabel),
+                        SelectOption(TopDisplayMode.STATUS_LYRIC.value, topDisplayLyricLabel),
+                        SelectOption(TopDisplayMode.LIVE_UPDATE.value, topDisplayLiveLabel),
+                    ),
+                )
+            }
+        val topDisplayMode = TopDisplayMode.fromString(topDisplayModeValue)
+        val topDisplaySubtitle =
+            when (topDisplayMode) {
+                TopDisplayMode.OFF -> stringResource(R.string.top_display_mode_off_subtitle)
+                TopDisplayMode.STATUS_LYRIC -> stringResource(R.string.settings_lyricon_subtitle)
+                TopDisplayMode.LIVE_UPDATE ->
+                    if (!viewModel.liveUpdateSupported || !viewModel.promotedNotificationAllowed) {
+                        stringResource(R.string.top_display_mode_live_update_unsupported)
+                    } else {
+                        stringResource(R.string.top_display_mode_live_update_subtitle)
+                    }
             }
         val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
         Scaffold(
@@ -279,12 +305,13 @@ class SettingsScene : StackScene() {
                                 onCheckedChange = viewModel::setKeepScreenOn,
                             )
                             SettingsItemDivider()
-                            ModernSettingsSwitchItem(
-                                title = stringResource(R.string.settings_lyricon_title),
-                                subtitle = stringResource(R.string.settings_lyricon_subtitle),
-                                icon = Icons.Default.Subtitles,
-                                checked = lyriconEnabled,
-                                onCheckedChange = viewModel::setLyriconEnabled,
+                            ModernSettingsSelectItem(
+                                title = stringResource(R.string.top_display_mode_title),
+                                subtitle = topDisplaySubtitle,
+                                icon = Icons.Default.NotificationsActive,
+                                options = topDisplayModeOptions,
+                                currentValue = topDisplayMode.value,
+                                onValueChange = viewModel::setTopDisplayMode,
                             )
                         }
                     }

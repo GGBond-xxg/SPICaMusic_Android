@@ -1,5 +1,6 @@
 package me.spica27.spicamusic.ui.dialog
 
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -71,6 +72,8 @@ import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.navkit.path.LocalScene
 import me.spica27.navkit.scene.DialogScene
 import me.spica27.spicamusic.R
+import me.spica27.spicamusic.cloud.CloudCatalogSong
+import me.spica27.spicamusic.cloud.CloudMusicCatalogViewModel
 import me.spica27.spicamusic.common.entity.Song
 import me.spica27.spicamusic.common.entity.getAlbumCoverUri
 import me.spica27.spicamusic.common.entity.getCoverUri
@@ -152,7 +155,11 @@ class SongMenuScene(
                         },
             ) {
                 SongMenuContent(
-                    song = song,
+                    title = song.displayName,
+                    artist = song.artist,
+                    album = song.album,
+                    artworkUri = song.getCoverUri(),
+                    fallbackArtworkUri = song.getAlbumCoverUri(),
                     isLiked = isLiked,
                     onClose = ::closeMenu,
                     onPlayNext = {
@@ -225,19 +232,107 @@ class SongMenuScene(
     override fun DialogContent() = Unit
 }
 
+class CloudSongMenuScene(
+    val song: CloudCatalogSong,
+) : DialogScene() {
+    @Composable
+    override fun Content() {
+        val path = LocalNavigationPath.current
+        val scene = LocalScene.current
+        val scope = rememberCoroutineScope()
+        val density = LocalDensity.current
+        val slideOffsetPx = with(density) { 72.dp.toPx() }
+        val viewModel: CloudMusicCatalogViewModel = koinViewModel()
+
+        fun closeMenu() {
+            path.pop(scene)
+        }
+
+        fun closeAndNavigate(navigate: () -> Unit) {
+            scope.launch {
+                path.pop(scene)
+                navigate()
+            }
+        }
+
+        Box(
+            Modifier
+                .zIndex(3f)
+                .fillMaxSize(),
+        ) {
+            val interactionSource = remember { MutableInteractionSource() }
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { alpha = enterProgress.value }
+                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.42f))
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                        ) { closeMenu() },
+            )
+
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.Center)
+                        .graphicsLayer {
+                            val p = enterProgress.value
+                            translationY = (1f - p) * slideOffsetPx
+                            alpha = p
+                        },
+            ) {
+                SongMenuContent(
+                    title = song.title,
+                    artist = song.artist,
+                    album = song.album,
+                    artworkUri = song.artworkUri,
+                    fallbackArtworkUri = null,
+                    isLiked = null,
+                    onClose = ::closeMenu,
+                    onPlayNext = {
+                        viewModel.addToNext(song)
+                        closeMenu()
+                    },
+                    onAddToQueue = {
+                        viewModel.addToQueue(song)
+                        closeMenu()
+                    },
+                    onToggleLike = null,
+                    onShowPlaylistDialog = null,
+                    onOpenAlbum = null,
+                    onOpenArtist = null,
+                    onOpenSongInfo = {
+                        closeAndNavigate { path.push(SongInfoScene(song)) }
+                    },
+                    onIgnoreSong = null,
+                )
+            }
+        }
+    }
+
+    @Composable
+    override fun DialogContent() = Unit
+}
+
 @Composable
 private fun SongMenuContent(
-    song: Song,
-    isLiked: Boolean,
+    title: String,
+    artist: String,
+    album: String,
+    artworkUri: Uri?,
+    fallbackArtworkUri: Uri?,
+    isLiked: Boolean?,
     onClose: () -> Unit,
     onPlayNext: () -> Unit,
     onAddToQueue: () -> Unit,
-    onToggleLike: () -> Unit,
-    onShowPlaylistDialog: () -> Unit,
-    onOpenAlbum: () -> Unit,
-    onOpenArtist: () -> Unit,
+    onToggleLike: (() -> Unit)?,
+    onShowPlaylistDialog: (() -> Unit)?,
+    onOpenAlbum: (() -> Unit)?,
+    onOpenArtist: (() -> Unit)?,
     onOpenSongInfo: () -> Unit,
-    onIgnoreSong: () -> Unit,
+    onIgnoreSong: (() -> Unit)?,
 ) {
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -283,11 +378,11 @@ private fun SongMenuContent(
                     tonalElevation = 3.dp,
                 ) {
                     LandscapistImage(
-                        imageModel = { song.getCoverUri() },
+                        imageModel = { artworkUri },
                         modifier = Modifier.fillMaxSize(),
                         failure = {
                             CoverFallback(
-                                fallbackUri = song.getAlbumCoverUri(),
+                                fallbackUri = fallbackArtworkUri,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         },
@@ -300,19 +395,19 @@ private fun SongMenuContent(
                             .padding(horizontal = 14.dp),
                 ) {
                     Text(
-                        text = song.displayName,
+                        text = title,
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                     )
                     Text(
-                        text = song.artist,
+                        text = artist,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                     )
                     Text(
-                        text = song.album,
+                        text = album,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
                         maxLines = 1,
@@ -357,24 +452,31 @@ private fun SongMenuContent(
                 )
                 ControlButton(
                     title =
-                        if (isLiked) {
+                        if (onToggleLike == null) {
+                            stringResource(R.string.song_info_dialog_title)
+                        } else if (isLiked == true) {
                             stringResource(R.string.remove_from_favorites)
                         } else {
-                            stringResource(
-                                R.string.favorite,
-                            )
+                            stringResource(R.string.favorite)
                         },
-                    icon = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    icon =
+                        if (onToggleLike == null) {
+                            Icons.Default.Info
+                        } else if (isLiked == true) {
+                            Icons.Default.Favorite
+                        } else {
+                            Icons.Default.FavoriteBorder
+                        },
                     modifier = Modifier.weight(1f),
-                    onClick = onToggleLike,
+                    onClick = onToggleLike ?: onOpenSongInfo,
                     containerColor =
-                        if (isLiked) {
+                        if (isLiked == true) {
                             MaterialTheme.colorScheme.tertiaryContainer
                         } else {
                             MaterialTheme.colorScheme.surfaceContainerHigh
                         },
                     iconTint =
-                        if (isLiked) {
+                        if (isLiked == true) {
                             MaterialTheme.colorScheme.tertiary
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
@@ -385,30 +487,38 @@ private fun SongMenuContent(
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
             )
-            ControlItem(
-                title = stringResource(R.string.add_to_playlist),
-                subtitle = stringResource(R.string.add_to_playlist_subtitle_menu),
-                icon = Icons.AutoMirrored.Default.PlaylistAdd,
-                onClick = onShowPlaylistDialog,
-            )
-            ControlItem(
-                title = stringResource(R.string.title_add_to_ignore_list),
-                subtitle = stringResource(R.string.desc_add_to_ignore_list),
-                icon = Icons.Default.MusicOff,
-                onClick = onIgnoreSong,
-            )
-            ControlItem(
-                title = stringResource(R.string.view_album),
-                subtitle = song.album,
-                icon = Icons.Default.Album,
-                onClick = onOpenAlbum,
-            )
-            ControlItem(
-                title = stringResource(R.string.view_artist),
-                subtitle = song.artist,
-                icon = Icons.Default.SportsMartialArts,
-                onClick = onOpenArtist,
-            )
+            onShowPlaylistDialog?.let { action ->
+                ControlItem(
+                    title = stringResource(R.string.add_to_playlist),
+                    subtitle = stringResource(R.string.add_to_playlist_subtitle_menu),
+                    icon = Icons.AutoMirrored.Default.PlaylistAdd,
+                    onClick = action,
+                )
+            }
+            onIgnoreSong?.let { action ->
+                ControlItem(
+                    title = stringResource(R.string.title_add_to_ignore_list),
+                    subtitle = stringResource(R.string.desc_add_to_ignore_list),
+                    icon = Icons.Default.MusicOff,
+                    onClick = action,
+                )
+            }
+            onOpenAlbum?.let { action ->
+                ControlItem(
+                    title = stringResource(R.string.view_album),
+                    subtitle = album,
+                    icon = Icons.Default.Album,
+                    onClick = action,
+                )
+            }
+            onOpenArtist?.let { action ->
+                ControlItem(
+                    title = stringResource(R.string.view_artist),
+                    subtitle = artist,
+                    icon = Icons.Default.SportsMartialArts,
+                    onClick = action,
+                )
+            }
             ControlItem(
                 title = stringResource(R.string.song_info_menu_title),
                 subtitle = stringResource(R.string.song_info_menu_subtitle),

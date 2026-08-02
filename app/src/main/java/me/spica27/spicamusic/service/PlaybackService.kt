@@ -21,9 +21,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.guava.future
-import me.spica27.spicamusic.lyricon.LyriconProviderManager
 import me.spica27.spicamusic.player.api.IMusicPlayer
 import me.spica27.spicamusic.player.impl.utils.MediaLibrary
+import me.spica27.spicamusic.topdisplay.TopDisplayModeController
 import org.koin.android.ext.android.inject
 import timber.log.Timber
 
@@ -35,7 +35,7 @@ import timber.log.Timber
 @UnstableApi
 class PlaybackService : MediaLibraryService() {
     private val player: IMusicPlayer by inject()
-    private val lyriconManager: LyriconProviderManager by inject()
+    private val topDisplayModeController: TopDisplayModeController by inject()
 
     private var mediaSession: MediaLibrarySession? = null
     private lateinit var exoPlayer: ExoPlayer
@@ -92,7 +92,7 @@ class PlaybackService : MediaLibraryService() {
                     true,
                 ).setUsePlatformDiagnostics(false)
                 .build()
-        lyriconManager.start(exoPlayer)
+        topDisplayModeController.start(exoPlayer)
 
         mediaSession =
             MediaLibrarySession
@@ -179,7 +179,7 @@ class PlaybackService : MediaLibraryService() {
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = mediaSession
 
     override fun onDestroy() {
-        lyriconManager.release()
+        topDisplayModeController.release()
         serviceScope.cancel()
         mediaSession?.run {
             exoPlayer.release()

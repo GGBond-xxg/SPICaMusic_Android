@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,12 +64,13 @@ fun LyricsPanel(
     // 监听应用生命周期状态，仅前台时更新播放进度
     var isUserScrollingLyrics by remember { mutableStateOf(false) }
     var showFloatingToolbar by remember { mutableStateOf(false) }
+    var toolbarInteractionVersion by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(isUserScrollingLyrics) {
+    LaunchedEffect(isUserScrollingLyrics, toolbarInteractionVersion) {
         if (isUserScrollingLyrics) {
             showFloatingToolbar = true
         } else if (showFloatingToolbar) {
-            delay(3_000)
+            delay(LYRICS_TOOLBAR_IDLE_TIMEOUT_MS)
             showFloatingToolbar = false
         }
     }
@@ -166,8 +168,14 @@ fun LyricsPanel(
                     onOffsetChange = { viewModel.updateOffset(it) },
                     onOpenLyricsSwitcher = { showSwitcherSheet = true },
                     hasMultipleSources = uiState.allLyricSources.size > 1,
+                    onInteraction = {
+                        showFloatingToolbar = true
+                        toolbarInteractionVersion++
+                    },
                 )
             }
         }
     }
 }
+
+private const val LYRICS_TOOLBAR_IDLE_TIMEOUT_MS = 5_000L

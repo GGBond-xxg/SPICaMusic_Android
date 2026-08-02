@@ -320,6 +320,21 @@ class SpicaPlayer(
                         }
                     }
 
+                    is PlayerAction.AddMediaItemToNext -> {
+                        val currentIndex = browser.currentMediaItemIndex.coerceAtLeast(0)
+                        val existingIndex = browser.currentTimeline.indexOf(action.item.mediaId)
+                        if (existingIndex != -1) {
+                            val targetIndex = (currentIndex + 1).coerceAtMost(browser.mediaItemCount)
+                            val adjustedTarget = if (existingIndex < targetIndex) targetIndex - 1 else targetIndex
+                            browser.moveMediaItem(existingIndex, adjustedTarget)
+                        } else {
+                            browser.addMediaItem(
+                                (currentIndex + 1).coerceAtMost(browser.mediaItemCount),
+                                action.item,
+                            )
+                        }
+                    }
+
                     is PlayerAction.PlayMediaItems -> {
                         if (action.items.isEmpty()) return@launch
                         val startIndex = action.startIndex.coerceIn(action.items.indices)
@@ -336,6 +351,10 @@ class SpicaPlayer(
                     is PlayerAction.AddToQueue -> {
                         val items = withContext(Dispatchers.IO) { MediaLibrary.mediaIdToMediaItems(action.mediaIds) }
                         browser.addMediaItems(items)
+                    }
+
+                    is PlayerAction.AddMediaItemsToQueue -> {
+                        if (action.items.isNotEmpty()) browser.addMediaItems(action.items)
                     }
                 }
             } catch (e: Exception) {
