@@ -4,13 +4,16 @@ import android.content.Context
 import androidx.compose.runtime.Stable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -20,8 +23,8 @@ import me.spica27.spicamusic.common.entity.LyricItem
 import me.spica27.spicamusic.common.utils.LrcParser
 import me.spica27.spicamusic.feature.lyrics.domain.LyricsUseCases
 import me.spica27.spicamusic.feature.player.domain.PlayerUseCases
-import me.spica27.spicamusic.topdisplay.TopDisplayModeController
 import me.spica27.spicamusic.player.api.PlayerAction
+import me.spica27.spicamusic.topdisplay.TopDisplayModeController
 import timber.log.Timber
 
 /**
@@ -52,21 +55,34 @@ class LyricsViewModel(
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
+    private data class LyricsRequest(
+        val mediaId: String?,
+        val title: String?,
+        val artist: String?,
+        val album: String?,
+        val durationMs: Long,
+    )
+
     init {
         viewModelScope.launch {
-            @OptIn(ExperimentalCoroutinesApi::class)
             player.currentMediaItem
-                .flatMapLatest { mediaItem ->
-                    kotlinx.coroutines.flow.flow {
-                        emit(mediaItem)
-                    }
-                }.collect { mediaItem ->
-                    loadLyrics(
+                .map { mediaItem ->
+                    LyricsRequest(
                         mediaId = mediaItem?.mediaId,
                         title = mediaItem?.mediaMetadata?.title?.toString(),
                         artist = mediaItem?.mediaMetadata?.artist?.toString(),
                         album = mediaItem?.mediaMetadata?.albumTitle?.toString(),
                         durationMs = mediaItem?.mediaMetadata?.durationMs ?: 0L,
+                    )
+                }
+                .distinctUntilChanged()
+                .collectLatest { request ->
+                    loadLyrics(
+                        mediaId = request.mediaId,
+                        title = request.title,
+                        artist = request.artist,
+                        album = request.album,
+                        durationMs = request.durationMs,
                     )
                 }
         }
@@ -86,35 +102,35 @@ class LyricsViewModel(
         }
     }
 
-    private fun loadLyrics(
+    private suspend fun loadLyrics(
         mediaId: String?,
         title: String?,
         artist: String?,
         album: String?,
         durationMs: Long,
     ) {
-        viewModelScope.launch {
-            if (mediaId == null) {
-                _uiState.value = UiState()
-                return@launch
-            }
+        if (mediaId == null) {
+            _uiState.value = UiState()
+            return
+        }
 
-            val mediaStoreId = mediaId.toLongOrNull() ?: 0L
+        val mediaStoreId = mediaId.toLongOrNull() ?: 0L
 
-            _uiState.update {
-                UiState(
-                    isLoading = true,
-                    currentMediaStoreId = mediaStoreId,
-                    currentMediaId = mediaId,
-                )
-            }
+        _uiState.update {
+            UiState(
+                isLoading = true,
+                currentMediaStoreId = mediaStoreId,
+                currentMediaId = mediaId,
+            )
+        }
 
-            if (title.isNullOrBlank()) {
-                _uiState.update { it.copy(isLoading = false, errorMessage = "歌曲信息缺失") }
-                return@launch
-            }
+        if (title.isNullOrBlank()) {
+            _uiState.update { it.copy(isLoading = false, errorMessage = "歌曲信息缺失") }
+            return
+        }
 
-            try {
+        try {
+            coroutineScope {
                 // 本地音频标签优先。网络源仍会在后台加载，供用户手动切换。
                 val rawEmbeddedLyrics = embeddedLyricsReader.read(mediaStoreId)
                 val parsedEmbeddedLyrics =
@@ -173,13 +189,16 @@ class LyricsViewModel(
                 }
 
                 val remoteResults =
-                    runCatching {
+                    try {
                         withContext(Dispatchers.IO) {
                             lyricsUseCases.searchAllLyrics(title)
                         }
-                    }.onFailure {
-                        Timber.w(it, "在线歌词搜索失败，本地歌词仍可使用")
-                    }.getOrDefault(emptyList())
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        Timber.w(error, "在线歌词搜索失败，本地歌词仍可使用")
+                        emptyList()
+                    }
                 val results = listOfNotNull(embeddedSource) + remoteResults
                 val parsedAll = parseLyricsSourcesInBackground(results)
 
@@ -221,17 +240,19 @@ class LyricsViewModel(
                         currentSourceIndex = sourceIndex,
                     )
                 }
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to fetch lyrics")
-                _uiState.update { state ->
-                    state.copy(
-                        isLoading = false,
-                        // 网络失败但有缓存时保留已加载的歌词
-                        errorMessage = if (state.lyrics == null) "加载歌词失败: ${e.message ?: "未知错误"}" else null,
-                        allLyricSources = emptyList(),
-                        allParsedLyrics = emptyList(),
-                    )
-                }
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to fetch lyrics")
+            _uiState.update { state ->
+                state.copy(
+                    isLoading = false,
+                    // 网络失败但有缓存时保留已加载的歌词
+                    errorMessage = if (state.lyrics == null) "加载歌词失败: ${e.message ?: "未知错误"}" else null,
+                    allLyricSources = emptyList(),
+                    allParsedLyrics = emptyList(),
+                )
             }
         }
     }

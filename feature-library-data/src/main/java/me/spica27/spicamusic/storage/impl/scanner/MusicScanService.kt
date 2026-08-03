@@ -83,6 +83,11 @@ class MusicScanService(
     private val pendingChangedMediaStoreIds = mutableSetOf<Long>()
     private val pendingDeletedMediaStoreIds = mutableSetOf<Long>()
     private var pendingFullMediaStoreRescan = false
+    private val emptySnapshotGuard =
+        MediaStoreSnapshotGuard(
+            minimumConfirmations = EMPTY_SNAPSHOT_MIN_CONFIRMATIONS,
+            minimumConfirmationWindowMs = EMPTY_SNAPSHOT_CONFIRMATION_WINDOW_MS,
+        )
 
     // MediaStore 内容观察者
     private var mediaStoreObserver: ContentObserver? = null
@@ -93,6 +98,9 @@ class MusicScanService(
     companion object {
         private const val TAG = "MusicScanService"
         private const val MAX_FOLDER_DEPTH = 20
+        private const val EMPTY_SNAPSHOT_MIN_CONFIRMATIONS = 3
+        private const val EMPTY_SNAPSHOT_CONFIRMATION_WINDOW_MS = 15_000L
+        private const val EMPTY_SNAPSHOT_RETRY_DELAY_MS = 5_000L
     }
 
     /**
@@ -268,11 +276,11 @@ class MusicScanService(
         }
     }
 
-    private fun scheduleDebouncedMediaStoreSync() {
+    private fun scheduleDebouncedMediaStoreSync(delayMs: Long = debounceDelayMs) {
         debounceJob?.cancel()
         debounceJob =
             serviceScope.launch {
-                delay(debounceDelayMs)
+                delay(delayMs)
                 flushPendingMediaStoreSync()
             }
     }
@@ -358,20 +366,14 @@ class MusicScanService(
         val ruleMatcher = loadScanRuleMatcher()
 
         try {
-            val albums = loadAlbums()
-            albumDao.replaceAll(albums)
-        } catch (e: Exception) {
-            Timber.tag(TAG).e(e, "扫描失败")
-            _isScanning.value = false
-            return@withContext ScanResult(0, 0, 0, 0)
-        }
-
-        try {
             val contentResolver = context.contentResolver
 
             // 1. 从 DB 加载现有歌曲的摘要信息，构建 HashMap（O(1) 查找）
             val existingScanInfoMap: Map<Long, SongDao.SongScanInfo> =
                 songDao.getAllScanInfo().associateBy { it.mediaStoreId }
+            // 专辑先查询、后提交。只有歌曲快照通过完整性校验后才允许替换，
+            // 避免 MediaStore 短暂不可用时先把所有封面清空。
+            val albums = loadAlbums()
 
             // 2. 查询 MediaStore（包含 DATE_MODIFIED 用于增量判断）
             val projection = arrayOf(
@@ -412,14 +414,19 @@ class MusicScanService(
             val songsToScan = mutableListOf<SongEntity>()
             // 本次 MediaStore 中所有可见的 mediaStoreId
             val currentMediaStoreIds = mutableSetOf<Long>()
+            var rawMediaStoreRowCount = 0
 
-            contentResolver.query(
-                uri,
-                projection,
-                selection,
-                null,
-                sortOrder
-            )?.use { cursor ->
+            val mediaCursor =
+                contentResolver.query(
+                    uri,
+                    projection,
+                    selection,
+                    null,
+                    sortOrder,
+                ) ?: throw MediaStoreQueryUnavailableException("MediaStore audio query returned null")
+
+            mediaCursor.use { cursor ->
+                rawMediaStoreRowCount = cursor.count
                 val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
                 val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)
                 val artistColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
@@ -518,6 +525,43 @@ class MusicScanService(
                 return@withContext ScanResult(totalScanned, 0, 0, 0)
             }
 
+            val snapshotAccepted =
+                emptySnapshotGuard.shouldAccept(
+                    existingItemCount = existingScanInfoMap.size,
+                    rawSnapshotItemCount = rawMediaStoreRowCount,
+                    nowMs = android.os.SystemClock.elapsedRealtime(),
+                )
+            if (!snapshotAccepted) {
+                Timber.tag(TAG).w(
+                    "MediaStore 暂时返回空快照，保留现有曲库并延迟复核: existing=${existingScanInfoMap.size}",
+                )
+                mergePendingMediaStoreSync(
+                    PendingMediaStoreSync(
+                        changedIds = emptySet(),
+                        deletedIds = emptySet(),
+                        requiresFullRescan = true,
+                    ),
+                )
+                scheduleDebouncedMediaStoreSync(EMPTY_SNAPSHOT_RETRY_DELAY_MS)
+                return@withContext ScanResult(totalScanned, 0, 0, 0)
+            }
+
+            if (albums.isNotEmpty() || currentMediaStoreIds.isEmpty()) {
+                albumDao.replaceAll(albums)
+            } else {
+                Timber.tag(TAG).w(
+                    "MediaStore 歌曲仍存在但专辑查询为空，保留旧封面并安排复核",
+                )
+                mergePendingMediaStoreSync(
+                    PendingMediaStoreSync(
+                        changedIds = emptySet(),
+                        deletedIds = emptySet(),
+                        requiresFullRescan = true,
+                    ),
+                )
+                scheduleDebouncedMediaStoreSync(EMPTY_SNAPSHOT_RETRY_DELAY_MS)
+            }
+
             // 3. 计算已从 MediaStore 中移除的歌曲
             val removedMediaStoreIds = existingScanInfoMap.keys - currentMediaStoreIds
 
@@ -540,6 +584,17 @@ class MusicScanService(
                 updated = updated,
                 removed = removed.coerceAtLeast(0)
             )
+        } catch (e: MediaStoreQueryUnavailableException) {
+            Timber.tag(TAG).w(e, "MediaStore 暂时不可用，保留现有曲库并延迟复核")
+            mergePendingMediaStoreSync(
+                PendingMediaStoreSync(
+                    changedIds = emptySet(),
+                    deletedIds = emptySet(),
+                    requiresFullRescan = true,
+                ),
+            )
+            scheduleDebouncedMediaStoreSync(EMPTY_SNAPSHOT_RETRY_DELAY_MS)
+            ScanResult(0, 0, 0, 0)
         } catch (e: Exception) {
             Timber.tag(TAG).e(e, "扫描失败")
             ScanResult(0, 0, 0, 0)
@@ -1307,13 +1362,16 @@ class MusicScanService(
                     chunk.map(Long::toString).toTypedArray()
                 }
 
-            context.contentResolver.query(
-                collection,
-                projection,
-                selection,
-                selectionArgs,
-                sortOrder,
-            )?.use { cursor ->
+            val albumCursor =
+                context.contentResolver.query(
+                    collection,
+                    projection,
+                    selection,
+                    selectionArgs,
+                    sortOrder,
+                ) ?: throw MediaStoreQueryUnavailableException("MediaStore album query returned null")
+
+            albumCursor.use { cursor ->
                 val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Albums._ID)
                 val albumColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Albums.ALBUM)
                 val artistColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Albums.ARTIST)

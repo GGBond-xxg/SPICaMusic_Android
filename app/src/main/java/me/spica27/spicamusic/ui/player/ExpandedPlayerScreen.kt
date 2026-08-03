@@ -136,6 +136,7 @@ private const val SHARED_PLAYBACK_TRAVEL_DP = 136f
 private const val SHARED_CONTROLS_EXIT_DP = 72f
 private const val LYRICS_ARTWORK_SOURCE_HANDOFF = 0.001f
 private const val LYRICS_ARTWORK_TARGET_HANDOFF = 0.999f
+private const val EMPTY_WAVEFORM_CACHE = "EMPTY"
 private val EmptyFftDrawData = FloatArray(0)
 
 // ============================================
@@ -1424,6 +1425,10 @@ private suspend fun loadAmplitudeData(
 
         val cache = mediaItem.mediaMetadata.extras?.getString("waveformData")
 
+        if (cache == EMPTY_WAVEFORM_CACHE) {
+            Timber.tag("ExpandedPlayerScreen").d("波形提取结果已缓存为空，跳过重复读取")
+            return@withContext emptyList()
+        }
         if (!TextUtils.isEmpty(cache)) {
             val cachedList = cache!!.split(",").mapNotNull { it.toIntOrNull() }
             if (cachedList.isNotEmpty()) {
@@ -1451,18 +1456,23 @@ private suspend fun loadAmplitudeData(
                         },
                         { result = emptyList() },
                     )
+                    val serializedWaveform =
+                        result
+                            .takeIf { it.isNotEmpty() }
+                            ?.joinToString(",")
+                            ?: EMPTY_WAVEFORM_CACHE
                     mediaItem.mediaId
                         .toLongOrNull()
                         ?.takeIf { it > 0L }
                         ?.let { mediaStoreId ->
                             songUseCases.updateSongWaveform(
                                 mediaId = mediaStoreId,
-                                waveformData = result.joinToString(","),
+                                waveformData = serializedWaveform,
                             )
                         }
                     mediaItem.mediaMetadata.extras?.putString(
                         "waveformData",
-                        result.joinToString(","),
+                        serializedWaveform,
                     )
                     result
                 } finally {

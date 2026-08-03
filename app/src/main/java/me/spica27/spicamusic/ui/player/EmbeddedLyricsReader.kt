@@ -12,38 +12,65 @@ import timber.log.Timber
 internal class EmbeddedLyricsReader(
     private val context: Context,
 ) {
+    private data class CacheEntry(
+        val lyrics: String?,
+    )
+
+    private val cacheLock = Any()
+    private val lyricsCache =
+        object : LinkedHashMap<Long, CacheEntry>(LYRICS_CACHE_SIZE, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, CacheEntry>?): Boolean =
+                size > LYRICS_CACHE_SIZE
+        }
+
     suspend fun read(mediaStoreId: Long): String? =
         withContext(Dispatchers.IO) {
             if (mediaStoreId <= 0L) return@withContext null
+
+            synchronized(cacheLock) {
+                lyricsCache[mediaStoreId]
+            }?.let { cached ->
+                return@withContext cached.lyrics
+            }
+
             val uri =
                 ContentUris.withAppendedId(
                     MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                     mediaStoreId,
                 )
 
-            runCatching {
-                context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
-                    val metadata =
-                        TagLib.getMetadata(
-                            fd = pfd.detachFd(),
-                            readPictures = false,
-                        ) ?: return@use null
+            val lookup =
+                runCatching {
+                    context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+                        val metadata =
+                            TagLib.getMetadata(
+                                fd = pfd.detachFd(),
+                                readPictures = false,
+                            ) ?: return@use null
 
-                    val candidates =
-                        EMBEDDED_LYRICS_KEYS
-                            .asSequence()
-                            .flatMap { key -> metadata.propertyMap[key].orEmpty().asSequence() }
-                            .map(String::trim)
-                            .filter(String::isNotBlank)
-                            .distinct()
-                            .toList()
+                        val candidates =
+                            EMBEDDED_LYRICS_KEYS
+                                .asSequence()
+                                .flatMap { key -> metadata.propertyMap[key].orEmpty().asSequence() }
+                                .map(String::trim)
+                                .filter(String::isNotBlank)
+                                .distinct()
+                                .toList()
 
-                    candidates.firstOrNull(::looksSynchronized)
-                        ?: candidates.firstOrNull()
+                        candidates.firstOrNull(::looksSynchronized)
+                            ?: candidates.firstOrNull()
+                    }
                 }
-            }.onFailure {
-                Timber.w(it, "读取本地内嵌歌词失败: mediaStoreId=$mediaStoreId")
-            }.getOrNull()
+            lookup.exceptionOrNull()?.let { error ->
+                Timber.w(error, "读取本地内嵌歌词失败: mediaStoreId=$mediaStoreId")
+                return@withContext null
+            }
+
+            val lyrics = lookup.getOrNull()
+            synchronized(cacheLock) {
+                lyricsCache[mediaStoreId] = CacheEntry(lyrics)
+            }
+            lyrics
         }
 
     private fun looksSynchronized(value: String): Boolean =
@@ -58,6 +85,8 @@ internal class EmbeddedLyricsReader(
         }
 
     private companion object {
+        const val LYRICS_CACHE_SIZE = 128
+
         val EMBEDDED_LYRICS_KEYS =
             listOf(
                 "SYNCEDLYRICS",
