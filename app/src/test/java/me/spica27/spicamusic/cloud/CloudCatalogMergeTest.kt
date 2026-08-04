@@ -30,6 +30,18 @@ class CloudCatalogMergeTest {
         assertEquals("telegram:42", merged.last().endpointKey())
     }
 
+    @Test
+    fun playbackCompletionDoesNotMutateVisiblePage() {
+        val visiblePage = (1L..60L).map(::telegramSong)
+        val remainingPages = (61L..94L).map(::telegramSong)
+
+        val playbackCatalog = mergeCatalogSongs(visiblePage, remainingPages)
+
+        assertEquals(60, visiblePage.size)
+        assertEquals("Song 60", visiblePage.last().title)
+        assertEquals(94, playbackCatalog.size)
+    }
+
     private fun telegramSong(
         id: Long,
         title: String = "Song $id",

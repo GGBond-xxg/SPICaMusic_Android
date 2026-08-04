@@ -288,8 +288,9 @@ class CloudMusicCatalogViewModel(
 
     /**
      * A paged catalog is sufficient for rendering, but a playback queue must represent the whole
-     * selected cloud library. Complete only the endpoints visible in the current filter, merge the
-     * result into the catalog cache, and keep the already-rendered order at the head of the queue.
+     * selected cloud library. Complete only the endpoints visible in the current filter with an
+     * independent cursor. The visible catalog must not change merely because a song was clicked:
+     * otherwise newly fetched entries are inserted by the active sort and the tapped row jumps.
      */
     private suspend fun completeEndpointsForPlayback(endpointKeys: Set<String>): List<CloudCatalogSong> {
         if (endpointKeys.isEmpty()) return _state.value.songs
@@ -297,7 +298,8 @@ class CloudMusicCatalogViewModel(
         endpointKeys.forEach { key ->
             val endpoint = endpoints[key] ?: return@forEach
             if (!endpoint.hasMore) return@forEach
-            runCatching { endpoint.loadRemaining() }
+            val playbackContinuation = endpoint.playbackContinuation()
+            runCatching { playbackContinuation.loadRemaining() }
                 .onSuccess { songs ->
                     completedByEndpoint[key] = songs
                     val total =
@@ -319,18 +321,9 @@ class CloudMusicCatalogViewModel(
                     }
                 }
         }
-        if (completedByEndpoint.isNotEmpty()) {
-            _state.update { current ->
-                current.copy(
-                    songs =
-                        completedByEndpoint.values.fold(current.songs) { songs, incoming ->
-                            mergeCatalogSongs(songs, incoming)
-                        },
-                )
-            }
-            publishStatus()
+        return completedByEndpoint.values.fold(_state.value.songs) { songs, incoming ->
+            mergeCatalogSongs(songs, incoming)
         }
-        return _state.value.songs
     }
 
     private fun loadEndpoint(endpoint: CatalogEndpoint) {
@@ -435,9 +428,16 @@ class CloudMusicCatalogViewModel(
 
         abstract suspend fun load(): CatalogPage
 
+        protected abstract fun copyForPlaybackContinuation(): CatalogEndpoint
+
         suspend fun loadNextPage(): CatalogPage =
             loadMutex.withLock {
                 load()
+            }
+
+        suspend fun playbackContinuation(): CatalogEndpoint =
+            loadMutex.withLock {
+                copyForPlaybackContinuation()
             }
 
         suspend fun loadAll(): List<CloudCatalogSong> =
@@ -471,6 +471,12 @@ class CloudMusicCatalogViewModel(
             source = CloudSongSource.TELEGRAM,
         ) {
         private var cursor = 0L
+
+        override fun copyForPlaybackContinuation(): CatalogEndpoint =
+            TelegramEndpoint(channel).also { copy ->
+                copy.cursor = cursor
+                copy.hasMore = hasMore
+            }
 
         override suspend fun load(): CatalogPage {
             val page =
@@ -511,6 +517,12 @@ class CloudMusicCatalogViewModel(
         ) {
         private var offset = 0
 
+        override fun copyForPlaybackContinuation(): CatalogEndpoint =
+            MediaServerEndpoint(account).also { copy ->
+                copy.offset = offset
+                copy.hasMore = hasMore
+            }
+
         override suspend fun load(): CatalogPage {
             val page = mediaServerClient.getSongs(account, offset).getOrThrow()
             offset = page.nextStartIndex ?: offset
@@ -549,6 +561,12 @@ class CloudMusicCatalogViewModel(
                 },
         ) {
         private var offset = 0
+
+        override fun copyForPlaybackContinuation(): CatalogEndpoint =
+            RemoteEndpoint(account).also { copy ->
+                copy.offset = offset
+                copy.hasMore = hasMore
+            }
 
         override suspend fun load(): CatalogPage {
             val page =
