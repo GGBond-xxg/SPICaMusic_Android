@@ -4,6 +4,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.cio.CIO
 import io.ktor.server.cio.CIOApplicationEngine
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.response.header
@@ -35,13 +36,41 @@ class TelegramStreamProxy(
     @Volatile
     private var port: Int = 0
 
-    suspend fun streamUrl(song: TelegramSong): String {
+    suspend fun streamUrl(song: TelegramSong): String =
+        streamUrl(song.chatId, song.messageId)
+
+    suspend fun streamUrl(
+        chatId: Long,
+        messageId: Long,
+    ): String {
+        check(repository.awaitReady()) { "Telegram is not ready for playback" }
         ensureStarted()
-        return "http://127.0.0.1:$port/telegram/${song.fileId}?size=${song.fileSize}"
+        return "http://127.0.0.1:$port/telegram-message/$chatId/$messageId"
     }
 
-    suspend fun artworkUrl(song: TelegramSong): String? {
-        val coverFileId = song.coverFileId ?: return null
+    suspend fun streamUrl(
+        fileId: Int,
+        fileSize: Long,
+    ): String {
+        check(repository.awaitReady()) { "Telegram is not ready for playback" }
+        ensureStarted()
+        return "http://127.0.0.1:$port/telegram/$fileId?size=$fileSize"
+    }
+
+    suspend fun artworkUrl(song: TelegramSong): String? =
+        song.coverFileId?.let { artworkUrl(it) }
+
+    suspend fun restoredArtworkUrl(
+        chatId: Long,
+        messageId: Long,
+    ): String {
+        check(repository.awaitReady()) { "Telegram is not ready for artwork" }
+        ensureStarted()
+        return "http://127.0.0.1:$port/telegram-message-art/$chatId/$messageId"
+    }
+
+    suspend fun artworkUrl(coverFileId: Int): String {
+        check(repository.awaitReady()) { "Telegram is not ready for artwork" }
         ensureStarted()
         return "http://127.0.0.1:$port/telegram-art/$coverFileId"
     }
@@ -57,6 +86,20 @@ class TelegramStreamProxy(
             val newServer =
                 embeddedServer(CIO, port = selectedPort, host = "127.0.0.1") {
                     routing {
+                        get("/telegram-message/{chatId}/{messageId}") {
+                            val chatId = call.parameters["chatId"]?.toLongOrNull()
+                            val messageId = call.parameters["messageId"]?.toLongOrNull()
+                            if (chatId == null || messageId == null) {
+                                call.respond(HttpStatusCode.BadRequest, "Invalid Telegram message")
+                                return@get
+                            }
+                            val song = repository.getAudio(chatId, messageId)
+                            if (song == null || song.fileSize <= 0L) {
+                                call.respond(HttpStatusCode.NotFound, "Telegram audio is not available")
+                                return@get
+                            }
+                            call.respondTelegramAudio(song.fileId, song.fileSize)
+                        }
                         get("/telegram/{fileId}") {
                             val fileId = call.parameters["fileId"]?.toIntOrNull()
                             val knownSize = call.request.queryParameters["size"]?.toLongOrNull()
@@ -64,62 +107,21 @@ class TelegramStreamProxy(
                                 call.respond(HttpStatusCode.BadRequest, "Invalid Telegram file")
                                 return@get
                             }
-
-                            val range = parseRange(call.request.headers["Range"], knownSize)
-                            if (range == null) {
-                                call.respond(HttpStatusCode(416, "Range Not Satisfiable"), "Invalid byte range")
+                            call.respondTelegramAudio(fileId, knownSize)
+                        }
+                        get("/telegram-message-art/{chatId}/{messageId}") {
+                            val chatId = call.parameters["chatId"]?.toLongOrNull()
+                            val messageId = call.parameters["messageId"]?.toLongOrNull()
+                            if (chatId == null || messageId == null) {
+                                call.respond(HttpStatusCode.BadRequest, "Invalid Telegram artwork message")
                                 return@get
                             }
-                            val (start, end) = range
-                            val length = end - start + 1L
-                            repository.download(fileId, start, length)
-
-                            val isPartial = start != 0L || end != knownSize - 1L
-                            call.response.header("Accept-Ranges", "bytes")
-                            call.response.header("Content-Length", length.toString())
-                            if (isPartial) {
-                                call.response.header("Content-Range", "bytes $start-$end/$knownSize")
+                            val coverFileId = repository.getAudio(chatId, messageId)?.coverFileId
+                            if (coverFileId == null) {
+                                call.respond(HttpStatusCode.NotFound, "Telegram artwork is not available")
+                                return@get
                             }
-
-                            call.respondOutputStream(
-                                contentType = ContentType.Audio.Any,
-                                status = if (isPartial) HttpStatusCode.PartialContent else HttpStatusCode.OK,
-                            ) {
-                                var current = start
-                                var randomAccessFile: RandomAccessFile? = null
-                                try {
-                                    while (current <= end) {
-                                        val info = repository.getFile(fileId)
-                                        val path = info.local.path
-                                        val availableStart = info.local.downloadOffset
-                                        val availableEnd = availableStart + info.local.downloadedPrefixSize
-                                        if (path.isBlank() || !File(path).isFile || current !in availableStart until availableEnd) {
-                                            delay(POLL_DELAY_MS)
-                                            continue
-                                        }
-                                        if (randomAccessFile == null) {
-                                            randomAccessFile = RandomAccessFile(path, "r")
-                                        }
-                                        val available = (availableEnd - current).coerceAtMost(end - current + 1L)
-                                        if (available <= 0L) {
-                                            delay(POLL_DELAY_MS)
-                                            continue
-                                        }
-                                        val buffer = ByteArray(minOf(BUFFER_SIZE.toLong(), available).toInt())
-                                        randomAccessFile.seek(current)
-                                        val read = randomAccessFile.read(buffer)
-                                        if (read <= 0) {
-                                            delay(POLL_DELAY_MS)
-                                            continue
-                                        }
-                                        write(buffer, 0, read)
-                                        flush()
-                                        current += read
-                                    }
-                                } finally {
-                                    randomAccessFile?.close()
-                                }
-                            }
+                            call.respondTelegramArtwork(coverFileId)
                         }
                         get("/telegram-art/{fileId}") {
                             val fileId = call.parameters["fileId"]?.toIntOrNull()
@@ -127,24 +129,89 @@ class TelegramStreamProxy(
                                 call.respond(HttpStatusCode.BadRequest, "Invalid Telegram artwork")
                                 return@get
                             }
-                            val artwork = awaitDownloadedFile(fileId)
-                            if (artwork == null) {
-                                call.respond(HttpStatusCode.ServiceUnavailable, "Artwork is not available")
-                                return@get
-                            }
-                            call.response.header("Cache-Control", "private, max-age=86400")
-                            call.response.header("Content-Length", artwork.length().toString())
-                            call.respondOutputStream(contentType = ContentType.Image.Any) {
-                                artwork.inputStream().buffered().use { input ->
-                                    input.copyTo(this)
-                                }
-                            }
+                            call.respondTelegramArtwork(fileId)
                         }
                     }
                 }
             withContext(Dispatchers.IO) { newServer.start(wait = false) }
             port = selectedPort
             server = newServer
+        }
+    }
+
+    private suspend fun ApplicationCall.respondTelegramAudio(
+        fileId: Int,
+        knownSize: Long,
+    ) {
+        val range = parseRange(request.headers["Range"], knownSize)
+        if (range == null) {
+            respond(HttpStatusCode(416, "Range Not Satisfiable"), "Invalid byte range")
+            return
+        }
+        val (start, end) = range
+        val length = end - start + 1L
+        repository.download(fileId, start, length)
+
+        val isPartial = start != 0L || end != knownSize - 1L
+        response.header("Accept-Ranges", "bytes")
+        response.header("Content-Length", length.toString())
+        if (isPartial) {
+            response.header("Content-Range", "bytes $start-$end/$knownSize")
+        }
+
+        respondOutputStream(
+            contentType = ContentType.Audio.Any,
+            status = if (isPartial) HttpStatusCode.PartialContent else HttpStatusCode.OK,
+        ) {
+            var current = start
+            var randomAccessFile: RandomAccessFile? = null
+            try {
+                while (current <= end) {
+                    val info = repository.getFile(fileId)
+                    val path = info.local.path
+                    val availableStart = info.local.downloadOffset
+                    val availableEnd = availableStart + info.local.downloadedPrefixSize
+                    if (path.isBlank() || !File(path).isFile || current !in availableStart until availableEnd) {
+                        delay(POLL_DELAY_MS)
+                        continue
+                    }
+                    if (randomAccessFile == null) {
+                        randomAccessFile = RandomAccessFile(path, "r")
+                    }
+                    val available = (availableEnd - current).coerceAtMost(end - current + 1L)
+                    if (available <= 0L) {
+                        delay(POLL_DELAY_MS)
+                        continue
+                    }
+                    val buffer = ByteArray(minOf(BUFFER_SIZE.toLong(), available).toInt())
+                    randomAccessFile.seek(current)
+                    val read = randomAccessFile.read(buffer)
+                    if (read <= 0) {
+                        delay(POLL_DELAY_MS)
+                        continue
+                    }
+                    write(buffer, 0, read)
+                    flush()
+                    current += read
+                }
+            } finally {
+                randomAccessFile?.close()
+            }
+        }
+    }
+
+    private suspend fun ApplicationCall.respondTelegramArtwork(fileId: Int) {
+        val artwork = awaitDownloadedFile(fileId)
+        if (artwork == null) {
+            respond(HttpStatusCode.ServiceUnavailable, "Artwork is not available")
+            return
+        }
+        response.header("Cache-Control", "private, max-age=86400")
+        response.header("Content-Length", artwork.length().toString())
+        respondOutputStream(contentType = ContentType.Image.Any) {
+            artwork.inputStream().buffered().use { input ->
+                input.copyTo(this)
+            }
         }
     }
 

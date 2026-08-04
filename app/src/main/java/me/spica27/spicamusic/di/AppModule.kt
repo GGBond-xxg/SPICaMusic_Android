@@ -7,6 +7,7 @@ import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import me.spica27.spicamusic.cloud.CloudAccountStore
 import me.spica27.spicamusic.cloud.CloudCatalogCountStore
 import me.spica27.spicamusic.cloud.CloudMusicCatalogViewModel
+import me.spica27.spicamusic.cloud.CloudPlaybackItemResolver
 import me.spica27.spicamusic.cloud.MediaServerClient
 import me.spica27.spicamusic.cloud.MediaServerType
 import me.spica27.spicamusic.cloud.MediaServerViewModel
@@ -136,6 +137,7 @@ object AppModule {
             single { TelegramClientManager(androidContext(), get()) }
             single { TelegramRepository(get(), get()) }
             single { TelegramStreamProxy(get()) }
+            single { CloudPlaybackItemResolver(get(), get(), get(), get()) }
 
             viewModel { parameters ->
                 MediaServerViewModel(

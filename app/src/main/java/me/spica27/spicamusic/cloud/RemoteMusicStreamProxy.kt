@@ -41,9 +41,14 @@ class RemoteMusicStreamProxy(
     suspend fun streamUrl(
         account: RemoteMusicAccount,
         song: RemoteSong,
+    ): String = streamUrl(account.id, song.id)
+
+    suspend fun streamUrl(
+        accountId: String,
+        songId: String,
     ): String {
         ensureStarted()
-        return "http://127.0.0.1:$port/remote/${account.id}/${song.id}"
+        return "http://127.0.0.1:$port/remote/$accountId/$songId"
     }
 
     private suspend fun ensureStarted() {

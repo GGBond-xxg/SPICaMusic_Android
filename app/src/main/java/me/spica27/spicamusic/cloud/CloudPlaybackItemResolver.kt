@@ -1,0 +1,127 @@
+package me.spica27.spicamusic.cloud
+
+import android.net.Uri
+import androidx.media3.common.MediaItem
+
+/**
+ * Rebuilds process-local and credential-bearing cloud URLs after process death.
+ *
+ * The player persists the queue's MediaItems so its UI state can be restored,
+ * but Telegram and remote providers use a loopback proxy with a new port in
+ * every process. Media-server URLs are also regenerated from the encrypted
+ * account store so restored items never depend on an old access token.
+ */
+class CloudPlaybackItemResolver(
+    private val accountStore: CloudAccountStore,
+    private val mediaServerClient: MediaServerClient,
+    private val telegramProxy: TelegramStreamProxy,
+    private val remoteProxy: RemoteMusicStreamProxy,
+) {
+    suspend fun resolve(item: MediaItem): MediaItem {
+        if (!item.mediaId.startsWith(CLOUD_ID_PREFIX)) return item
+
+        val identity = parseCloudMediaIdentity(item.mediaId) ?: return item
+        val provider = identity.provider
+        val accountOrChatId = identity.accountOrChatId
+        val songId = identity.songId
+        val extras = item.mediaMetadata.extras
+
+        val resolved =
+            runCatching {
+                when (provider) {
+                    TELEGRAM_PROVIDER -> {
+                        val chatId = accountOrChatId.toLongOrNull() ?: return item
+                        val messageId = songId.toLongOrNull() ?: return item
+                        val hasArtwork =
+                            extras?.containsKey(EXTRA_TELEGRAM_COVER_FILE_ID) == true ||
+                                item.mediaMetadata.artworkUri != null
+
+                        ResolvedUrls(
+                            streamUrl = telegramProxy.streamUrl(chatId, messageId),
+                            artworkUrl =
+                                if (hasArtwork) {
+                                    telegramProxy.restoredArtworkUrl(chatId, messageId)
+                                } else {
+                                    null
+                                },
+                        )
+                    }
+
+                    EMBY_PROVIDER,
+                    JELLYFIN_PROVIDER,
+                    -> {
+                        val account =
+                            accountStore
+                                .getAccounts()
+                                .firstOrNull { it.id == accountOrChatId }
+                                ?: return item
+                        val artworkItemId =
+                            extras?.getString(EXTRA_CLOUD_ARTWORK_ITEM_ID)
+                                ?: mediaServerArtworkItemId(item.mediaMetadata.artworkUri)
+                        ResolvedUrls(
+                            streamUrl = mediaServerClient.streamUrl(account, songId),
+                            artworkUrl = artworkItemId?.let { mediaServerClient.imageUrl(account, it) },
+                        )
+                    }
+
+                    else -> {
+                        val accountExists =
+                            accountStore
+                                .getRemoteAccounts()
+                                .any { it.id == accountOrChatId }
+                        if (!accountExists) return item
+                        ResolvedUrls(
+                            streamUrl = remoteProxy.streamUrl(accountOrChatId, songId),
+                            artworkUrl = null,
+                        )
+                    }
+                }
+            }.getOrNull() ?: return item
+
+        val builder = item.buildUpon().setUri(resolved.streamUrl)
+        resolved.artworkUrl?.let { artworkUrl ->
+            builder.setMediaMetadata(
+                item.mediaMetadata
+                    .buildUpon()
+                    .setArtworkUri(Uri.parse(artworkUrl))
+                    .build(),
+            )
+        }
+        return builder.build()
+    }
+
+    private fun mediaServerArtworkItemId(uri: Uri?): String? {
+        val segments = uri?.pathSegments ?: return null
+        val itemsIndex = segments.indexOf("Items")
+        return segments.getOrNull(itemsIndex + 1).takeIf { itemsIndex >= 0 && !it.isNullOrBlank() }
+    }
+
+    private data class ResolvedUrls(
+        val streamUrl: String,
+        val artworkUrl: String?,
+    )
+
+    private companion object {
+        const val CLOUD_ID_PREFIX = "cloud:"
+        const val TELEGRAM_PROVIDER = "telegram"
+        const val EMBY_PROVIDER = "emby"
+        const val JELLYFIN_PROVIDER = "jellyfin"
+        const val EXTRA_TELEGRAM_COVER_FILE_ID = "telegramCoverFileId"
+        const val EXTRA_CLOUD_ARTWORK_ITEM_ID = "cloudArtworkItemId"
+    }
+}
+
+internal data class CloudMediaIdentity(
+    val provider: String,
+    val accountOrChatId: String,
+    val songId: String,
+)
+
+internal fun parseCloudMediaIdentity(mediaId: String): CloudMediaIdentity? {
+    val parts = mediaId.split(':', limit = 4)
+    if (parts.size != 4 || parts[0] != "cloud") return null
+    val provider = parts[1].lowercase().takeIf(String::isNotBlank) ?: return null
+    val accountOrChatId = parts[2].takeIf(String::isNotBlank) ?: return null
+    val songId = parts[3].takeIf(String::isNotBlank) ?: return null
+    return CloudMediaIdentity(provider, accountOrChatId, songId)
+}

@@ -16,6 +16,8 @@ class TelegramRepository(
 
     fun hasConfig(): Boolean = client.hasConfig()
 
+    suspend fun awaitReady(timeoutMs: Long = 20_000L): Boolean = client.awaitReady(timeoutMs)
+
     fun savedChannels(): List<TelegramChannel> = accountStore.getTelegramChannels()
 
     suspend fun sendPhoneNumber(phone: String) {
@@ -100,6 +102,18 @@ class TelegramRepository(
             songs = response.messages.mapNotNull(::mapMessage),
             nextFromMessageId = response.nextFromMessageId.takeIf { it != 0L },
         )
+    }
+
+    suspend fun getAudio(
+        chatId: Long,
+        messageId: Long,
+    ): TelegramSong? {
+        check(client.awaitReady()) { "Telegram 尚未连接" }
+        val message =
+            runCatching {
+                client.sendRequest<TdApi.Message>(TdApi.GetMessage(chatId, messageId))
+            }.getOrNull() ?: return null
+        return mapMessage(message)
     }
 
     suspend fun download(

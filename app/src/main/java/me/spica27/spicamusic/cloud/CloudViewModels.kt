@@ -159,6 +159,7 @@ class MediaServerViewModel(
                         Bundle().apply {
                             putString("cloudProvider", account.type.name)
                             putString("cloudAccountId", account.id)
+                            imageItemId?.let { putString("cloudArtworkItemId", it) }
                         },
                     ).build(),
             ).build()
@@ -378,6 +379,8 @@ class TelegramChannelViewModel(
                                         putString("cloudProvider", "TELEGRAM")
                                         putLong("telegramChatId", song.chatId)
                                         putInt("telegramFileId", song.fileId)
+                                        putLong("telegramFileSize", song.fileSize)
+                                        song.coverFileId?.let { putInt("telegramCoverFileId", it) }
                                     },
                                 ).build(),
                         ).build()

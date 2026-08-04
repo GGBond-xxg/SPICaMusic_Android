@@ -21,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.guava.future
+import me.spica27.spicamusic.cloud.CloudPlaybackItemResolver
 import me.spica27.spicamusic.player.api.IMusicPlayer
 import me.spica27.spicamusic.player.impl.utils.MediaLibrary
 import me.spica27.spicamusic.topdisplay.TopDisplayModeController
@@ -36,6 +37,7 @@ import timber.log.Timber
 class PlaybackService : MediaLibraryService() {
     private val player: IMusicPlayer by inject()
     private val topDisplayModeController: TopDisplayModeController by inject()
+    private val cloudPlaybackItemResolver: CloudPlaybackItemResolver by inject()
 
     private var mediaSession: MediaLibrarySession? = null
     private lateinit var exoPlayer: ExoPlayer
@@ -100,6 +102,15 @@ class PlaybackService : MediaLibraryService() {
                     this,
                     exoPlayer,
                     object : MediaLibrarySession.Callback {
+                        override fun onAddMediaItems(
+                            session: MediaSession,
+                            controller: MediaSession.ControllerInfo,
+                            mediaItems: List<MediaItem>,
+                        ): ListenableFuture<List<MediaItem>> =
+                            serviceScope.future {
+                                mediaItems.map { cloudPlaybackItemResolver.resolve(it) }
+                            }
+
                         override fun onGetLibraryRoot(
                             session: MediaLibrarySession,
                             browser: MediaSession.ControllerInfo,

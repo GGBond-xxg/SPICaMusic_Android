@@ -147,7 +147,7 @@ class SpicaPlayer(
                 browser.addListener(this@SpicaPlayer)
 
                 val items = withContext(Dispatchers.IO) {
-                    playerKVUtils.getHistoryItems().map { it.toMediaItem() }
+                    playerKVUtils.getHistoryMediaItems()
                 }
 
                 if (items.isEmpty()) {
@@ -198,8 +198,10 @@ class SpicaPlayer(
                 Timber.d("doAction: ${action.javaClass.simpleName}")
                 when (action) {
                     PlayerAction.Play -> {
-                        // 若 ExoPlayer 在服务重启后处于 IDLE 状态，需要先 prepare()
-                        if (browser.playbackState == Player.STATE_IDLE) {
+                        // A restored cloud source can fail transiently while its
+                        // provider session reconnects. Prepare again on retry
+                        // instead of leaving the controller in a terminal error.
+                        if (browser.playbackState == Player.STATE_IDLE || browser.playerError != null) {
                             browser.prepare()
                         }
                         browser.play()
@@ -235,7 +237,7 @@ class SpicaPlayer(
                         if (_isPlaying.value) {
                             browser.pause()
                         } else {
-                            if (browser.playbackState == Player.STATE_IDLE) {
+                            if (browser.playbackState == Player.STATE_IDLE || browser.playerError != null) {
                                 browser.prepare()
                             }
                             browser.play()
@@ -597,6 +599,7 @@ class SpicaPlayer(
 
         val ids = _currentTimelineItems.value.map { it.mediaId }
         playerKVUtils.setHistoryIds(ids.mapNotNull { it.toLongOrNull() })
+        playerKVUtils.setHistoryMediaItems(items)
     }
 
     private fun Timeline.toMediaItems(): List<MediaItem> =

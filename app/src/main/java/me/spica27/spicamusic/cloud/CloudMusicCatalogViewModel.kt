@@ -595,6 +595,8 @@ class CloudMusicCatalogViewModel(
                                     putString("cloudProvider", "TELEGRAM")
                                     putLong("telegramChatId", value.song.chatId)
                                     putInt("telegramFileId", value.song.fileId)
+                                    putLong("telegramFileSize", value.song.fileSize)
+                                    value.song.coverFileId?.let { putInt("telegramCoverFileId", it) }
                                 },
                         )
 
@@ -608,6 +610,7 @@ class CloudMusicCatalogViewModel(
                                 Bundle().apply {
                                     putString("cloudProvider", value.account.type.name)
                                     putString("cloudAccountId", value.account.id)
+                                    value.song.imageItemId?.let { putString("cloudArtworkItemId", it) }
                                 },
                         )
 
