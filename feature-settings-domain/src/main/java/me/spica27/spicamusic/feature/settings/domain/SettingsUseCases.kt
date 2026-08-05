@@ -36,6 +36,11 @@ class SettingsUseCases(
         defaultValue: Boolean = false,
     ): Flow<Boolean> = preferencesManager.getBoolean(key, defaultValue)
 
+    fun getCachedBoolean(
+        key: Preferences.Key<Boolean>,
+        defaultValue: Boolean = false,
+    ): Boolean = preferencesManager.getCachedBoolean(key, defaultValue)
+
     suspend fun setBoolean(
         key: Preferences.Key<Boolean>,
         value: Boolean,

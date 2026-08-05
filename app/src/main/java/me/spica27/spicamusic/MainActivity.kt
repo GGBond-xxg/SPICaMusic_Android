@@ -1,13 +1,27 @@
 package me.spica27.spicamusic
 
+import android.content.Intent
 import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.content.IntentCompat
+import androidx.lifecycle.lifecycleScope
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import me.jessyan.autosize.internal.CustomAdapt
+import me.spica27.spicamusic.player.api.IMusicPlayer
+import me.spica27.spicamusic.player.api.PlayerAction
 import me.spica27.spicamusic.ui.AppScaffold
+import org.koin.android.ext.android.inject
 
 /**
  * 主 Activity
@@ -15,7 +29,7 @@ import me.spica27.spicamusic.ui.AppScaffold
 class MainActivity :
     ComponentActivity(),
     CustomAdapt {
-//    private val audioEffectsViewModel by viewModels<AudioEffectsViewModel>()
+    private val musicPlayer: IMusicPlayer by inject()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,6 +51,14 @@ class MainActivity :
         setContent {
             AppScaffold()
         }
+
+        playExternalAudio(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        playExternalAudio(intent)
     }
 
     override fun isBaseOnWidth(): Boolean = true
@@ -47,4 +69,66 @@ class MainActivity :
      * 横屏：1024dp（平板/横屏设计稿）
      */
     override fun getSizeInDp(): Float = 375f
+
+    private fun playExternalAudio(intent: Intent?) {
+        val uri =
+            when (intent?.action) {
+                Intent.ACTION_VIEW -> intent.data
+                Intent.ACTION_SEND ->
+                    intent.clipData
+                        ?.takeIf { it.itemCount > 0 }
+                        ?.getItemAt(0)
+                        ?.uri
+                        ?: IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
+                else -> null
+            } ?: return
+
+        val title =
+            runCatching {
+                contentResolver
+                    .query(
+                        uri,
+                        arrayOf(OpenableColumns.DISPLAY_NAME),
+                        null,
+                        null,
+                        null,
+                    )?.use { cursor ->
+                        cursor
+                            .takeIf { it.moveToFirst() }
+                            ?.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
+                    }
+            }.getOrNull()
+                ?.substringBeforeLast('.')
+                ?.takeIf { it.isNotBlank() }
+                ?: uri.lastPathSegment?.substringBeforeLast('.')
+                ?: getString(R.string.app_name)
+
+        val mediaItem =
+            MediaItem
+                .Builder()
+                .setMediaId("external:$uri")
+                .setUri(uri)
+                .setMediaMetadata(
+                    MediaMetadata
+                        .Builder()
+                        .setTitle(title)
+                        .setIsPlayable(true)
+                        .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
+                        .build(),
+                ).build()
+
+        lifecycleScope.launch {
+            musicPlayer.init()
+            val initialized =
+                withTimeoutOrNull(EXTERNAL_PLAYBACK_READY_TIMEOUT_MS) {
+                    musicPlayer.isInitialized.filter { it }.first()
+                } != null
+            if (!initialized) return@launch
+            musicPlayer.doAction(PlayerAction.PlayMediaItems(listOf(mediaItem)))
+        }
+    }
+
+    private companion object {
+        const val EXTERNAL_PLAYBACK_READY_TIMEOUT_MS = 5_000L
+    }
 }

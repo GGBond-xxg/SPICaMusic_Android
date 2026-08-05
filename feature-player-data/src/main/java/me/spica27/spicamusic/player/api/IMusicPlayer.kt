@@ -28,6 +28,11 @@ interface IMusicPlayer {
     val isPlaying: StateFlow<Boolean>
 
     /**
+     * Whether the media controller connection and saved queue restoration have completed.
+     */
+    val isInitialized: StateFlow<Boolean>
+
+    /**
      * 当前播放的媒体项
      */
     val currentMediaItem: StateFlow<MediaItem?>

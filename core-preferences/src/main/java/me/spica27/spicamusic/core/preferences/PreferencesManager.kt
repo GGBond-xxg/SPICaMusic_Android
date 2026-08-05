@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.runBlocking
 
 class PreferencesManager(
@@ -107,6 +108,14 @@ class PreferencesManager(
         context.dataStore.data.map { preferences ->
             preferences[key] ?: defaultValue
         }.distinctUntilChanged()
+            .onEach { value ->
+                renderCache.edit().putBoolean(BOOLEAN_CACHE_PREFIX + key.name, value).apply()
+            }
+
+    fun getCachedBoolean(
+        key: Preferences.Key<Boolean>,
+        defaultValue: Boolean = false,
+    ): Boolean = renderCache.getBoolean(BOOLEAN_CACHE_PREFIX + key.name, defaultValue)
 
     suspend fun setBoolean(
         key: Preferences.Key<Boolean>,
@@ -115,6 +124,7 @@ class PreferencesManager(
         context.dataStore.edit { preferences ->
             preferences[key] = value
         }
+        renderCache.edit().putBoolean(BOOLEAN_CACHE_PREFIX + key.name, value).apply()
     }
 
     fun getString(
@@ -180,6 +190,7 @@ class PreferencesManager(
         const val RENDER_CACHE_ARTWORK_URI = "player_theme_artwork_uri"
         const val RENDER_CACHE_THEME_ARGB = "player_theme_argb"
         const val RENDER_CACHE_THEME_MODE = "theme_mode"
+        const val BOOLEAN_CACHE_PREFIX = "boolean_"
         const val DEFAULT_PLAYER_THEME_ARGB = 0xFF2196F3.toInt()
     }
 }

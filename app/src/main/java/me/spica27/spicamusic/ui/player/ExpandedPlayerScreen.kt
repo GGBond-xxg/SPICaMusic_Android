@@ -939,10 +939,23 @@ private fun PlayerPage(
                     },
                     contentKey = { it?.mediaId ?: "-1" },
                 ) { currentMediaItem ->
+                    val resolvedArtworkUri =
+                        currentMediaItem?.mediaMetadata?.artworkUri
+                            ?: currentMediaItem?.mediaMetadata?.albumCoverFallbackUri()
+                    val artworkContainerColor =
+                        if (resolvedArtworkUri == null && artworkPainter == null) {
+                            MaterialTheme.colorScheme.tertiaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHigh
+                        }
+                    val placeholderContentColor =
+                        if (resolvedArtworkUri == null && artworkPainter == null) {
+                            MaterialTheme.colorScheme.onTertiaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
                     StableAudioCover(
-                        uri =
-                            currentMediaItem?.mediaMetadata?.artworkUri
-                                ?: currentMediaItem?.mediaMetadata?.albumCoverFallbackUri(),
+                        uri = resolvedArtworkUri,
                         retainedPainter = artworkPainter,
                         onPainterReady = onArtworkPainterReady,
                         onPainterFailed = onArtworkPainterFailed,
@@ -952,7 +965,9 @@ private fun PlayerPage(
                                     Modifier
                                         .fillMaxSize()
                                         .clip(Shapes.LargeCornerBasedShape)
-                                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                                        .background(artworkContainerColor),
+                                containerColor = artworkContainerColor,
+                                contentColor = placeholderContentColor,
                                 contentDescription = stringResource(R.string.cover_placeholder),
                             )
                         },
@@ -960,7 +975,7 @@ private fun PlayerPage(
                             Modifier
                                 .fillMaxSize()
                                 .clip(Shapes.LargeCornerBasedShape)
-                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                                .background(artworkContainerColor)
                                 .clickHighlight {
                                     onOpenLyrics()
                                     /*

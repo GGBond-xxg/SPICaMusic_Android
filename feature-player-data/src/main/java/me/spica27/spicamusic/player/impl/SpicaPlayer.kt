@@ -102,6 +102,9 @@ class SpicaPlayer(
     private val _isPlaying = MutableStateFlow(false)
     override val isPlaying: StateFlow<Boolean> = _isPlaying
 
+    private val _isInitialized = MutableStateFlow(false)
+    override val isInitialized: StateFlow<Boolean> = _isInitialized
+
     private val _currentMediaItem = MutableStateFlow<MediaItem?>(null)
     override val currentMediaItem: StateFlow<MediaItem?> = _currentMediaItem
 
@@ -138,8 +141,12 @@ class SpicaPlayer(
      * 仅在需要时才创建 MediaBrowser 连接，减少应用启动时间
      */
     override fun init() {
-        if (browserInstance != null) return
+        if (browserInstance != null) {
+            _isInitialized.value = true
+            return
+        }
         if (!_initializing.compareAndSet(false, true)) return
+        _isInitialized.value = false
         launch(Dispatchers.Main) {
             try {
                 val browser = getOrCreateBrowserFuture().await()
@@ -174,6 +181,7 @@ class SpicaPlayer(
                 _browserFuture = null
             } finally {
                 _initializing.set(false)
+                _isInitialized.value = browserInstance != null
             }
         }
     }
@@ -372,6 +380,7 @@ class SpicaPlayer(
         _browserFuture?.let { MediaBrowser.releaseFuture(it) }
         _browserFuture = null
         browserInstance = null
+        _isInitialized.value = false
         // 3. 允许 release 后重新 init（例如服务重启场景）
         _initializing.set(false)
         // 4. 释放 FFT 处理器（取消线程池）
@@ -392,6 +401,7 @@ class SpicaPlayer(
         browserInstance = null
         _browserFuture = null
         _initializing.set(false)
+        _isInitialized.value = false
         _isPlaying.value = false
     }
 

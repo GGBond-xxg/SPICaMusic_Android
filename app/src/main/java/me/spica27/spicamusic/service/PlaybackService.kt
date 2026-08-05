@@ -35,7 +35,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.guava.future
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import me.spica27.spicamusic.cloud.CloudPlaybackItemResolver
 import me.spica27.spicamusic.feature.settings.domain.SettingsUseCases
 import me.spica27.spicamusic.player.api.IMusicPlayer
@@ -133,13 +132,9 @@ class PlaybackService : MediaLibraryService() {
         )
         val initialHiFi =
             PlaybackAudioCapabilities.supportsFloatOutput() &&
-                runBlocking {
-                    settingsUseCases.getBoolean(SettingsUseCases.Keys.HIFI_MODE, false).first()
-                }
+                settingsUseCases.getCachedBoolean(SettingsUseCases.Keys.HIFI_MODE, false)
         usbDacOutputEnabled =
-            runBlocking {
-                settingsUseCases.getBoolean(SettingsUseCases.Keys.USB_DAC_OUTPUT, false).first()
-            }
+            settingsUseCases.getCachedBoolean(SettingsUseCases.Keys.USB_DAC_OUTPUT, false)
         // 创建自定义渲染器工厂，添加音频处理器（FFT、EQ、混响）
         val renderersFactory =
             object : DefaultRenderersFactory(this) {

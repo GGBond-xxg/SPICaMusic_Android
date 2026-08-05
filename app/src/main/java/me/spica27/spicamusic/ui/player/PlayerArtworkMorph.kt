@@ -170,6 +170,19 @@ fun PlayerArtworkMorphOverlay(
     val targetWidth = target.width.coerceAtLeast(1f)
     val targetHeight = target.height.coerceAtLeast(1f)
     val density = LocalDensity.current
+    val hasArtwork = artworkPainter != null || artworkUri != null
+    val artworkContainerColor =
+        if (hasArtwork) {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        } else {
+            MaterialTheme.colorScheme.tertiaryContainer
+        }
+    val placeholderContentColor =
+        if (hasArtwork) {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        } else {
+            MaterialTheme.colorScheme.onTertiaryContainer
+        }
     val currentSourceShape by rememberUpdatedState(sourceShape)
     val transitionShape =
         remember(isPlaying, progressProvider) {
@@ -196,7 +209,7 @@ fun PlayerArtworkMorphOverlay(
                     MusicCoverPlaceholder(
                         modifier = Modifier.fillMaxSize(),
                         containerColor = androidx.compose.ui.graphics.Color.Transparent,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        contentColor = placeholderContentColor,
                     )
                 },
             )
@@ -245,7 +258,7 @@ fun PlayerArtworkMorphOverlay(
                             compositingStrategy = CompositingStrategy.Offscreen
                             shape = transitionShape
                             clip = true
-                        }.background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                        }.background(artworkContainerColor),
             ) {
                 artwork()
             }
