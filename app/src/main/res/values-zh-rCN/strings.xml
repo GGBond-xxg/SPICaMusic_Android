@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="online_source_title">在线音源</string>
+  <string name="online_source_provider_subtitle">用 LX Music 兼容 JS 音源解析网易云与 QQ 音乐</string>
+  <string name="online_source_import_file">导入 JS 文件</string>
+  <string name="online_source_import_url">从网址导入</string>
+  <string name="online_source_import">导入</string>
+  <string name="online_source_url_hint">输入 LX Music 兼容音源脚本的 HTTPS 地址。</string>
+  <string name="online_source_not_installed">尚未设置在线音源</string>
+  <string name="online_source_not_installed_detail">导入音源脚本后可解析网易云与 QQ 云端歌曲。</string>
+  <string name="online_source_importing">正在检查并加载音源…</string>
+  <string name="online_source_ready_detail">版本 %1$s · %2$d 个音源</string>
+  <string name="online_source_choose">音乐来源</string>
+  <string name="online_source_search_hint">搜索在线音乐</string>
+  <string name="online_source_resolver_only">此音源用于解析网易云或 QQ 云端音乐库歌曲，不提供搜索。</string>
+  <string name="online_source_security_hint">音源脚本在隔离的 JavaScript 引擎中运行。请只导入可信脚本；网络请求由本设备直接发送。</string>
+  <string name="settings_background_playback">后台播放</string>
+  <string name="settings_background_playback_subtitle">从最近任务划掉应用后继续播放</string>
+  <string name="settings_headset_resume">耳机续播</string>
+  <string name="settings_headset_resume_subtitle">仅在音频设备断开导致暂停后自动恢复</string>
+  <string name="settings_fade">淡入淡出</string>
+  <string name="settings_fade_subtitle">平滑处理每首歌曲的开头和结尾</string>
+  <string name="settings_fade_duration">淡入淡出时长</string>
+  <string name="settings_hifi">Hi-Fi 模式</string>
+  <string name="settings_hifi_subtitle">使用 32 位浮点输出；播放服务重启后生效</string>
+  <string name="settings_hifi_unsupported">此设备没有 PCM 浮点输出路径</string>
+  <string name="settings_usb_dac">USB DAC 输出</string>
+  <string name="settings_usb_dac_connected">优先输出到 %1$s；仍会经过 Android 系统混音。</string>
+  <string name="settings_usb_dac_disconnected">连接 USB 音频设备后才能启用定向输出</string>
+  <string name="settings_equalizer_subtitle">启用 EQ、选择预设并调整十个频段</string>
+  <string name="equalizer_flat">平坦</string>
+  <string name="equalizer_enable">启用均衡器</string>
+  <string name="equalizer_enable_subtitle">对本地和云端播放应用十段 EQ</string>
+  <string name="equalizer_pop">流行</string>
+  <string name="equalizer_rock">摇滚</string>
+  <string name="equalizer_classical">古典</string>
+  <string name="equalizer_jazz">爵士</string>
+</resources>

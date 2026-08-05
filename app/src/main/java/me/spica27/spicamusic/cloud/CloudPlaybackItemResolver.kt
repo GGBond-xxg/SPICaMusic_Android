@@ -2,6 +2,7 @@ package me.spica27.spicamusic.cloud
 
 import android.net.Uri
 import androidx.media3.common.MediaItem
+import org.json.JSONObject
 
 /**
  * Rebuilds process-local and credential-bearing cloud URLs after process death.
@@ -16,6 +17,8 @@ class CloudPlaybackItemResolver(
     private val mediaServerClient: MediaServerClient,
     private val telegramProxy: TelegramStreamProxy,
     private val remoteProxy: RemoteMusicStreamProxy,
+    private val onlineSourceProxy: OnlineSourceStreamProxy,
+    private val onlineSourceEngine: OnlineSourceEngine,
 ) {
     suspend fun resolve(item: MediaItem): MediaItem {
         if (!item.mediaId.startsWith(CLOUD_ID_PREFIX)) return item
@@ -64,14 +67,59 @@ class CloudPlaybackItemResolver(
                         )
                     }
 
+                    ONLINE_PROVIDER -> {
+                        val source =
+                            extras
+                                ?.getString(EXTRA_ONLINE_SOURCE)
+                                ?.takeIf(String::isNotBlank)
+                                ?: accountOrChatId
+                        val songInfo =
+                            extras
+                                ?.getString(EXTRA_ONLINE_SONG_INFO)
+                                ?.takeIf(String::isNotBlank)
+                                ?: return item
+                        ResolvedUrls(
+                            streamUrl = onlineSourceProxy.streamUrl(source, songInfo),
+                            artworkUrl = null,
+                        )
+                    }
+
                     else -> {
                         val accountExists =
                             accountStore
                                 .getRemoteAccounts()
                                 .any { it.id == accountOrChatId }
                         if (!accountExists) return item
+                        val fallbackUrl = remoteProxy.streamUrl(accountOrChatId, songId)
+                        val sourceKey =
+                            when (provider) {
+                                NETEASE_PROVIDER -> "wy"
+                                QQ_MUSIC_PROVIDER -> "tx"
+                                else -> null
+                            }
+                        val usableSourceKey =
+                            sourceKey?.takeIf { key ->
+                                runCatching {
+                                    onlineSourceEngine
+                                        .status()
+                                        .takeIf(OnlineSourceStatus::ready)
+                                        ?.sources
+                                        ?.firstOrNull { it.key == key }
+                                        ?.actions
+                                        ?.contains("musicUrl") == true
+                                }.getOrDefault(false)
+                            }
                         ResolvedUrls(
-                            streamUrl = remoteProxy.streamUrl(accountOrChatId, songId),
+                            streamUrl =
+                                if (usableSourceKey != null) {
+                                    onlineSourceProxy.streamUrl(
+                                        source = usableSourceKey,
+                                        songInfoJson = onlineSongInfo(item, songId),
+                                        fallbackUrl = fallbackUrl,
+                                    )
+                                } else {
+                                    fallbackUrl
+                                },
                             artworkUrl = null,
                         )
                     }
@@ -96,6 +144,21 @@ class CloudPlaybackItemResolver(
         return segments.getOrNull(itemsIndex + 1).takeIf { itemsIndex >= 0 && !it.isNullOrBlank() }
     }
 
+    private fun onlineSongInfo(
+        item: MediaItem,
+        songId: String,
+    ): String =
+        JSONObject()
+            .put("id", songId)
+            .put("songmid", songId)
+            .put("name", item.mediaMetadata.title?.toString().orEmpty())
+            .put("singer", item.mediaMetadata.artist?.toString().orEmpty())
+            .put("artist", item.mediaMetadata.artist?.toString().orEmpty())
+            .put("albumName", item.mediaMetadata.albumTitle?.toString().orEmpty())
+            .put("duration", item.mediaMetadata.durationMs ?: 0L)
+            .put("pic", item.mediaMetadata.artworkUri?.toString().orEmpty())
+            .toString()
+
     private data class ResolvedUrls(
         val streamUrl: String,
         val artworkUrl: String?,
@@ -106,8 +169,13 @@ class CloudPlaybackItemResolver(
         const val TELEGRAM_PROVIDER = "telegram"
         const val EMBY_PROVIDER = "emby"
         const val JELLYFIN_PROVIDER = "jellyfin"
+        const val ONLINE_PROVIDER = "online"
+        const val NETEASE_PROVIDER = "netease"
+        const val QQ_MUSIC_PROVIDER = "qq_music"
         const val EXTRA_TELEGRAM_COVER_FILE_ID = "telegramCoverFileId"
         const val EXTRA_CLOUD_ARTWORK_ITEM_ID = "cloudArtworkItemId"
+        const val EXTRA_ONLINE_SOURCE = "onlineSource"
+        const val EXTRA_ONLINE_SONG_INFO = "onlineSongInfo"
     }
 }
 

@@ -12,6 +12,11 @@ import me.spica27.spicamusic.cloud.MediaServerClient
 import me.spica27.spicamusic.cloud.MediaServerType
 import me.spica27.spicamusic.cloud.MediaServerViewModel
 import me.spica27.spicamusic.cloud.NeteaseClient
+import me.spica27.spicamusic.cloud.OnlineSourceEngine
+import me.spica27.spicamusic.cloud.OnlineSourceFileStore
+import me.spica27.spicamusic.cloud.OnlineSourceRepository
+import me.spica27.spicamusic.cloud.OnlineSourceStreamProxy
+import me.spica27.spicamusic.cloud.OnlineSourceViewModel
 import me.spica27.spicamusic.cloud.QqMusicClient
 import me.spica27.spicamusic.cloud.RemoteMusicClientRegistry
 import me.spica27.spicamusic.cloud.RemoteMusicProvider
@@ -127,6 +132,10 @@ object AppModule {
             single { NeteaseClient(get(named("cloudHttpClient"))) }
             single { QqMusicClient(get(named("cloudHttpClient"))) }
             single { RemoteMusicClientRegistry(get(), get(), get()) }
+            single { OnlineSourceFileStore(androidContext(), get(named("cloudHttpClient"))) }
+            single { OnlineSourceEngine(androidContext(), get(), get(named("cloudHttpClient"))) }
+            single { OnlineSourceRepository(get()) }
+            single { OnlineSourceStreamProxy(get(named("cloudHttpClient")), get()) }
             single {
                 RemoteMusicStreamProxy(
                     baseClient = get(named("cloudHttpClient")),
@@ -137,7 +146,7 @@ object AppModule {
             single { TelegramClientManager(androidContext(), get()) }
             single { TelegramRepository(get(), get()) }
             single { TelegramStreamProxy(get()) }
-            single { CloudPlaybackItemResolver(get(), get(), get(), get()) }
+            single { CloudPlaybackItemResolver(get(), get(), get(), get(), get(), get()) }
 
             viewModel { parameters ->
                 MediaServerViewModel(
@@ -168,6 +177,14 @@ object AppModule {
                     accountStore = get(),
                     clients = get(),
                     proxy = get(),
+                    player = get(),
+                )
+            }
+            viewModel {
+                OnlineSourceViewModel(
+                    fileStore = get(),
+                    engine = get(),
+                    repository = get(),
                     player = get(),
                 )
             }
@@ -229,6 +246,7 @@ object AppModule {
             // 设置页面 ViewModel
             viewModel {
                 SettingsViewModel(
+                    app = androidApplication(),
                     settingsUseCases = get<SettingsUseCases>(),
                     topDisplayModeController = get(),
                 )

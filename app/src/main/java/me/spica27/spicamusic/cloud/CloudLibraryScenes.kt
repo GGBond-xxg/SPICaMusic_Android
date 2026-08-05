@@ -109,6 +109,14 @@ class CloudLibraryScene : StackScene() {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                item(key = "online_source", contentType = "provider") {
+                    ProviderCard(
+                        title = stringResource(R.string.online_source_title),
+                        subtitle = stringResource(R.string.online_source_provider_subtitle),
+                        icon = Icons.Default.LibraryMusic,
+                        onClick = { path.push(OnlineSourceScene()) },
+                    )
+                }
                 item(key = "telegram", contentType = "provider") {
                     ProviderCard(
                         title = "Telegram",

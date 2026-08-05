@@ -1,9 +1,18 @@
 package me.spica27.spicamusic.ui.settings
 
+import android.app.Application
+import android.content.Context
+import android.media.AudioDeviceCallback
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.runtime.Stable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -13,6 +22,7 @@ import me.spica27.spicamusic.common.entity.ProgressBarStyle
 import me.spica27.spicamusic.common.entity.ThemeColorStyle
 import me.spica27.spicamusic.common.entity.ThemeMode
 import me.spica27.spicamusic.feature.settings.domain.SettingsUseCases
+import me.spica27.spicamusic.service.PlaybackAudioCapabilities
 import me.spica27.spicamusic.topdisplay.TopDisplayMode
 import me.spica27.spicamusic.topdisplay.TopDisplayModeController
 
@@ -21,6 +31,7 @@ import me.spica27.spicamusic.topdisplay.TopDisplayModeController
  */
 @Stable
 class SettingsViewModel(
+    private val app: Application,
     private val settingsUseCases: SettingsUseCases,
     private val topDisplayModeController: TopDisplayModeController,
 ) : ViewModel() {
@@ -70,6 +81,111 @@ class SettingsViewModel(
         viewModelScope.launch {
             settingsUseCases.setBoolean(SettingsUseCases.Keys.KEEP_SCREEN_ON, enabled)
         }
+    }
+
+    val backgroundPlayback =
+        settingsUseCases
+            .getBoolean(SettingsUseCases.Keys.BACKGROUND_PLAYBACK, true)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setBackgroundPlayback(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsUseCases.setBoolean(SettingsUseCases.Keys.BACKGROUND_PLAYBACK, enabled)
+        }
+    }
+
+    val resumeOnHeadset =
+        settingsUseCases
+            .getBoolean(SettingsUseCases.Keys.RESUME_ON_HEADSET, false)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setResumeOnHeadset(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsUseCases.setBoolean(SettingsUseCases.Keys.RESUME_ON_HEADSET, enabled)
+        }
+    }
+
+    val fadeEnabled =
+        settingsUseCases
+            .getBoolean(SettingsUseCases.Keys.FADE_ENABLED, false)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setFadeEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsUseCases.setBoolean(SettingsUseCases.Keys.FADE_ENABLED, enabled)
+        }
+    }
+
+    val fadeDurationMs =
+        settingsUseCases
+            .getFloat(SettingsUseCases.Keys.FADE_DURATION_MS, 4_000f)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, 4_000f)
+
+    fun setFadeDuration(value: String) {
+        val duration = value.toFloatOrNull()?.coerceIn(1_000f, 8_000f) ?: return
+        viewModelScope.launch {
+            settingsUseCases.setFloat(SettingsUseCases.Keys.FADE_DURATION_MS, duration)
+        }
+    }
+
+    val hiFiMode =
+        settingsUseCases
+            .getBoolean(SettingsUseCases.Keys.HIFI_MODE, false)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val hiFiSupported: Boolean = PlaybackAudioCapabilities.supportsFloatOutput()
+
+    fun setHiFiMode(enabled: Boolean) {
+        if (enabled && !hiFiSupported) return
+        viewModelScope.launch {
+            settingsUseCases.setBoolean(SettingsUseCases.Keys.HIFI_MODE, enabled)
+        }
+    }
+
+    val usbDacOutput =
+        settingsUseCases
+            .getBoolean(SettingsUseCases.Keys.USB_DAC_OUTPUT, false)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    private val audioManager = app.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private val _usbDeviceName =
+        MutableStateFlow(
+            PlaybackAudioCapabilities.displayName(
+                PlaybackAudioCapabilities.usbOutput(app),
+            ),
+        )
+    val usbDeviceName = _usbDeviceName.asStateFlow()
+    private val audioDeviceCallback =
+        object : AudioDeviceCallback() {
+            override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
+                updateUsbDevice()
+            }
+
+            override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
+                updateUsbDevice()
+            }
+        }
+
+    init {
+        audioManager.registerAudioDeviceCallback(audioDeviceCallback, Handler(Looper.getMainLooper()))
+    }
+
+    fun setUsbDacOutput(enabled: Boolean) {
+        if (enabled && _usbDeviceName.value == null) return
+        viewModelScope.launch {
+            settingsUseCases.setBoolean(SettingsUseCases.Keys.USB_DAC_OUTPUT, enabled)
+        }
+    }
+
+    private fun updateUsbDevice() {
+        _usbDeviceName.value =
+            PlaybackAudioCapabilities.displayName(
+                PlaybackAudioCapabilities.usbOutput(app),
+            )
+    }
+
+    override fun onCleared() {
+        audioManager.unregisterAudioDeviceCallback(audioDeviceCallback)
+        super.onCleared()
     }
 
     val topDisplayMode =

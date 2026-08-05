@@ -26,6 +26,18 @@ class CloudPlaybackItemResolverTest {
     }
 
     @Test
+    fun `parses online source queue id`() {
+        assertEquals(
+            CloudMediaIdentity(
+                provider = "online",
+                accountOrChatId = "wy",
+                songId = "2081053975",
+            ),
+            parseCloudMediaIdentity("cloud:online:wy:2081053975"),
+        )
+    }
+
+    @Test
     fun `rejects local and incomplete ids`() {
         assertNull(parseCloudMediaIdentity("12345"))
         assertNull(parseCloudMediaIdentity("cloud:telegram:chat"))

@@ -34,11 +34,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBackIosNew
 import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LensBlur
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Percent
+import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.SwapCalls
+import androidx.compose.material.icons.filled.Usb
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -81,6 +87,7 @@ import me.spica27.spicamusic.common.entity.ThemeColorStyle
 import me.spica27.spicamusic.common.entity.ThemeMode
 import me.spica27.spicamusic.topdisplay.TopDisplayMode
 import me.spica27.spicamusic.ui.about.AboutScene
+import me.spica27.spicamusic.ui.audioeffects.EqualizerScene
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
@@ -99,6 +106,13 @@ class SettingsScene : StackScene() {
         val themeModeValue by viewModel.themeMode.collectAsStateWithLifecycle()
         val themeMode = ThemeMode.fromString(themeModeValue)
         val keepScreenOn by viewModel.keepScreenOn.collectAsStateWithLifecycle()
+        val backgroundPlayback by viewModel.backgroundPlayback.collectAsStateWithLifecycle()
+        val resumeOnHeadset by viewModel.resumeOnHeadset.collectAsStateWithLifecycle()
+        val fadeEnabled by viewModel.fadeEnabled.collectAsStateWithLifecycle()
+        val fadeDurationMs by viewModel.fadeDurationMs.collectAsStateWithLifecycle()
+        val hiFiMode by viewModel.hiFiMode.collectAsStateWithLifecycle()
+        val usbDacOutput by viewModel.usbDacOutput.collectAsStateWithLifecycle()
+        val usbDeviceName by viewModel.usbDeviceName.collectAsStateWithLifecycle()
         val topDisplayModeValue by viewModel.topDisplayMode.collectAsStateWithLifecycle()
         val spectrumValue by viewModel.dynamicSpectrumBackground.collectAsStateWithLifecycle()
         val coverTypeValue by viewModel.dynamicCoverType.collectAsStateWithLifecycle()
@@ -166,6 +180,17 @@ class SettingsScene : StackScene() {
                 )
             }
         val topDisplayMode = TopDisplayMode.fromString(topDisplayModeValue)
+        val fadeDurationOptions =
+            remember {
+                ImmutableList.copyOf(
+                    listOf(
+                        SelectOption("2000", "2 s"),
+                        SelectOption("4000", "4 s"),
+                        SelectOption("6000", "6 s"),
+                        SelectOption("8000", "8 s"),
+                    ),
+                )
+            }
         val topDisplaySubtitle =
             when (topDisplayMode) {
                 TopDisplayMode.OFF -> stringResource(R.string.top_display_mode_off_subtitle)
@@ -297,6 +322,84 @@ class SettingsScene : StackScene() {
                             title = stringResource(R.string.settings_playback),
                             subtitle = stringResource(R.string.settings_playback_subtitle),
                         ) {
+                            ModernSettingsSwitchItem(
+                                title = stringResource(R.string.settings_background_playback),
+                                subtitle = stringResource(R.string.settings_background_playback_subtitle),
+                                icon = Icons.Default.PlayCircle,
+                                checked = backgroundPlayback,
+                                onCheckedChange = viewModel::setBackgroundPlayback,
+                            )
+                            SettingsItemDivider()
+                            ModernSettingsSwitchItem(
+                                title = stringResource(R.string.settings_headset_resume),
+                                subtitle = stringResource(R.string.settings_headset_resume_subtitle),
+                                icon = Icons.Default.Headphones,
+                                checked = resumeOnHeadset,
+                                onCheckedChange = viewModel::setResumeOnHeadset,
+                            )
+                            SettingsItemDivider()
+                            ModernSettingsSwitchItem(
+                                title = stringResource(R.string.settings_fade),
+                                subtitle = stringResource(R.string.settings_fade_subtitle),
+                                icon = Icons.Default.SwapCalls,
+                                checked = fadeEnabled,
+                                onCheckedChange = viewModel::setFadeEnabled,
+                            )
+                            if (fadeEnabled) {
+                                SettingsItemDivider()
+                                ModernSettingsSelectItem(
+                                    title = stringResource(R.string.settings_fade_duration),
+                                    subtitle = "${(fadeDurationMs / 1_000f).toInt()} s",
+                                    icon = Icons.Default.SwapCalls,
+                                    options = fadeDurationOptions,
+                                    currentValue = fadeDurationMs.toInt().toString(),
+                                    onValueChange = viewModel::setFadeDuration,
+                                )
+                            }
+                            SettingsItemDivider()
+                            ModernSettingsSwitchItem(
+                                title = stringResource(R.string.settings_hifi),
+                                subtitle =
+                                    stringResource(
+                                        if (viewModel.hiFiSupported) {
+                                            R.string.settings_hifi_subtitle
+                                        } else {
+                                            R.string.settings_hifi_unsupported
+                                        },
+                                    ),
+                                icon = Icons.Default.HighQuality,
+                                checked = hiFiMode,
+                                enabled = viewModel.hiFiSupported,
+                                onCheckedChange = viewModel::setHiFiMode,
+                            )
+                            SettingsItemDivider()
+                            ModernSettingsSwitchItem(
+                                title = stringResource(R.string.settings_usb_dac),
+                                subtitle =
+                                    usbDeviceName?.let {
+                                        stringResource(R.string.settings_usb_dac_connected, it)
+                                    } ?: stringResource(R.string.settings_usb_dac_disconnected),
+                                icon = Icons.Default.Usb,
+                                checked = usbDacOutput,
+                                enabled = usbDeviceName != null,
+                                onCheckedChange = viewModel::setUsbDacOutput,
+                            )
+                            SettingsItemDivider()
+                            SettingsRow(
+                                title = stringResource(R.string.equalizer_10_band),
+                                subtitle = stringResource(R.string.settings_equalizer_subtitle),
+                                icon = Icons.Default.GraphicEq,
+                                selected = false,
+                                onClick = { path.push(EqualizerScene()) },
+                                trailingContent = {
+                                    Icon(
+                                        imageVector = Icons.Default.ChevronRight,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                },
+                            )
+                            SettingsItemDivider()
                             ModernSettingsSwitchItem(
                                 title = stringResource(R.string.settings_keep_screen_on),
                                 subtitle = stringResource(R.string.settings_keep_screen_on_subtitle),
@@ -647,6 +750,7 @@ private fun ModernSettingsSwitchItem(
     subtitle: String,
     icon: ImageVector,
     checked: Boolean,
+    enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit,
 ) {
     val iconScale by animateFloatAsState(
@@ -660,11 +764,13 @@ private fun ModernSettingsSwitchItem(
         subtitle = subtitle,
         icon = icon,
         selected = checked,
+        enabled = enabled,
         onClick = { onCheckedChange(!checked) },
         iconModifier = Modifier.graphicsLayer(scaleX = iconScale, scaleY = iconScale),
         trailingContent = {
             Switch(
                 checked = checked,
+                enabled = enabled,
                 onCheckedChange = onCheckedChange,
             )
         },
@@ -717,6 +823,7 @@ private fun SettingsRow(
     subtitle: String,
     icon: ImageVector,
     selected: Boolean,
+    enabled: Boolean = true,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     iconModifier: Modifier = Modifier,
@@ -745,7 +852,8 @@ private fun SettingsRow(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clickable(onClick = onClick)
+                .graphicsLayer { alpha = if (enabled) 1f else 0.55f }
+                .clickable(enabled = enabled, onClick = onClick)
                 .padding(horizontal = Spacing.Large, vertical = Spacing.Medium),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),

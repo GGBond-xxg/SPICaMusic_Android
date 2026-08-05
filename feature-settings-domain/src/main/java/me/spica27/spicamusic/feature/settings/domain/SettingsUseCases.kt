@@ -12,6 +12,12 @@ class SettingsUseCases(
         val THEME_MODE = PreferencesManager.Keys.THEME_MODE
         val THEME_COLOR_STYLE = PreferencesManager.Keys.THEME_COLOR_STYLE
         val KEEP_SCREEN_ON = PreferencesManager.Keys.KEEP_SCREEN_ON
+        val BACKGROUND_PLAYBACK = PreferencesManager.Keys.BACKGROUND_PLAYBACK
+        val RESUME_ON_HEADSET = PreferencesManager.Keys.RESUME_ON_HEADSET
+        val FADE_ENABLED = PreferencesManager.Keys.FADE_ENABLED
+        val FADE_DURATION_MS = PreferencesManager.Keys.FADE_DURATION_MS
+        val HIFI_MODE = PreferencesManager.Keys.HIFI_MODE
+        val USB_DAC_OUTPUT = PreferencesManager.Keys.USB_DAC_OUTPUT
         val LYRICON_ENABLED = PreferencesManager.Keys.LYRICON_ENABLED
         val TOP_DISPLAY_MODE = PreferencesManager.Keys.TOP_DISPLAY_MODE
         val DYNAMIC_SPECTRUM_BACKGROUND = PreferencesManager.Keys.DYNAMIC_SPECTRUM_BACKGROUND
