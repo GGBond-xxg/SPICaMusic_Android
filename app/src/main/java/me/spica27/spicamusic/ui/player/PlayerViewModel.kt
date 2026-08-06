@@ -60,6 +60,9 @@ class PlayerViewModel(
      */
     val isPlaying: StateFlow<Boolean> = player.isPlaying
 
+    /** 播放服务与上次队列是否已经完成冷启动恢复。 */
+    val isInitialized: StateFlow<Boolean> = player.isInitialized
+
     /**
      * 当前播放模式
      */

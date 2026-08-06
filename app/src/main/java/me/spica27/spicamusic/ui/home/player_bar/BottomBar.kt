@@ -9,7 +9,7 @@ import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -56,7 +56,6 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -78,7 +77,6 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -100,6 +98,7 @@ import kotlinx.coroutines.launch
 import me.spica27.navkit.geometry.geometryOccluder
 import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.spicamusic.R
+import me.spica27.spicamusic.ui.cache.ArtworkRenderCache
 import me.spica27.spicamusic.ui.home.HomePage
 import me.spica27.spicamusic.ui.home.HomeViewModel
 import me.spica27.spicamusic.ui.home.LocalBottomBarScrollConnection
@@ -557,12 +556,17 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
 
     val currentHomePage = homeViewModel.currentPage.collectAsStateWithLifecycle().value
     val currentMediaItem by playerViewModel.currentMediaItem.collectAsStateWithLifecycle()
+    val playerInitialized by playerViewModel.isInitialized.collectAsStateWithLifecycle()
     val displayedMediaItem = rememberRetainedMediaItem(currentMediaItem)
     val nowPlayingSong = displayedMediaItem
     val metadata = displayedMediaItem?.mediaMetadata
     val title = metadata?.title?.toString() ?: stringResource(R.string.unknown_song)
     val artworkUri = metadata?.artworkUri ?: metadata?.albumCoverFallbackUri()
-    var stableCoverPainter by remember { mutableStateOf<Painter?>(null) }
+    val firstFrameCoverPainter =
+        remember {
+            ArtworkRenderCache.read(artworkUri?.toString())
+        }
+    var stableCoverPainter by remember { mutableStateOf(firstFrameCoverPainter) }
     LaunchedEffect(artworkUri) {
         if (artworkUri == null) {
             // Media3 may briefly publish a null item while seeking to an adjacent queue entry.
@@ -572,6 +576,7 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
         }
     }
     val isPlaying by playerViewModel.isPlaying.collectAsStateWithLifecycle()
+    val playerContentReady = displayedMediaItem != null || playerInitialized
 
     // 记录跳转到播放器的初始页（默认主页 or 播放列表页）
     var initialPage by remember { mutableIntStateOf(DEFAULT_PAGE) }
@@ -717,8 +722,13 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                                         resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
                                     ),
                                 coverPainter = stableCoverPainter,
-                                onCoverPainterReady = { stableCoverPainter = it },
+                                onCoverPainterReady = { painter ->
+                                    stableCoverPainter = painter
+                                    ArtworkRenderCache.write(artworkUri?.toString())
+                                },
                                 onCoverPainterFailed = { stableCoverPainter = null },
+                                contentReady = playerContentReady,
+                                controlsReady = playerInitialized,
                                 modifier = Modifier.fillMaxWidth(),
                                 onExpand = {
                                     initialPage = DEFAULT_PAGE
@@ -835,7 +845,10 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                             StableHeroCover(
                                 uri = artworkUri,
                                 painter = stableCoverPainter,
-                                onPainterReady = { stableCoverPainter = it },
+                                onPainterReady = { painter ->
+                                    stableCoverPainter = painter
+                                    ArtworkRenderCache.write(artworkUri?.toString())
+                                },
                                 onPainterFailed = { stableCoverPainter = null },
                                 modifier =
                                     Modifier
@@ -1005,39 +1018,18 @@ private fun StableHeroCover(
 private fun HomePageSwitcher(modifier: Modifier = Modifier) {
     val homeViewModel: HomeViewModel = koinActivityViewModel()
     val tabs = remember { HomePage.entries.toTypedArray() }
-    val selectIndex = homeViewModel.currentPage.collectAsStateWithLifecycle().value
-    val tabPositions = remember { mutableStateMapOf<HomePage, Dp>() }
-    val tabWidths = remember { mutableStateMapOf<HomePage, Dp>() }
-    val tabHeight = remember { mutableStateMapOf<HomePage, Dp>() }
-    val density = LocalDensity.current
-
-    val indicatorOffset by animateDpAsState(
-        targetValue = tabPositions.getOrElse(selectIndex) { 0.dp },
-        label = "",
-        animationSpec =
-            spring(
-                stiffness = Spring.StiffnessMediumLow,
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-            ),
-    )
-    val indicatorWidth by animateDpAsState(
-        targetValue = tabWidths.getOrElse(selectIndex) { 0.dp },
-        label = "",
-        animationSpec =
-            spring(
-                stiffness = Spring.StiffnessMediumLow,
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-            ),
-    )
-    val indicatorHeight by animateDpAsState(
-        targetValue = tabHeight.getOrElse(selectIndex) { 0.dp },
-        label = "",
-        animationSpec =
-            spring(
-                stiffness = Spring.StiffnessMediumLow,
-                dampingRatio = Spring.DampingRatioLowBouncy,
-            ),
-    )
+    val selectedPage = homeViewModel.currentPage.collectAsStateWithLifecycle().value
+    val indicatorIndex by
+        animateFloatAsState(
+            targetValue = selectedPage.ordinal.toFloat(),
+            label = "homePageIndicator",
+            animationSpec =
+                spring(
+                    stiffness = Spring.StiffnessMediumLow,
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    visibilityThreshold = 0.001f,
+                ),
+        )
     val indicatorColor =
         MaterialTheme.colorScheme.primaryContainer.copy(
             alpha = BOTTOM_FLOATING_CONTAINER_ALPHA,
@@ -1055,27 +1047,26 @@ private fun HomePageSwitcher(modifier: Modifier = Modifier) {
                     ),
                 ).drawWithCache {
                     val paddingValues = 6.dp.toPx()
+                    val tabWidth = size.width / tabs.size
                     onDrawBehind {
-                        if (indicatorWidth > 0.dp && indicatorHeight > 0.dp) {
-                            drawRoundRect(
-                                color = indicatorColor,
-                                topLeft =
-                                    Offset(
-                                        indicatorOffset.toPx() + paddingValues,
-                                        paddingValues,
-                                    ),
-                                size =
-                                    Size(
-                                        indicatorWidth.toPx() - 2 * paddingValues,
-                                        indicatorHeight.toPx() - 2 * paddingValues,
-                                    ),
-                                cornerRadius =
-                                    CornerRadius(
-                                        100f,
-                                        100f,
-                                    ),
-                            )
-                        }
+                        drawRoundRect(
+                            color = indicatorColor,
+                            topLeft =
+                                Offset(
+                                    tabWidth * indicatorIndex + paddingValues,
+                                    paddingValues,
+                                ),
+                            size =
+                                Size(
+                                    tabWidth - 2 * paddingValues,
+                                    size.height - 2 * paddingValues,
+                                ),
+                            cornerRadius =
+                                CornerRadius(
+                                    100f,
+                                    100f,
+                                ),
+                        )
                     }
                 }.animateContentSize(),
         verticalAlignment = Alignment.CenterVertically,
@@ -1084,11 +1075,7 @@ private fun HomePageSwitcher(modifier: Modifier = Modifier) {
             HomePageSwitchItem(
                 modifier =
                     Modifier
-                        .onGloballyPositioned {
-                            tabPositions[page] = with(density) { it.positionInParent().x.toDp() }
-                            tabWidths[page] = with(density) { it.size.width.toDp() }
-                            tabHeight[page] = with(density) { it.size.height.toDp() }
-                        }.weight(1f),
+                        .weight(1f),
                 icon = {
                     Icon(
                         page.icon,

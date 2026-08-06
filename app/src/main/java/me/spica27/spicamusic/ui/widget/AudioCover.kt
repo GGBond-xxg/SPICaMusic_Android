@@ -53,6 +53,9 @@ fun AudioCover(
                 .build()
         },
         imageModel = { uri },
+        loading = {
+            placeHolder()
+        },
         success = { _, painter ->
             LaunchedEffect(painter) {
                 onPainterReady(painter)
@@ -65,16 +68,18 @@ fun AudioCover(
             )
         },
         failure = {
-            LaunchedEffect(uri, fallbackUri) {
-                onPainterFailed()
-            }
             if (fallbackUri != null && fallbackUri != uri) {
                 CoverFallback(
                     fallbackUri = fallbackUri,
                     modifier = Modifier.fillMaxSize(),
                     placeHolder = placeHolder,
+                    onPainterReady = onPainterReady,
+                    onPainterFailed = onPainterFailed,
                 )
             } else {
+                LaunchedEffect(uri, fallbackUri) {
+                    onPainterFailed()
+                }
                 placeHolder()
             }
         },
@@ -91,6 +96,7 @@ fun AudioCover(
 @Composable
 fun StableAudioCover(
     uri: Uri?,
+    fallbackUri: Uri? = null,
     retainedPainter: Painter?,
     modifier: Modifier = Modifier,
     onPainterReady: (Painter) -> Unit = {},
@@ -148,6 +154,7 @@ fun StableAudioCover(
             key(uri) {
                 AudioCover(
                     uri = uri,
+                    fallbackUri = fallbackUri,
                     modifier =
                         Modifier
                             .fillMaxSize()
@@ -204,8 +211,13 @@ fun CoverFallback(
     fallbackUri: Uri?,
     modifier: Modifier = Modifier,
     placeHolder: @Composable () -> Unit = { },
+    onPainterReady: (Painter) -> Unit = {},
+    onPainterFailed: () -> Unit = {},
 ) {
     if (fallbackUri == null) {
+        LaunchedEffect(fallbackUri) {
+            onPainterFailed()
+        }
         placeHolder()
         return
     }
@@ -219,7 +231,13 @@ fun CoverFallback(
                 .build()
         },
         imageModel = { fallbackUri },
+        loading = {
+            placeHolder()
+        },
         success = { _, painter ->
+            LaunchedEffect(painter) {
+                onPainterReady(painter)
+            }
             Image(
                 painter = painter,
                 contentDescription = null,
@@ -228,6 +246,9 @@ fun CoverFallback(
             )
         },
         failure = {
+            LaunchedEffect(fallbackUri) {
+                onPainterFailed()
+            }
             placeHolder()
         },
     )

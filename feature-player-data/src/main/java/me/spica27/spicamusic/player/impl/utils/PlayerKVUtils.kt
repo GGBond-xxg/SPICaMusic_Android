@@ -94,6 +94,21 @@ class PlayerKVUtils(
     }
 
     /**
+     * Returns the last serialized current item without opening Room or connecting MediaBrowser.
+     *
+     * This is a first-frame snapshot only. [getHistoryMediaItems] still refreshes local entries
+     * from Room before the player restores its authoritative queue.
+     */
+    @OptIn(UnstableApi::class)
+    fun getCachedCurrentMediaItem(): MediaItem? {
+        val items = decodeHistoryItems()
+        if (items.isEmpty()) return null
+        val currentMediaId = getCurrentMediaId()
+        return items.firstOrNull { it.mediaId == currentMediaId }
+            ?: items.getOrNull(getHistoryPosition().coerceIn(items.indices))
+    }
+
+    /**
      * Stores local and cloud queue entries, including their display metadata.
      * MediaItem's bundle format keeps this independent from individual cloud
      * providers while the service refreshes process-local stream URLs on restore.

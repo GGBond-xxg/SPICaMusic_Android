@@ -105,10 +105,12 @@ class SpicaPlayer(
     private val _isInitialized = MutableStateFlow(false)
     override val isInitialized: StateFlow<Boolean> = _isInitialized
 
-    private val _currentMediaItem = MutableStateFlow<MediaItem?>(null)
+    private val cachedCurrentMediaItem = playerKVUtils.getCachedCurrentMediaItem()
+
+    private val _currentMediaItem = MutableStateFlow(cachedCurrentMediaItem)
     override val currentMediaItem: StateFlow<MediaItem?> = _currentMediaItem
 
-    private val _currentMediaMetadata = MutableStateFlow<MediaMetadata?>(null)
+    private val _currentMediaMetadata = MutableStateFlow(cachedCurrentMediaItem?.mediaMetadata)
     override val currentMediaMetadata: StateFlow<MediaMetadata?> = _currentMediaMetadata
 
     private val _currentPlaylistMetadata = MutableStateFlow<MediaMetadata?>(null)

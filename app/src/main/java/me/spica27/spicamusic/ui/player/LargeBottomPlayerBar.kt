@@ -1,6 +1,7 @@
 package me.spica27.spicamusic.ui.player
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -67,6 +69,8 @@ fun LargeBottomPlayerBar(
     coverPainter: Painter? = null,
     onCoverPainterReady: (Painter) -> Unit = {},
     onCoverPainterFailed: () -> Unit = {},
+    contentReady: Boolean = true,
+    controlsReady: Boolean = true,
     viewModel: PlayerViewModel = LocalPlayerViewModel.current,
     mediaItem: MediaItem?,
     onExpand: () -> Unit,
@@ -79,6 +83,20 @@ fun LargeBottomPlayerBar(
     val artist = metadata?.artist?.toString() ?: stringResource(R.string.unknown_artist)
     val artworkUri = metadata?.artworkUri ?: metadata?.albumCoverFallbackUri()
     val hasMediaItem = mediaItem != null
+    val contentReveal by animateFloatAsState(
+        targetValue = if (contentReady) 1f else 0f,
+        animationSpec =
+            tween(
+                durationMillis = 180,
+                delayMillis = if (contentReady) 70 else 0,
+            ),
+        label = "bottomPlayerContentReveal",
+    )
+    val loadingReveal by animateFloatAsState(
+        targetValue = if (contentReady) 0f else 1f,
+        animationSpec = tween(durationMillis = 90),
+        label = "bottomPlayerLoadingReveal",
+    )
     val nextRevealOrigin = rememberThemeRevealOriginState()
     Box(
         modifier =
@@ -109,58 +127,101 @@ fun LargeBottomPlayerBar(
                         .background(
                             MaterialTheme.colorScheme.tertiaryContainer,
                         )
-                StableAudioCover(
-                    uri = artworkUri,
-                    retainedPainter = coverPainter,
-                    modifier = resolvedCoverModifier,
-                    onPainterReady = onCoverPainterReady,
-                    onPainterFailed = onCoverPainterFailed,
-                    placeHolder = {
-                        MusicCoverPlaceholder(
-                            modifier = Modifier.fillMaxSize(),
-                            containerColor = androidx.compose.ui.graphics.Color.Transparent,
-                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                            contentDescription = stringResource(R.string.cover_placeholder),
-                        )
-                    },
-                )
+                Box(modifier = resolvedCoverModifier) {
+                    StableAudioCover(
+                        uri = artworkUri,
+                        retainedPainter = coverPainter,
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .graphicsLayer { alpha = contentReveal },
+                        onPainterReady = onCoverPainterReady,
+                        onPainterFailed = onCoverPainterFailed,
+                        placeHolder = {
+                            if (contentReady) {
+                                MusicCoverPlaceholder(
+                                    modifier = Modifier.fillMaxSize(),
+                                    containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    contentDescription = stringResource(R.string.cover_placeholder),
+                                )
+                            }
+                        },
+                    )
+                }
 
                 Spacer(modifier = Modifier.width(12.dp))
 
                 // 歌曲信息
-                Column(
+                Box(
                     modifier =
                         infoModifier
                             .weight(1f)
+                            .height(40.dp)
                             .clipToBounds(),
                 ) {
-                    if (hasMediaItem) {
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = titleModifier,
+                    Column(
+                        modifier =
+                            Modifier
+                                .align(Alignment.CenterStart)
+                                .graphicsLayer { alpha = contentReveal },
+                    ) {
+                        if (hasMediaItem) {
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = titleModifier,
+                            )
+                            Text(
+                                text = artist,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = artistModifier,
+                            )
+                        } else {
+                            Text(
+                                text = stringResource(R.string.no_song_playing),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = titleModifier,
+                            )
+                        }
+                    }
+                    Column(
+                        modifier =
+                            Modifier
+                                .align(Alignment.CenterStart)
+                                .fillMaxWidth(0.72f)
+                                .graphicsLayer { alpha = loadingReveal },
+                        verticalArrangement =
+                            androidx.compose.foundation.layout.Arrangement.spacedBy(
+                                6.dp,
+                            ),
+                    ) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth(0.72f)
+                                    .height(12.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)),
                         )
-                        Text(
-                            text = artist,
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = artistModifier,
-                        )
-                    } else {
-                        Text(
-                            text = stringResource(R.string.no_song_playing),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = titleModifier,
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth(0.48f)
+                                    .height(9.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f)),
                         )
                     }
                 }
@@ -170,8 +231,11 @@ fun LargeBottomPlayerBar(
                 // 播放/暂停按钮
                 IconButton(
                     onClick = { viewModel.togglePlayPause() },
-                    enabled = hasMediaItem,
-                    modifier = playButtonModifier.size(40.dp),
+                    enabled = hasMediaItem && contentReady && controlsReady,
+                    modifier =
+                        playButtonModifier
+                            .size(40.dp)
+                            .graphicsLayer { alpha = 0.22f + 0.78f * contentReveal },
                 ) {
                     MorphingPlayPauseIcon(
                         isPlaying = isPlaying,
@@ -187,10 +251,11 @@ fun LargeBottomPlayerBar(
                         nextRevealOrigin.armFromCenter()
                         onNext()
                     },
-                    enabled = hasMediaItem,
+                    enabled = hasMediaItem && contentReady && controlsReady,
                     modifier =
                         nextButtonModifier
                             .size(40.dp)
+                            .graphicsLayer { alpha = 0.22f + 0.78f * contentReveal }
                             .themeRevealOrigin(nextRevealOrigin),
                 ) {
                     Icon(

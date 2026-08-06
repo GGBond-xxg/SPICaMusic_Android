@@ -28,15 +28,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -62,6 +59,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,6 +68,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
@@ -88,6 +87,7 @@ import me.spica27.spicamusic.R
 import me.spica27.spicamusic.common.entity.Song
 import me.spica27.spicamusic.common.entity.getAlbumCoverUri
 import me.spica27.spicamusic.common.entity.getCoverUri
+import me.spica27.spicamusic.ui.cache.ArtworkRenderCache
 import me.spica27.spicamusic.ui.favorite.FavoriteScene
 import me.spica27.spicamusic.ui.home.HomePage
 import me.spica27.spicamusic.ui.home.HomeViewModel
@@ -106,8 +106,10 @@ import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
 import me.spica27.spicamusic.ui.widget.AudioCover
 import me.spica27.spicamusic.ui.widget.PlaylistCoverView
+import me.spica27.spicamusic.ui.widget.StableAudioCover
 import me.spica27.spicamusic.ui.widget.clickHighlight
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
+import me.spica27.spicamusic.ui.widget.stableStatusBarTopPadding
 import org.koin.compose.viewmodel.koinActivityViewModel
 
 /**
@@ -161,7 +163,7 @@ fun FinderPage(playEntrance: Boolean = true) {
     }
 
     val listState = rememberLazyListState()
-    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val statusBarTop = stableStatusBarTopPadding()
 
     Box(
         modifier =
@@ -249,6 +251,7 @@ fun FinderPage(playEntrance: Boolean = true) {
                     val entrance = rememberEntrance(order = 3, play = playEntrance)
                     FrequentHeroCard(
                         songs = frequentCardSongs,
+                        renderCachedContentImmediately = homeViewModel.frequentSongsRestoredFromCache,
                         onPlayAll = {
                             playerViewModel.updatePlaylistWithSongs(
                                 songs = frequentSongs,
@@ -538,7 +541,7 @@ private fun FinderTopBar(
     onSearchClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val statusBarTop = stableStatusBarTopPadding()
     val backgroundColor = MaterialTheme.colorScheme.background
     // 布尔量化派生状态放在顶栏自身作用域：翻转只重组顶栏，不波及页面根
     val solid by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
@@ -738,54 +741,7 @@ private fun FrequentHeroPlaceholder(modifier: Modifier = Modifier) {
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
             )
         }
-        Column {
-            repeat(3) { index ->
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(Spacing.Small),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
-                ) {
-                    Text(
-                        text = "${index + 1}",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
-                        modifier = Modifier.width(24.dp),
-                        textAlign = TextAlign.Center,
-                    )
-                    Box(
-                        modifier =
-                            Modifier
-                                .size(48.dp)
-                                .clip(Shapes.MediumCornerBasedShape)
-                                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-                    )
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Box(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth(0.62f)
-                                    .height(12.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)),
-                        )
-                        Box(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth(0.42f)
-                                    .height(9.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f)),
-                        )
-                    }
-                }
-            }
-        }
+        FrequentHeroRowsPlaceholder()
         Box(
             modifier =
                 Modifier
@@ -926,11 +882,37 @@ private fun ScanGuideCard(
 @Composable
 private fun FrequentHeroCard(
     songs: ImmutableList<Song>,
+    renderCachedContentImmediately: Boolean,
     onPlayAll: () -> Unit,
     onSongClick: (Song) -> Unit,
     onSaveAsPlaylist: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val previewSongs = songs.take(3)
+    val resolvedArtwork =
+        remember(previewSongs.map(Song::mediaStoreId)) {
+            mutableStateMapOf<Long, Boolean>()
+        }
+    val rowsReady =
+        renderCachedContentImmediately ||
+            previewSongs.all { song ->
+                resolvedArtwork[song.mediaStoreId] == true
+            }
+    val rowsReveal by animateFloatAsState(
+        targetValue = if (rowsReady) 1f else 0f,
+        animationSpec =
+            tween(
+                durationMillis = 180,
+                delayMillis = if (rowsReady) 70 else 0,
+            ),
+        label = "frequentRowsReveal",
+    )
+    val rowsLoadingReveal by animateFloatAsState(
+        targetValue = if (rowsReady) 0f else 1f,
+        animationSpec = tween(durationMillis = 90),
+        label = "frequentRowsLoadingReveal",
+    )
+
     Column(
         modifier =
             modifier
@@ -986,16 +968,45 @@ private fun FrequentHeroCard(
                 )
             }
         }
-        AnimatedContent(songs.take(3), label = "frequentHeroSongs") { songs ->
-            Column {
-                songs.forEachIndexed { index, song ->
+        Box {
+            Column(
+                modifier =
+                    Modifier.graphicsLayer {
+                        alpha = rowsReveal
+                    },
+            ) {
+                previewSongs.forEachIndexed { index, song ->
                     HeroSongRow(
                         index = index,
                         song = song,
                         onClick = { onSongClick(song) },
+                        retainedPainter =
+                            if (renderCachedContentImmediately) {
+                                remember(song.mediaStoreId) {
+                                    ArtworkRenderCache.read(song.getCoverUri()?.toString())
+                                }
+                            } else {
+                                null
+                            },
+                        onArtworkReady = {
+                            ArtworkRenderCache.write(
+                                key = song.getCoverUri()?.toString(),
+                                fallbackKey = song.getAlbumCoverUri()?.toString(),
+                            )
+                            resolvedArtwork[song.mediaStoreId] = true
+                        },
+                        onArtworkFailed = {
+                            resolvedArtwork[song.mediaStoreId] = true
+                        },
                     )
                 }
             }
+            FrequentHeroRowsPlaceholder(
+                modifier =
+                    Modifier.graphicsLayer {
+                        alpha = rowsLoadingReveal
+                    },
+            )
         }
         FinderActionPill(
             text = stringResource(R.string.finder_save_as_playlist),
@@ -1012,6 +1023,9 @@ private fun HeroSongRow(
     index: Int,
     song: Song,
     onClick: () -> Unit,
+    retainedPainter: Painter?,
+    onArtworkReady: (Painter) -> Unit,
+    onArtworkFailed: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -1037,14 +1051,17 @@ private fun HeroSongRow(
             modifier = Modifier.width(24.dp),
             textAlign = TextAlign.Center,
         )
-        AudioCover(
+        StableAudioCover(
             uri = song.getCoverUri(),
             fallbackUri = song.getAlbumCoverUri(),
+            retainedPainter = retainedPainter,
             modifier =
                 Modifier
                     .size(48.dp)
                     .clip(Shapes.MediumCornerBasedShape),
             placeHolder = { CoverPlaceholder() },
+            onPainterReady = onArtworkReady,
+            onPainterFailed = onArtworkFailed,
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -1070,6 +1087,58 @@ private fun HeroSongRow(
             modifier = Modifier.width(40.dp),
             textAlign = TextAlign.End,
         )
+    }
+}
+
+@Composable
+private fun FrequentHeroRowsPlaceholder(modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
+        repeat(3) { index ->
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(Spacing.Small),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
+            ) {
+                Text(
+                    text = "${index + 1}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                    modifier = Modifier.width(24.dp),
+                    textAlign = TextAlign.Center,
+                )
+                Box(
+                    modifier =
+                        Modifier
+                            .size(48.dp)
+                            .clip(Shapes.MediumCornerBasedShape)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth(0.62f)
+                                .height(12.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)),
+                    )
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth(0.42f)
+                                .height(9.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f)),
+                    )
+                }
+            }
+        }
     }
 }
 

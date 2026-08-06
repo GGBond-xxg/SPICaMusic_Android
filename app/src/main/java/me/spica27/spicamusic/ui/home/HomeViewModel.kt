@@ -39,6 +39,14 @@ class HomeViewModel(
     private val songRepository: SongUseCases,
     private val playlistRepository: PlaylistUseCases,
 ) : ViewModel() {
+    private val finderRenderCache = FinderRenderCache(app)
+    private val cachedFrequentSongs = finderRenderCache.getFrequentSongs()
+    private val cachedFavoriteSongs = finderRenderCache.getFavoriteSongs()
+    private val cachedPlaylists = finderRenderCache.getPlaylists()
+
+    /** True only when this process started with a previous Finder snapshot. */
+    val frequentSongsRestoredFromCache: Boolean = cachedFrequentSongs != null
+
     // 排序方式
     private val _sortOrder = MutableStateFlow(SongSortOrder.DEFAULT)
     val sortOrder: StateFlow<SongSortOrder> = _sortOrder
@@ -57,7 +65,7 @@ class HomeViewModel(
     private val _snackbarMessage = MutableStateFlow<String?>(null)
     val snackbarMessage: StateFlow<String?> = _snackbarMessage.asStateFlow()
 
-    private val _frequentSongsInitialized = MutableStateFlow(false)
+    private val _frequentSongsInitialized = MutableStateFlow(cachedFrequentSongs != null)
     val frequentSongsInitialized: StateFlow<Boolean> = _frequentSongsInitialized.asStateFlow()
 
     private val _allSongsInitialized = MutableStateFlow(false)
@@ -88,10 +96,11 @@ class HomeViewModel(
     val favoriteSongs: StateFlow<List<Song>> =
         songRepository
             .getAllLikeSongsFlow()
+            .onEach(finderRenderCache::setFavoriteSongs)
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5000),
-                initialValue = emptyList(),
+                initialValue = cachedFavoriteSongs.orEmpty(),
             )
 
     /**
@@ -100,11 +109,13 @@ class HomeViewModel(
     val frequentSongs: StateFlow<List<Song>> =
         songRepository
             .getOftenListenSong10Flow()
-            .onEach { _frequentSongsInitialized.value = true }
-            .stateIn(
+            .onEach { songs ->
+                _frequentSongsInitialized.value = true
+                finderRenderCache.setFrequentSongs(songs)
+            }.stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.Eagerly,
-                initialValue = emptyList(),
+                initialValue = cachedFrequentSongs.orEmpty(),
             )
 
     /**
@@ -113,10 +124,11 @@ class HomeViewModel(
     val playlists: StateFlow<List<Playlist>> =
         playlistRepository
             .getAllPlaylistsFlow()
+            .onEach(finderRenderCache::setPlaylists)
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5000),
-                initialValue = emptyList(),
+                initialValue = cachedPlaylists.orEmpty(),
             )
 
     /**
