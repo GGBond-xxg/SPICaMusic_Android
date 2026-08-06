@@ -770,6 +770,7 @@
   <string name="equalizer_flat">Flat</string>
   <string name="equalizer_enable">Enable equalizer</string>
   <string name="equalizer_enable_subtitle">Apply the ten-band EQ to local and cloud playback</string>
+  <string name="equalizer_disabled_by_hifi">Turn off Hi-Fi mode before using the equalizer</string>
   <string name="equalizer_pop">Pop</string>
   <string name="equalizer_rock">Rock</string>
   <string name="equalizer_classical">Classical</string>

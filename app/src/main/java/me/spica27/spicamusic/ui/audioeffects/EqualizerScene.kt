@@ -48,6 +48,8 @@ class EqualizerScene : StackScene() {
         val viewModel: AudioEffectsViewModel = koinViewModel()
         val enabled by viewModel.eqEnabled.collectAsStateWithLifecycle()
         val bands by viewModel.eqBands.collectAsStateWithLifecycle()
+        val hiFiMode by viewModel.hiFiMode.collectAsStateWithLifecycle()
+        val controlsEnabled = !hiFiMode
 
         Scaffold(
             containerColor = MaterialTheme.colorScheme.surface,
@@ -63,7 +65,10 @@ class EqualizerScene : StackScene() {
                         }
                     },
                     actions = {
-                        TextButton(onClick = { viewModel.setAllEqBands(List(10) { 0f }) }) {
+                        TextButton(
+                            onClick = { viewModel.setAllEqBands(List(10) { 0f }) },
+                            enabled = controlsEnabled,
+                        ) {
                             Text(stringResource(R.string.equalizer_flat))
                         }
                     },
@@ -112,14 +117,22 @@ class EqualizerScene : StackScene() {
                                     fontWeight = FontWeight.SemiBold,
                                 )
                                 Text(
-                                    text = stringResource(R.string.equalizer_enable_subtitle),
+                                    text =
+                                        stringResource(
+                                            if (hiFiMode) {
+                                                R.string.equalizer_disabled_by_hifi
+                                            } else {
+                                                R.string.equalizer_enable_subtitle
+                                            },
+                                        ),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                             Switch(
-                                checked = enabled,
+                                checked = enabled && controlsEnabled,
                                 onCheckedChange = viewModel::setEqEnabled,
+                                enabled = controlsEnabled,
                             )
                         }
                     }
@@ -140,18 +153,22 @@ class EqualizerScene : StackScene() {
                             PresetChip(
                                 text = stringResource(R.string.equalizer_pop),
                                 onClick = { viewModel.applyPreset(AudioEffectsViewModel.Preset.POP) },
+                                enabled = controlsEnabled,
                             )
                             PresetChip(
                                 text = stringResource(R.string.equalizer_rock),
                                 onClick = { viewModel.applyPreset(AudioEffectsViewModel.Preset.ROCK) },
+                                enabled = controlsEnabled,
                             )
                             PresetChip(
                                 text = stringResource(R.string.equalizer_classical),
                                 onClick = { viewModel.applyPreset(AudioEffectsViewModel.Preset.CLASSICAL) },
+                                enabled = controlsEnabled,
                             )
                             PresetChip(
                                 text = stringResource(R.string.equalizer_jazz),
                                 onClick = { viewModel.applyPreset(AudioEffectsViewModel.Preset.JAZZ) },
+                                enabled = controlsEnabled,
                             )
                         }
                     }
@@ -166,7 +183,7 @@ class EqualizerScene : StackScene() {
                     EqualizerBand(
                         frequency = FREQUENCIES[index],
                         value = value,
-                        enabled = enabled,
+                        enabled = enabled && controlsEnabled,
                         onValueChange = { viewModel.setEqBandGain(index, it) },
                     )
                 }
@@ -184,10 +201,12 @@ class EqualizerScene : StackScene() {
 private fun PresetChip(
     text: String,
     onClick: () -> Unit,
+    enabled: Boolean,
 ) {
     FilterChip(
         selected = false,
         onClick = onClick,
+        enabled = enabled,
         label = { Text(text) },
     )
 }

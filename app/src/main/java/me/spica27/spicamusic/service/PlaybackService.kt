@@ -11,6 +11,7 @@ import android.os.Looper
 import android.os.SystemClock
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -31,6 +32,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.guava.future
 import kotlinx.coroutines.isActive
@@ -38,6 +40,7 @@ import kotlinx.coroutines.launch
 import me.spica27.spicamusic.cloud.CloudPlaybackItemResolver
 import me.spica27.spicamusic.feature.settings.domain.SettingsUseCases
 import me.spica27.spicamusic.player.api.IMusicPlayer
+import me.spica27.spicamusic.player.impl.SpicaPlayer
 import me.spica27.spicamusic.player.impl.utils.MediaLibrary
 import me.spica27.spicamusic.topdisplay.TopDisplayModeController
 import org.koin.android.ext.android.inject
@@ -57,6 +60,7 @@ class PlaybackService : MediaLibraryService() {
 
     private var mediaSession: MediaLibrarySession? = null
     private lateinit var exoPlayer: ExoPlayer
+    private lateinit var sessionPlayer: Player
     private var audioSink: DefaultAudioSink? = null
 
     // 服务级别的协程作用域
@@ -79,10 +83,15 @@ class PlaybackService : MediaLibraryService() {
     @Volatile
     private var usbDacOutputEnabled = false
 
+    @Volatile
+    private var hiFiOutputEnabled = false
+
     private var resumeAfterDisconnect = false
     private var disconnectPauseAtMs = 0L
     private var fadeInStartedAtMs = 0L
     private var fadeMonitorJob: Job? = null
+    private var manualFadeJob: Job? = null
+    private var manualFadeActive = false
     private val audioDeviceCallback =
         object : AudioDeviceCallback() {
             override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
@@ -92,6 +101,9 @@ class PlaybackService : MediaLibraryService() {
 
             override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
                 applyPreferredUsbDevice()
+                if (removedDevices.any(::isReconnectableOutput) && exoPlayer.playWhenReady) {
+                    armReconnectResume()
+                }
             }
         }
     private val playbackListener =
@@ -104,8 +116,7 @@ class PlaybackService : MediaLibraryService() {
                     playWhenReady -> clearReconnectResume()
                     !resumeOnHeadsetEnabled -> clearReconnectResume()
                     reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY -> {
-                        resumeAfterDisconnect = true
-                        disconnectPauseAtMs = SystemClock.elapsedRealtime()
+                        armReconnectResume()
                     }
                     else -> clearReconnectResume()
                 }
@@ -116,14 +127,56 @@ class PlaybackService : MediaLibraryService() {
                 reason: Int,
             ) {
                 if (fadeEnabled && mediaItem != null) {
-                    fadeInStartedAtMs = SystemClock.elapsedRealtime()
-                    exoPlayer.volume = 0f
+                    beginFadeIn()
                 } else {
                     fadeInStartedAtMs = 0L
                     exoPlayer.volume = 1f
                 }
             }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (isPlaying && fadeEnabled && exoPlayer.volume <= 0.01f) {
+                    fadeInStartedAtMs = SystemClock.elapsedRealtime()
+                }
+            }
         }
+
+    private inner class FadeAwarePlayer(
+        private val delegatePlayer: ExoPlayer,
+    ) : ForwardingPlayer(delegatePlayer) {
+        override fun play() = requestPlayWithFade { delegatePlayer.play() }
+
+        override fun pause() = requestFadeOut { delegatePlayer.pause() }
+
+        override fun stop() = requestFadeOut { delegatePlayer.stop() }
+
+        override fun setPlayWhenReady(playWhenReady: Boolean) {
+            if (playWhenReady) {
+                requestPlayWithFade { delegatePlayer.playWhenReady = true }
+            } else {
+                requestFadeOut { delegatePlayer.playWhenReady = false }
+            }
+        }
+
+        override fun seekToNext() = requestTrackChangeWithFade { delegatePlayer.seekToNext() }
+
+        override fun seekToNextMediaItem() = requestTrackChangeWithFade { delegatePlayer.seekToNextMediaItem() }
+
+        override fun seekToPrevious() = requestTrackChangeWithFade { delegatePlayer.seekToPrevious() }
+
+        override fun seekToPreviousMediaItem() = requestTrackChangeWithFade { delegatePlayer.seekToPreviousMediaItem() }
+
+        override fun seekTo(
+            mediaItemIndex: Int,
+            positionMs: Long,
+        ) {
+            if (mediaItemIndex == delegatePlayer.currentMediaItemIndex) {
+                delegatePlayer.seekTo(mediaItemIndex, positionMs)
+            } else {
+                requestTrackChangeWithFade { delegatePlayer.seekTo(mediaItemIndex, positionMs) }
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -133,6 +186,7 @@ class PlaybackService : MediaLibraryService() {
         val initialHiFi =
             PlaybackAudioCapabilities.supportsFloatOutput() &&
                 settingsUseCases.getCachedBoolean(SettingsUseCases.Keys.HIFI_MODE, false)
+        hiFiOutputEnabled = initialHiFi
         usbDacOutputEnabled =
             settingsUseCases.getCachedBoolean(SettingsUseCases.Keys.USB_DAC_OUTPUT, false)
         // 创建自定义渲染器工厂，添加音频处理器（FFT、EQ、混响）
@@ -174,6 +228,7 @@ class PlaybackService : MediaLibraryService() {
                     renderersFactory,
                 ).setWakeMode(C.WAKE_MODE_LOCAL)
                 .setMaxSeekToPreviousPositionMs(Long.MAX_VALUE)
+                .setHandleAudioBecomingNoisy(true)
                 .setAudioAttributes(
                     AudioAttributes
                         .Builder()
@@ -186,6 +241,7 @@ class PlaybackService : MediaLibraryService() {
                 ).setUsePlatformDiagnostics(false)
                 .build()
         exoPlayer.addListener(playbackListener)
+        sessionPlayer = FadeAwarePlayer(exoPlayer)
         audioManager.registerAudioDeviceCallback(audioDeviceCallback, Handler(Looper.getMainLooper()))
         startSettingsObservers()
         startFadeMonitor()
@@ -195,7 +251,7 @@ class PlaybackService : MediaLibraryService() {
             MediaLibrarySession
                 .Builder(
                     this,
-                    exoPlayer,
+                    sessionPlayer,
                     object : MediaLibrarySession.Callback {
                         override fun onAddMediaItems(
                             session: MediaSession,
@@ -296,6 +352,7 @@ class PlaybackService : MediaLibraryService() {
     override fun onDestroy() {
         runCatching { audioManager.unregisterAudioDeviceCallback(audioDeviceCallback) }
         fadeMonitorJob?.cancel()
+        manualFadeJob?.cancel()
         exoPlayer.removeListener(playbackListener)
         topDisplayModeController.release()
         serviceScope.cancel()
@@ -306,6 +363,99 @@ class PlaybackService : MediaLibraryService() {
             mediaSession = null
         }
         super.onDestroy()
+    }
+
+    private fun buildExoPlayer(enableHiFi: Boolean): ExoPlayer {
+        val renderersFactory =
+            object : DefaultRenderersFactory(this) {
+                override fun buildAudioSink(
+                    context: Context,
+                    enableFloatOutput: Boolean,
+                    enableAudioTrackPlaybackParams: Boolean,
+                ): AudioSink =
+                    DefaultAudioSink
+                        .Builder(context)
+                        .setEnableFloatOutput(enableFloatOutput)
+                        .setEnableAudioOutputPlaybackParameters(enableAudioTrackPlaybackParams)
+                        .setAudioProcessors(
+                            (player as? SpicaPlayer)?.getAudioProcessors()
+                                ?: arrayOf(player.fftAudioProcessor),
+                        ).build()
+                        .apply {
+                            setExtensionRendererMode(EXTENSION_RENDERER_MODE_PREFER)
+                            audioSink = this
+                            if (usbDacOutputEnabled) {
+                                setPreferredDevice(PlaybackAudioCapabilities.usbOutput(this@PlaybackService))
+                            }
+                        }
+            }.apply {
+                setEnableAudioFloatOutput(enableHiFi)
+            }
+        return ExoPlayer
+            .Builder(
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    createAttributionContext("audioPlayback")
+                } else {
+                    this
+                },
+                renderersFactory,
+            ).setWakeMode(C.WAKE_MODE_LOCAL)
+            .setMaxSeekToPreviousPositionMs(Long.MAX_VALUE)
+            .setHandleAudioBecomingNoisy(true)
+            .setAudioAttributes(
+                AudioAttributes
+                    .Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setSpatializationBehavior(C.SPATIALIZATION_BEHAVIOR_AUTO)
+                    .setAllowedCapturePolicy(C.ALLOW_CAPTURE_BY_ALL)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                    .build(),
+                true,
+            ).setUsePlatformDiagnostics(false)
+            .build()
+    }
+
+    private fun reconfigureAudioPipeline(enableHiFi: Boolean) {
+        if (enableHiFi == hiFiOutputEnabled) return
+        val oldPlayer = exoPlayer
+        val mediaItems = List(oldPlayer.mediaItemCount) { oldPlayer.getMediaItemAt(it) }
+        val currentIndex = oldPlayer.currentMediaItemIndex
+        val currentPosition = oldPlayer.currentPosition
+        val playWhenReady = oldPlayer.playWhenReady
+        val repeatMode = oldPlayer.repeatMode
+        val shuffleModeEnabled = oldPlayer.shuffleModeEnabled
+        val playbackParameters = oldPlayer.playbackParameters
+
+        manualFadeJob?.cancel()
+        manualFadeActive = false
+        fadeInStartedAtMs = 0L
+
+        val replacement = buildExoPlayer(enableHiFi)
+        replacement.repeatMode = repeatMode
+        replacement.shuffleModeEnabled = shuffleModeEnabled
+        replacement.playbackParameters = playbackParameters
+        replacement.addListener(playbackListener)
+        exoPlayer = replacement
+        sessionPlayer = FadeAwarePlayer(replacement)
+        mediaSession?.setPlayer(sessionPlayer)
+        oldPlayer.removeListener(playbackListener)
+        oldPlayer.release()
+
+        if (mediaItems.isNotEmpty()) {
+            replacement.setMediaItems(
+                mediaItems,
+                currentIndex.coerceIn(0, mediaItems.lastIndex),
+                currentPosition.coerceAtLeast(0L),
+            )
+            replacement.prepare()
+        }
+        topDisplayModeController.start(replacement)
+        hiFiOutputEnabled = enableHiFi
+        replacement.playWhenReady = playWhenReady
+        if (playWhenReady && fadeEnabled && mediaItems.isNotEmpty()) beginFadeIn()
+        Timber
+            .tag("PlaybackService")
+            .i("Audio pipeline rebuilt: Hi-Fi=$enableHiFi, EQ=${!enableHiFi}")
     }
 
     private fun startSettingsObservers() {
@@ -328,6 +478,8 @@ class PlaybackService : MediaLibraryService() {
                 .collect {
                     fadeEnabled = it
                     if (!it) {
+                        manualFadeJob?.cancel()
+                        manualFadeActive = false
                         fadeInStartedAtMs = 0L
                         playerScope.launch { exoPlayer.volume = 1f }
                     }
@@ -347,9 +499,19 @@ class PlaybackService : MediaLibraryService() {
                 }
         }
         serviceScope.launch {
-            settingsUseCases
-                .getBoolean(SettingsUseCases.Keys.EQ_ENABLED, false)
-                .collect(player::setEQEnabled)
+            combine(
+                settingsUseCases.getBoolean(SettingsUseCases.Keys.HIFI_MODE, false),
+                settingsUseCases.getBoolean(SettingsUseCases.Keys.EQ_ENABLED, false),
+            ) { requestedHiFi, eqEnabled -> requestedHiFi to eqEnabled }
+                .collect { (requestedHiFi, eqEnabled) ->
+                    val effectiveHiFi =
+                        requestedHiFi && PlaybackAudioCapabilities.supportsFloatOutput()
+                    if (effectiveHiFi && eqEnabled) {
+                        settingsUseCases.setBoolean(SettingsUseCases.Keys.EQ_ENABLED, false)
+                    }
+                    player.setEQEnabled(eqEnabled && !effectiveHiFi)
+                    playerScope.launch { reconfigureAudioPipeline(effectiveHiFi) }
+                }
         }
         serviceScope.launch {
             settingsUseCases
@@ -390,6 +552,10 @@ class PlaybackService : MediaLibraryService() {
         fadeMonitorJob =
             playerScope.launch {
                 while (isActive) {
+                    if (manualFadeActive) {
+                        delay(FADE_TICK_MS)
+                        continue
+                    }
                     if (!fadeEnabled || !exoPlayer.isPlaying) {
                         if (!fadeEnabled) exoPlayer.volume = 1f
                         delay(FADE_TICK_MS)
@@ -417,6 +583,61 @@ class PlaybackService : MediaLibraryService() {
             }
     }
 
+    private fun beginFadeIn() {
+        manualFadeJob?.cancel()
+        manualFadeActive = false
+        fadeInStartedAtMs = SystemClock.elapsedRealtime()
+        exoPlayer.volume = 0f
+    }
+
+    private fun requestPlayWithFade(action: () -> Unit) {
+        manualFadeJob?.cancel()
+        manualFadeActive = false
+        if (!fadeEnabled || exoPlayer.currentMediaItem == null || exoPlayer.isPlaying) {
+            if (!fadeEnabled) exoPlayer.volume = 1f
+            action()
+            return
+        }
+        beginFadeIn()
+        action()
+    }
+
+    private fun requestFadeOut(action: () -> Unit) {
+        if (!fadeEnabled || !exoPlayer.isPlaying) {
+            action()
+            return
+        }
+        manualFadeJob?.cancel()
+        manualFadeJob =
+            playerScope.launch {
+                manualFadeActive = true
+                try {
+                    val startVolume = exoPlayer.volume.coerceIn(0f, 1f)
+                    val duration = minOf(fadeDurationMs, CONTROL_FADE_MAX_MS)
+                    val startedAt = SystemClock.elapsedRealtime()
+                    while (isActive) {
+                        val progress =
+                            ((SystemClock.elapsedRealtime() - startedAt).toFloat() / duration)
+                                .coerceIn(0f, 1f)
+                        exoPlayer.volume = startVolume * (1f - progress)
+                        if (progress >= 1f) break
+                        delay(FADE_TICK_MS)
+                    }
+                    exoPlayer.volume = 0f
+                    action()
+                } finally {
+                    manualFadeActive = false
+                }
+            }
+    }
+
+    private fun requestTrackChangeWithFade(action: () -> Unit) {
+        requestFadeOut {
+            action()
+            if (!fadeEnabled) exoPlayer.volume = 1f
+        }
+    }
+
     private fun applyPreferredUsbDevice() {
         val preferred =
             if (usbDacOutputEnabled) {
@@ -441,10 +662,16 @@ class PlaybackService : MediaLibraryService() {
                     .getDevices(AudioManager.GET_DEVICES_OUTPUTS)
                     .any(::isReconnectableOutput)
             ) {
-                exoPlayer.play()
+                requestPlayWithFade { exoPlayer.play() }
             }
             clearReconnectResume()
         }
+    }
+
+    private fun armReconnectResume() {
+        if (!resumeOnHeadsetEnabled) return
+        resumeAfterDisconnect = true
+        disconnectPauseAtMs = SystemClock.elapsedRealtime()
     }
 
     private fun clearReconnectResume() {
@@ -461,6 +688,9 @@ class PlaybackService : MediaLibraryService() {
             AudioDeviceInfo.TYPE_USB_DEVICE,
             AudioDeviceInfo.TYPE_USB_HEADSET,
             AudioDeviceInfo.TYPE_USB_ACCESSORY,
+            AudioDeviceInfo.TYPE_HEARING_AID,
+            AudioDeviceInfo.TYPE_BLE_HEADSET,
+            AudioDeviceInfo.TYPE_BLE_SPEAKER,
             -> true
             else -> false
         }
@@ -468,6 +698,7 @@ class PlaybackService : MediaLibraryService() {
     private companion object {
         const val DEFAULT_FADE_DURATION_MS = 4_000L
         const val FADE_TICK_MS = 50L
+        const val CONTROL_FADE_MAX_MS = 600L
         const val HEADSET_RESUME_WINDOW_MS = 10 * 60 * 1_000L
     }
 }

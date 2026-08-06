@@ -137,6 +137,9 @@ class SettingsViewModel(
     fun setHiFiMode(enabled: Boolean) {
         if (enabled && !hiFiSupported) return
         viewModelScope.launch {
+            if (enabled) {
+                settingsUseCases.setBoolean(SettingsUseCases.Keys.EQ_ENABLED, false)
+            }
             settingsUseCases.setBoolean(SettingsUseCases.Keys.HIFI_MODE, enabled)
         }
     }

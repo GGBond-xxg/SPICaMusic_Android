@@ -38,6 +38,11 @@ class AudioEffectsViewModel(
             .getFloatList(SettingsUseCases.Keys.EQ_BANDS, defaultEqBands)
             .stateIn(viewModelScope, SharingStarted.Eagerly, defaultEqBands)
 
+    val hiFiMode: StateFlow<Boolean> =
+        settingsUseCases
+            .getBoolean(SettingsUseCases.Keys.HIFI_MODE, false)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     // 混响开关
     val reverbEnabled: StateFlow<Boolean> =
         settingsUseCases
@@ -100,6 +105,7 @@ class AudioEffectsViewModel(
      * 只更新 DataStore，通过 Flow 监听自动应用到播放器
      */
     fun setEqEnabled(enabled: Boolean) {
+        if (enabled && hiFiMode.value) return
         viewModelScope.launch {
             settingsUseCases.setBoolean(SettingsUseCases.Keys.EQ_ENABLED, enabled)
         }
@@ -114,7 +120,7 @@ class AudioEffectsViewModel(
         band: Int,
         gainDb: Float,
     ) {
-        if (band !in 0..9) return
+        if (hiFiMode.value || band !in 0..9) return
 
         viewModelScope.launch {
             val newBands = eqBands.value.toMutableList()
@@ -127,7 +133,7 @@ class AudioEffectsViewModel(
      * 设置所有 EQ 频段增益
      */
     fun setAllEqBands(bands: List<Float>) {
-        if (bands.size != 10) return
+        if (hiFiMode.value || bands.size != 10) return
 
         viewModelScope.launch {
             val clampedBands = bands.map { it.coerceIn(-12f, 12f) }
@@ -139,6 +145,7 @@ class AudioEffectsViewModel(
      * 应用预设配置
      */
     fun applyPreset(preset: Preset) {
+        if (hiFiMode.value) return
         viewModelScope.launch {
             val bands =
                 when (preset) {

@@ -768,6 +768,7 @@
   <string name="equalizer_flat">平坦</string>
   <string name="equalizer_enable">啟用均衡器</string>
   <string name="equalizer_enable_subtitle">對本機與雲端播放套用十段 EQ</string>
+  <string name="equalizer_disabled_by_hifi">Hi-Fi 模式開啟時不可使用，請先關閉 Hi-Fi</string>
   <string name="equalizer_pop">流行</string>
   <string name="equalizer_rock">搖滾</string>
   <string name="equalizer_classical">古典</string>
