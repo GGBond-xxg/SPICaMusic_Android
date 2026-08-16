@@ -40,7 +40,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -49,8 +48,10 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
@@ -59,10 +60,11 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Scanner
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.SortByAlpha
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -122,8 +124,8 @@ import me.spica27.spicamusic.common.entity.getAlbumCoverUri
 import me.spica27.spicamusic.common.entity.getCoverUri
 import me.spica27.spicamusic.ui.albumdetail.AlbumDetailScene
 import me.spica27.spicamusic.ui.artistdetail.ArtistDetailScene
-import me.spica27.spicamusic.ui.dialog.SongMenuScene
 import me.spica27.spicamusic.ui.dialog.CloudSongMenuScene
+import me.spica27.spicamusic.ui.dialog.SongMenuScene
 import me.spica27.spicamusic.ui.dialog.SortMenuOption
 import me.spica27.spicamusic.ui.dialog.SortMenuScene
 import me.spica27.spicamusic.ui.home.HomeViewModel
@@ -180,15 +182,16 @@ private enum class MusicBrowserTab(
 private enum class SongLibrarySource(
     val titleRes: Int,
     val cloudSource: CloudSongSource? = null,
+    val icon: ImageVector,
 ) {
-    All(R.string.music_source_all),
-    Local(R.string.music_source_local),
-    Telegram(R.string.music_source_telegram, CloudSongSource.TELEGRAM),
-    Jellyfin(R.string.music_source_jellyfin, CloudSongSource.JELLYFIN),
-    Emby(R.string.music_source_emby, CloudSongSource.EMBY),
-    Subsonic(R.string.music_source_subsonic, CloudSongSource.SUBSONIC),
-    Netease(R.string.music_source_netease, CloudSongSource.NETEASE),
-    QqMusic(R.string.music_source_qq, CloudSongSource.QQ_MUSIC),
+    All(R.string.music_source_all, icon = Icons.Default.AllInclusive),
+    Local(R.string.music_source_local, icon = Icons.Default.Smartphone),
+    Telegram(R.string.music_source_telegram, CloudSongSource.TELEGRAM, Icons.Default.Cloud),
+    Jellyfin(R.string.music_source_jellyfin, CloudSongSource.JELLYFIN, Icons.Default.Storage),
+    Emby(R.string.music_source_emby, CloudSongSource.EMBY, Icons.Default.Storage),
+    Subsonic(R.string.music_source_subsonic, CloudSongSource.SUBSONIC, Icons.Default.Storage),
+    Netease(R.string.music_source_netease, CloudSongSource.NETEASE, Icons.Default.Cloud),
+    QqMusic(R.string.music_source_qq, CloudSongSource.QQ_MUSIC, Icons.Default.Cloud),
 }
 
 @Immutable
@@ -232,6 +235,27 @@ private sealed interface BrowserSongItem {
 private data class SongRowSubtitle(
     val artist: String,
     val album: String,
+)
+
+@Immutable
+private data class BrowserAlbumItem(
+    val stableId: String,
+    val title: String,
+    val artist: String,
+    val numberOfSongs: Int,
+    val artworkUri: Uri?,
+    val localAlbum: Album? = null,
+    val source: CloudSongSource? = null,
+)
+
+@Immutable
+private data class BrowserArtistItem(
+    val stableId: String,
+    val name: String,
+    val songCount: Int,
+    val artworkUri: Uri?,
+    val localArtist: Artist? = null,
+    val source: CloudSongSource? = null,
 )
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -312,56 +336,62 @@ private fun formatDuration(durationMs: Long): String {
 @Immutable
 private enum class AlbumSortMode(
     val option: SortMenuOption,
-    val comparator: Comparator<Album>,
 ) {
     TitleAsc(
         SortMenuOption("title_asc", R.string.sort_album_title_az, Icons.Default.SortByAlpha),
-        compareBy(String.CASE_INSENSITIVE_ORDER) { it.title },
     ),
     TitleDesc(
         SortMenuOption("title_desc", R.string.sort_album_title_za, Icons.Default.SortByAlpha),
-        compareBy(String.CASE_INSENSITIVE_ORDER, Album::title).reversed(),
     ),
     ArtistAsc(
         SortMenuOption("artist_asc", R.string.sort_album_artist_az, Icons.Default.Person),
-        compareBy(String.CASE_INSENSITIVE_ORDER) { it.artist },
     ),
     ArtistDesc(
         SortMenuOption("artist_desc", R.string.sort_album_artist_za, Icons.Default.Person),
-        compareBy(String.CASE_INSENSITIVE_ORDER, Album::artist).reversed(),
     ),
     CountDesc(
         SortMenuOption("count_desc", R.string.sort_album_count_desc, Icons.Default.FormatListNumbered),
-        compareByDescending { it.numberOfSongs },
     ),
     CountAsc(
         SortMenuOption("count_asc", R.string.sort_album_count_asc, Icons.Default.FormatListNumbered),
-        compareBy { it.numberOfSongs },
     ),
 }
 
 @Immutable
 private enum class ArtistSortMode(
     val option: SortMenuOption,
-    val comparator: Comparator<Artist>,
 ) {
     NameAsc(
         SortMenuOption("name_asc", R.string.sort_artist_name_az, Icons.Default.SortByAlpha),
-        compareBy(String.CASE_INSENSITIVE_ORDER) { it.name },
     ),
     NameDesc(
         SortMenuOption("name_desc", R.string.sort_artist_name_za, Icons.Default.SortByAlpha),
-        compareBy(String.CASE_INSENSITIVE_ORDER, Artist::name).reversed(),
     ),
     CountDesc(
         SortMenuOption("count_desc", R.string.sort_artist_count_desc, Icons.Default.FormatListNumbered),
-        compareByDescending { it.songCount },
     ),
     CountAsc(
         SortMenuOption("count_asc", R.string.sort_artist_count_asc, Icons.Default.FormatListNumbered),
-        compareBy { it.songCount },
     ),
 }
+
+private fun AlbumSortMode.browserComparator(): Comparator<BrowserAlbumItem> =
+    when (this) {
+        AlbumSortMode.TitleAsc -> compareBy(String.CASE_INSENSITIVE_ORDER, BrowserAlbumItem::title)
+        AlbumSortMode.TitleDesc -> compareBy(String.CASE_INSENSITIVE_ORDER, BrowserAlbumItem::title).reversed()
+        AlbumSortMode.ArtistAsc -> compareBy(String.CASE_INSENSITIVE_ORDER, BrowserAlbumItem::artist)
+        AlbumSortMode.ArtistDesc -> compareBy(String.CASE_INSENSITIVE_ORDER, BrowserAlbumItem::artist).reversed()
+        AlbumSortMode.CountDesc -> compareByDescending(BrowserAlbumItem::numberOfSongs)
+        AlbumSortMode.CountAsc -> compareBy(BrowserAlbumItem::numberOfSongs)
+    }
+
+private fun ArtistSortMode.browserComparator(): Comparator<BrowserArtistItem> =
+    when (this) {
+        ArtistSortMode.NameAsc -> compareBy(String.CASE_INSENSITIVE_ORDER, BrowserArtistItem::name)
+        ArtistSortMode.NameDesc -> compareBy(String.CASE_INSENSITIVE_ORDER, BrowserArtistItem::name).reversed()
+        ArtistSortMode.CountDesc -> compareByDescending(BrowserArtistItem::songCount)
+        ArtistSortMode.CountAsc -> compareBy(BrowserArtistItem::songCount)
+    }
 
 @Composable
 fun MusicPage() {
@@ -389,11 +419,11 @@ fun MusicPage() {
     val unknownAlbum = stringResource(R.string.unknown_album)
     val unknownArtist = stringResource(R.string.unknown_artist)
 
-    val albums =
+    val localAlbums =
         remember(allSongs, unknownAlbum, unknownArtist) {
             allSongs.toAlbums(unknownAlbum = unknownAlbum, unknownArtist = unknownArtist)
         }
-    val artists =
+    val localArtists =
         remember(allSongs, unknownArtist) {
             allSongs.toArtists(unknownArtist = unknownArtist)
         }
@@ -433,21 +463,30 @@ fun MusicPage() {
     LaunchedEffect(availableSources) {
         if (selectedSource !in availableSources) selectedSource = SongLibrarySource.All
     }
-    val browserSongs =
-        remember(allSongs, cloudCatalog.songs, selectedSource) {
+    val allBrowserSongs =
+        remember(allSongs, cloudCatalog.songs) {
             buildList {
-                if (selectedSource == SongLibrarySource.All || selectedSource == SongLibrarySource.Local) {
-                    allSongs.forEach { add(BrowserSongItem.Local(it)) }
-                }
-                if (selectedSource != SongLibrarySource.Local) {
-                    cloudCatalog.songs
-                        .asSequence()
-                        .filter {
-                            selectedSource == SongLibrarySource.All ||
-                                it.source == selectedSource.cloudSource
-                        }.forEach { add(BrowserSongItem.Cloud(it)) }
+                allSongs.forEach { add(BrowserSongItem.Local(it)) }
+                cloudCatalog.songs.forEach { add(BrowserSongItem.Cloud(it)) }
+            }
+        }
+    val browserSongs =
+        remember(allBrowserSongs, selectedSource) {
+            allBrowserSongs.filter {
+                when (selectedSource) {
+                    SongLibrarySource.All -> true
+                    SongLibrarySource.Local -> it.source == null
+                    else -> it.source == selectedSource.cloudSource
                 }
             }
+        }
+    val albums =
+        remember(allBrowserSongs, localAlbums, unknownAlbum, unknownArtist) {
+            allBrowserSongs.toBrowserAlbums(localAlbums, unknownAlbum, unknownArtist)
+        }
+    val artists =
+        remember(allBrowserSongs, localArtists, unknownArtist) {
+            allBrowserSongs.toBrowserArtists(localArtists, unknownArtist)
         }
     val filteredSongs =
         remember(browserSongs, searchQuery, songSortMode) {
@@ -482,14 +521,14 @@ fun MusicPage() {
     val filteredAlbums =
         remember(albums, searchQuery, albumSortMode) {
             albums
-                .filterAlbumsBy(searchQuery)
-                .sortedWith(albumSortMode.comparator)
+                .filterBrowserAlbumsBy(searchQuery)
+                .sortedWith(albumSortMode.browserComparator())
         }
     val filteredArtists =
         remember(artists, searchQuery, artistSortMode) {
             artists
-                .filterArtistsBy(searchQuery)
-                .sortedWith(artistSortMode.comparator)
+                .filterBrowserArtistsBy(searchQuery)
+                .sortedWith(artistSortMode.browserComparator())
         }
 
     val listState = rememberLazyListState()
@@ -498,6 +537,29 @@ fun MusicPage() {
     val focusManager = LocalFocusManager.current
     // 排序菜单锚点：挂在页面作用域，锚点图标本身在 Lazy item 内
     val sortAnchor = rememberPopupMenuAnchorState()
+    val sourceAnchor = rememberPopupMenuAnchorState()
+
+    fun openSourceMenu() {
+        if (sourceAnchor.isOpen) return
+        path.push(
+            SortMenuScene(
+                anchorState = sourceAnchor,
+                anchorIcon = selectedSource.icon,
+                options =
+                    availableSources.map {
+                        SortMenuOption(it.name, it.titleRes, it.icon)
+                    },
+                selectedId = selectedSource.name,
+                onSelect = { id ->
+                    SongLibrarySource.entries.firstOrNull { it.name == id }?.let {
+                        selectedSource = it
+                        playlistEntrance = true
+                    }
+                },
+                titleRes = R.string.music_source_selector_cd,
+            ),
+        )
+    }
 
     fun openSortMenu() {
         if (sortAnchor.isOpen) return
@@ -631,19 +693,6 @@ fun MusicPage() {
                 )
             }
 
-            if (selectedTab == MusicBrowserTab.Songs) {
-                item(key = "song_sources", contentType = "song_sources") {
-                    MusicSourceFilterRow(
-                        sources = availableSources,
-                        selected = selectedSource,
-                        onSelect = {
-                            selectedSource = it
-                            playlistEntrance = true
-                        },
-                    )
-                }
-            }
-
             item(key = "search", contentType = "search") {
                 val entrance = rememberEntrance(order = 2, play = playEntrance)
                 MusicSearchBar(
@@ -673,6 +722,10 @@ fun MusicPage() {
                         },
                     sortAnchor = sortAnchor,
                     onSortClick = ::openSortMenu,
+                    sourceAnchor = sourceAnchor,
+                    sourceIcon = selectedSource.icon,
+                    showSourceSelector = selectedTab == MusicBrowserTab.Songs,
+                    onSourceClick = ::openSourceMenu,
                     showCloudRefresh =
                         selectedTab == MusicBrowserTab.Songs &&
                             selectedSource != SongLibrarySource.Local &&
@@ -825,7 +878,7 @@ fun MusicPage() {
                     } else {
                         itemsIndexed(
                             items = filteredAlbums,
-                            key = { index, album -> album.id },
+                            key = { _, album -> album.stableId },
                             contentType = { index, _ -> "album" },
                         ) { index, album ->
                             val entrance =
@@ -835,7 +888,14 @@ fun MusicPage() {
                                 )
                             MusicAlbumRow(
                                 album = album,
-                                onClick = { path.push(AlbumDetailScene(album)) },
+                                onClick = {
+                                    album.localAlbum?.let { path.push(AlbumDetailScene(it)) }
+                                        ?: run {
+                                            selectedTab = MusicBrowserTab.Songs
+                                            selectedSource = album.source?.filter() ?: SongLibrarySource.All
+                                            searchQuery = album.title
+                                        }
+                                },
                                 modifier =
                                     Modifier
                                         .animateItem(
@@ -877,7 +937,7 @@ fun MusicPage() {
                     } else {
                         itemsIndexed(
                             items = filteredArtists,
-                            key = { index, artist -> artist.name },
+                            key = { _, artist -> artist.stableId },
                             contentType = { index, _ -> "artist" },
                         ) { index, artist ->
                             val entrance =
@@ -887,7 +947,14 @@ fun MusicPage() {
                                 )
                             MusicArtistRow(
                                 artist = artist,
-                                onClick = { path.push(ArtistDetailScene(artist)) },
+                                onClick = {
+                                    artist.localArtist?.let { path.push(ArtistDetailScene(it)) }
+                                        ?: run {
+                                            selectedTab = MusicBrowserTab.Songs
+                                            selectedSource = artist.source?.filter() ?: SongLibrarySource.All
+                                            searchQuery = artist.name
+                                        }
+                                },
                                 modifier =
                                     Modifier
                                         .animateItem(
@@ -1262,35 +1329,6 @@ private fun MusicSearchBar(
 }
 
 @Composable
-private fun MusicSourceFilterRow(
-    sources: List<SongLibrarySource>,
-    selected: SongLibrarySource,
-    onSelect: (SongLibrarySource) -> Unit,
-) {
-    LazyRow(
-        contentPadding =
-            PaddingValues(horizontal = LayoutTokens.MusicHeaderHorizontalPadding),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
-    ) {
-        items(
-            items = sources,
-            key = SongLibrarySource::name,
-        ) { source ->
-            FilterChip(
-                selected = selected == source,
-                onClick = { onSelect(source) },
-                label = {
-                    Text(
-                        text = stringResource(source.titleRes),
-                        maxLines = 1,
-                    )
-                },
-            )
-        }
-    }
-}
-
-@Composable
 private fun MusicCloudLoadingState(compact: Boolean = false) {
     Row(
         modifier =
@@ -1319,6 +1357,10 @@ private fun MusicSectionHeader(
     count: Int,
     sortAnchor: PopupMenuAnchorState,
     onSortClick: () -> Unit,
+    sourceAnchor: PopupMenuAnchorState,
+    sourceIcon: ImageVector,
+    showSourceSelector: Boolean,
+    onSourceClick: () -> Unit,
     showCloudRefresh: Boolean,
     cloudRefreshing: Boolean,
     onCloudRefresh: () -> Unit,
@@ -1379,6 +1421,26 @@ private fun MusicSectionHeader(
                             modifier = Modifier.size(18.dp),
                         )
                     }
+                }
+            }
+            if (showSourceSelector) {
+                Box(
+                    modifier =
+                        Modifier
+                            .popupMenuAnchor(sourceAnchor)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer)
+                            .clickHighlight(
+                                onClickLabel = stringResource(R.string.music_source_selector_cd),
+                                onClick = onSourceClick,
+                            ).padding(Spacing.Small),
+                ) {
+                    Icon(
+                        imageVector = sourceIcon,
+                        contentDescription = stringResource(R.string.music_source_selector_cd),
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp),
+                    )
                 }
             }
             // 排序锚点：点击后图标原地过渡成排序菜单（SortMenuScene）
@@ -1513,7 +1575,7 @@ private fun MusicSongRow(
 
 @Composable
 private fun MusicAlbumRow(
-    album: Album,
+    album: BrowserAlbumItem,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1530,7 +1592,7 @@ private fun MusicAlbumRow(
         horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
     ) {
         AudioCover(
-            uri = album.getCoverUri(),
+            uri = album.artworkUri,
             modifier =
                 Modifier
                     .size(64.dp)
@@ -1564,7 +1626,7 @@ private fun MusicAlbumRow(
 
 @Composable
 private fun MusicArtistRow(
-    artist: Artist,
+    artist: BrowserArtistItem,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1581,7 +1643,7 @@ private fun MusicArtistRow(
         horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
     ) {
         AudioCover(
-            uri = artist.getCoverUri(),
+            uri = artist.artworkUri,
             modifier =
                 Modifier
                     .size(64.dp)
@@ -1751,6 +1813,60 @@ private fun List<Song>.toArtists(unknownArtist: String): List<Artist> =
             )
         }.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
 
+private fun List<BrowserSongItem>.toBrowserAlbums(
+    localAlbums: List<Album>,
+    unknownAlbum: String,
+    unknownArtist: String,
+): List<BrowserAlbumItem> {
+    val localById = localAlbums.associateBy(Album::id)
+    return groupBy { song ->
+        when (song) {
+            is BrowserSongItem.Local -> "local:${song.song.albumId}"
+            is BrowserSongItem.Cloud ->
+                "${song.source}:${song.album.trim().lowercase()}:${song.artist.trim().lowercase()}"
+        }
+    }.map { (stableId, songs) ->
+        val first = songs.first()
+        val localAlbum =
+            (first as? BrowserSongItem.Local)
+                ?.song
+                ?.albumId
+                ?.toString()
+                ?.let(localById::get)
+        BrowserAlbumItem(
+            stableId = stableId,
+            title = first.album.ifBlank { unknownAlbum },
+            artist = first.artist.ifBlank { unknownArtist },
+            numberOfSongs = songs.size,
+            artworkUri = first.artworkUri ?: first.fallbackArtworkUri,
+            localAlbum = localAlbum,
+            source = first.source,
+        )
+    }
+}
+
+private fun List<BrowserSongItem>.toBrowserArtists(
+    localArtists: List<Artist>,
+    unknownArtist: String,
+): List<BrowserArtistItem> {
+    val localByName = localArtists.associateBy(Artist::name)
+    return groupBy { song ->
+        val name = song.artist.ifBlank { unknownArtist }
+        "${song.source ?: "local"}:${name.trim().lowercase()}"
+    }.map { (stableId, songs) ->
+        val first = songs.first()
+        val name = first.artist.ifBlank { unknownArtist }
+        BrowserArtistItem(
+            stableId = stableId,
+            name = name,
+            songCount = songs.size,
+            artworkUri = first.artworkUri ?: first.fallbackArtworkUri,
+            localArtist = if (first.source == null) localByName[name] else null,
+            source = first.source,
+        )
+    }
+}
+
 private fun List<Song>.filterSongsBy(query: String): List<Song> {
     val normalized = query.trim()
     if (normalized.isEmpty()) return this
@@ -1776,10 +1892,25 @@ private fun List<Album>.filterAlbumsBy(query: String): List<Album> {
     }
 }
 
+private fun List<BrowserAlbumItem>.filterBrowserAlbumsBy(query: String): List<BrowserAlbumItem> {
+    val normalized = query.trim()
+    if (normalized.isEmpty()) return this
+    return filter { album ->
+        album.title.contains(normalized, ignoreCase = true) ||
+            album.artist.contains(normalized, ignoreCase = true)
+    }
+}
+
 private fun List<Artist>.filterArtistsBy(query: String): List<Artist> {
     val normalized = query.trim()
     if (normalized.isEmpty()) return this
     return filter { artist ->
         artist.name.contains(normalized, ignoreCase = true)
     }
+}
+
+private fun List<BrowserArtistItem>.filterBrowserArtistsBy(query: String): List<BrowserArtistItem> {
+    val normalized = query.trim()
+    if (normalized.isEmpty()) return this
+    return filter { it.name.contains(normalized, ignoreCase = true) }
 }

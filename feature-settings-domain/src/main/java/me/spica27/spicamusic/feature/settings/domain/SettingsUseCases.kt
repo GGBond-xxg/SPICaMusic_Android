@@ -18,6 +18,7 @@ class SettingsUseCases(
         val FADE_DURATION_MS = PreferencesManager.Keys.FADE_DURATION_MS
         val HIFI_MODE = PreferencesManager.Keys.HIFI_MODE
         val USB_DAC_OUTPUT = PreferencesManager.Keys.USB_DAC_OUTPUT
+        val CLOUD_AUDIO_CACHE_MIB = PreferencesManager.Keys.CLOUD_AUDIO_CACHE_MIB
         val LYRICON_ENABLED = PreferencesManager.Keys.LYRICON_ENABLED
         val TOP_DISPLAY_MODE = PreferencesManager.Keys.TOP_DISPLAY_MODE
         val DYNAMIC_SPECTRUM_BACKGROUND = PreferencesManager.Keys.DYNAMIC_SPECTRUM_BACKGROUND

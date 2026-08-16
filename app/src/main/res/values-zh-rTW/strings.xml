@@ -413,6 +413,7 @@
   <string name="music_search_albums_hint">搜尋專輯…</string>
   <string name="music_search_artists_hint">搜尋歌手…</string>
   <string name="music_sort_cd">排序</string>
+  <string name="music_source_selector_cd">播放清單</string>
   <string name="music_refresh_cloud_cd">重新整理雲端歌曲</string>
   <string name="sort_song_title_az">標題 A–Z</string>
   <string name="sort_song_title_za">標題 Z–A</string>
@@ -758,6 +759,8 @@
   <string name="settings_fade">淡入淡出</string>
   <string name="settings_fade_subtitle">平滑處理每首歌曲的開頭與結尾</string>
   <string name="settings_fade_duration">淡入淡出時長</string>
+  <string name="settings_cloud_audio_cache">雲端音樂快取</string>
+  <string name="settings_cloud_audio_cache_subtitle">最多保留 %1$s，用於重複播放與離線播放</string>
   <string name="settings_hifi">Hi-Fi 模式</string>
   <string name="settings_hifi_subtitle">使用 32 位元浮點輸出；播放服務重啟後生效</string>
   <string name="settings_hifi_unsupported">此裝置沒有 PCM 浮點輸出路徑</string>
@@ -773,4 +776,9 @@
   <string name="equalizer_rock">搖滾</string>
   <string name="equalizer_classical">古典</string>
   <string name="equalizer_jazz">爵士</string>
+  <string name="notification_desktop_lyrics">桌面歌詞</string>
+  <string name="notification_close">關閉</string>
+  <string name="desktop_lyrics_no_lyrics">暫無歌詞</string>
+  <string name="cloud_playback_restricted_skipping">《%1$s》無法播放，可能需要會員或受版權限制，已自動播放下一首</string>
+  <string name="cloud_playback_restricted_stopped">《%1$s》無法播放，可能需要會員或受版權限制</string>
 </resources>

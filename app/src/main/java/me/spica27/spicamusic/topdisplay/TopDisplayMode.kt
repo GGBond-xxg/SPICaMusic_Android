@@ -9,7 +9,6 @@ enum class TopDisplayMode(
     ;
 
     companion object {
-        fun fromString(value: String): TopDisplayMode =
-            entries.firstOrNull { it.value == value } ?: STATUS_LYRIC
+        fun fromString(value: String): TopDisplayMode = entries.firstOrNull { it.value == value } ?: STATUS_LYRIC
     }
 }

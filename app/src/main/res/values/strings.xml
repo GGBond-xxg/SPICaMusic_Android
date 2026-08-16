@@ -415,6 +415,7 @@
   <string name="music_search_albums_hint">Search albums…</string>
   <string name="music_search_artists_hint">Search artists…</string>
   <string name="music_sort_cd">Sort</string>
+  <string name="music_source_selector_cd">Music source</string>
   <string name="music_refresh_cloud_cd">Refresh cloud songs</string>
   <string name="sort_song_title_az">Title A–Z</string>
   <string name="sort_song_title_za">Title Z–A</string>
@@ -760,6 +761,8 @@
   <string name="settings_fade">Fade in/out</string>
   <string name="settings_fade_subtitle">Smooth the beginning and end of each track</string>
   <string name="settings_fade_duration">Fade duration</string>
+  <string name="settings_cloud_audio_cache">Cloud music cache</string>
+  <string name="settings_cloud_audio_cache_subtitle">Keep up to %1$s for repeat and offline playback</string>
   <string name="settings_hifi">Hi-Fi mode</string>
   <string name="settings_hifi_subtitle">Use 32-bit floating-point output; takes effect after the playback service restarts</string>
   <string name="settings_hifi_unsupported">This device does not provide a PCM float output path</string>
@@ -775,4 +778,9 @@
   <string name="equalizer_rock">Rock</string>
   <string name="equalizer_classical">Classical</string>
   <string name="equalizer_jazz">Jazz</string>
+  <string name="notification_desktop_lyrics">Desktop lyrics</string>
+  <string name="notification_close">Close</string>
+  <string name="desktop_lyrics_no_lyrics">No lyrics</string>
+  <string name="cloud_playback_restricted_skipping">%1$s cannot be played. It may require a membership or be restricted by copyright. Skipping to the next song.</string>
+  <string name="cloud_playback_restricted_stopped">%1$s cannot be played. It may require a membership or be restricted by copyright.</string>
 </resources>

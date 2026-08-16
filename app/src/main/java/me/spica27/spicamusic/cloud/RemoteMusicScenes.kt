@@ -2,6 +2,7 @@ package me.spica27.spicamusic.cloud
 
 import android.annotation.SuppressLint
 import android.graphics.Color
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.webkit.CookieManager
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Storage
@@ -65,6 +67,8 @@ import androidx.paging.compose.itemContentType
 import androidx.paging.compose.itemKey
 import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.navkit.scene.StackScene
+import me.spica27.spicamusic.ui.widget.AudioCover
+import org.koin.compose.viewmodel.koinActivityViewModel
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 
@@ -79,6 +83,8 @@ class RemoteMusicScene(
                 parametersOf(provider)
             }
         val state by viewModel.state.collectAsStateWithLifecycle()
+        val catalogViewModel: CloudMusicCatalogViewModel = koinActivityViewModel()
+        val catalogState by catalogViewModel.state.collectAsStateWithLifecycle()
         val songs = viewModel.songs.collectAsLazyPagingItems()
         var showLogin by rememberSaveable(provider) { mutableStateOf(state.accounts.isEmpty()) }
         var searchText by rememberSaveable(provider) { mutableStateOf("") }
@@ -95,7 +101,15 @@ class RemoteMusicScene(
             onBack = { path.popTop() },
             actions = {
                 if (state.selectedAccount != null && !showLogin) {
-                    IconButton(onClick = { songs.refresh() }) {
+                    IconButton(
+                        onClick = {
+                            if (provider == RemoteMusicProvider.NETEASE) {
+                                catalogViewModel.refreshNeteasePlaylists(forceRefresh = true)
+                            } else {
+                                songs.refresh()
+                            }
+                        },
+                    ) {
                         Icon(Icons.Default.Refresh, "Refresh")
                     }
                 }
@@ -190,27 +204,65 @@ class RemoteMusicScene(
                                     }
                                 }
                             }
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                OutlinedTextField(
-                                    value = searchText,
-                                    onValueChange = { searchText = it },
-                                    modifier = Modifier.weight(1f),
-                                    singleLine = true,
-                                    label = { Text("搜索云端音乐") },
-                                    leadingIcon = { Icon(Icons.Default.Search, null) },
-                                )
-                                FilledTonalButton(onClick = { viewModel.search(searchText) }) {
-                                    Text("搜索")
+                            if (provider != RemoteMusicProvider.NETEASE) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    OutlinedTextField(
+                                        value = searchText,
+                                        onValueChange = { searchText = it },
+                                        modifier = Modifier.weight(1f),
+                                        singleLine = true,
+                                        label = { Text("搜索云端音乐") },
+                                        leadingIcon = { Icon(Icons.Default.Search, null) },
+                                    )
+                                    FilledTonalButton(onClick = { viewModel.search(searchText) }) {
+                                        Text("搜索")
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (provider == RemoteMusicProvider.NETEASE) {
+                        val accountId = state.selectedAccount?.id
+                        val playlists =
+                            catalogState.neteasePlaylists.filter { it.account.id == accountId }
+                        if (playlists.isEmpty()) {
+                            item(key = "netease_playlists_empty", contentType = "empty") {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    if (catalogState.loadingSources.contains(CloudSongSource.NETEASE)) {
+                                        CircularProgressIndicator(modifier = Modifier.size(28.dp))
+                                    }
+                                    Text("还没有获取到收藏歌单")
+                                    Text(
+                                        "点击右上角刷新；网络异常时会继续显示上次成功获取的歌单。",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        } else {
+                            items(
+                                count = playlists.size,
+                                key = { index -> playlists[index].stableId },
+                                contentType = { "netease_playlist" },
+                            ) { index ->
+                                val playlist = playlists[index]
+                                NeteasePlaylistRow(playlist) {
+                                    path.push(NeteasePlaylistScene(playlist))
                                 }
                             }
                         }
                     }
 
                     items(
-                        count = songs.itemCount,
+                        count = if (provider == RemoteMusicProvider.NETEASE) 0 else songs.itemCount,
                         key = songs.itemKey(RemoteSong::id),
                         contentType = songs.itemContentType { "remote_song" },
                     ) { index ->
@@ -221,35 +273,37 @@ class RemoteMusicScene(
                         }
                     }
 
-                    when {
-                        songs.loadState.refresh is LoadState.Loading ||
-                            songs.loadState.append is LoadState.Loading -> {
-                            item(key = "loading", contentType = "paging") {
-                                Box(
-                                    modifier = Modifier.fillMaxWidth().padding(20.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    CircularProgressIndicator(modifier = Modifier.size(28.dp))
+                    if (provider != RemoteMusicProvider.NETEASE) {
+                        when {
+                            songs.loadState.refresh is LoadState.Loading ||
+                                songs.loadState.append is LoadState.Loading -> {
+                                item(key = "loading", contentType = "paging") {
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth().padding(20.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        CircularProgressIndicator(modifier = Modifier.size(28.dp))
+                                    }
                                 }
                             }
-                        }
-                        songs.loadState.refresh is LoadState.Error ||
-                            songs.loadState.append is LoadState.Error -> {
-                            item(key = "error", contentType = "paging") {
-                                val error =
-                                    (songs.loadState.refresh as? LoadState.Error)?.error
-                                        ?: (songs.loadState.append as? LoadState.Error)?.error
-                                Column(
-                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                                ) {
-                                    Text(
-                                        error?.message ?: "加载云端音乐失败",
-                                        color = MaterialTheme.colorScheme.error,
-                                    )
-                                    OutlinedButton(onClick = songs::retry) {
-                                        Text("重试")
+                            songs.loadState.refresh is LoadState.Error ||
+                                songs.loadState.append is LoadState.Error -> {
+                                item(key = "error", contentType = "paging") {
+                                    val error =
+                                        (songs.loadState.refresh as? LoadState.Error)?.error
+                                            ?: (songs.loadState.append as? LoadState.Error)?.error
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        Text(
+                                            error?.message ?: "加载云端音乐失败",
+                                            color = MaterialTheme.colorScheme.error,
+                                        )
+                                        OutlinedButton(onClick = songs::retry) {
+                                            Text("重试")
+                                        }
                                     }
                                 }
                             }
@@ -258,6 +312,155 @@ class RemoteMusicScene(
                 }
             }
         }
+    }
+}
+
+class NeteasePlaylistScene(
+    private val value: CloudCatalogPlaylist,
+) : StackScene() {
+    @Composable
+    override fun Content() {
+        val path = LocalNavigationPath.current
+        val viewModel: CloudMusicCatalogViewModel = koinActivityViewModel()
+        val state by viewModel.state.collectAsStateWithLifecycle()
+        val songs = state.playlistSongs[value.stableId].orEmpty()
+        val loading = value.stableId in state.loadingPlaylists
+
+        LaunchedEffect(value.stableId) {
+            viewModel.loadPlaylist(value)
+        }
+        RemoteSceneScaffold(
+            title = value.playlist.name,
+            onBack = { path.popTop() },
+            actions = {
+                IconButton(onClick = { viewModel.loadPlaylist(value, forceRefresh = true) }) {
+                    Icon(Icons.Default.Refresh, "Refresh")
+                }
+            },
+        ) { padding ->
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding =
+                    PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = padding.calculateTopPadding() + 10.dp,
+                        bottom = 36.dp,
+                    ),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                item(key = "playlist_header", contentType = "header") {
+                    NeteasePlaylistRow(value, onClick = null)
+                }
+                items(
+                    count = songs.size,
+                    key = { index -> songs[index].stableId },
+                    contentType = { "netease_song" },
+                ) { index ->
+                    val song = songs[index]
+                    CloudPlaylistSongRow(song) {
+                        viewModel.playPlaylistSongs(song.stableId, songs)
+                    }
+                }
+                if (loading) {
+                    item(key = "loading", contentType = "loading") {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(28.dp))
+                        }
+                    }
+                } else if (songs.isEmpty()) {
+                    item(key = "empty", contentType = "empty") {
+                        Text(
+                            text = "歌单中暂无可播放歌曲",
+                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NeteasePlaylistRow(
+    value: CloudCatalogPlaylist,
+    onClick: (() -> Unit)?,
+) {
+    val clickableModifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+    Surface(
+        modifier = Modifier.fillMaxWidth().then(clickableModifier),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            AudioCover(
+                uri = value.playlist.coverUrl?.let(Uri::parse),
+                modifier = Modifier.size(64.dp),
+                placeHolder = {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.PlaylistPlay, null)
+                    }
+                },
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    value.playlist.name,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "${value.playlist.songCount} 首 · ${value.account.displayName}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CloudPlaylistSongRow(
+    song: CloudCatalogSong,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        AudioCover(
+            uri = song.artworkUri,
+            modifier = Modifier.size(48.dp),
+            placeHolder = {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.MusicNote, null)
+                }
+            },
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                "${song.artist} · ${song.album}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Text(
+            formatRemoteDuration(song.durationMs),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

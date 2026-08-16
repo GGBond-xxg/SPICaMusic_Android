@@ -44,6 +44,13 @@ data class CloudCatalogSong(
 )
 
 @Immutable
+data class CloudCatalogPlaylist(
+    val stableId: String,
+    val account: RemoteMusicAccount,
+    val playlist: RemotePlaylist,
+)
+
+@Immutable
 sealed interface CloudCatalogPayload {
     data class Telegram(
         val song: TelegramSong,
@@ -86,6 +93,9 @@ data class CloudMusicCatalogState(
     val errors: Map<CloudSongSource, String> = emptyMap(),
     val sourcesWithMore: Set<CloudSongSource> = emptySet(),
     val isRefreshing: Boolean = false,
+    val neteasePlaylists: List<CloudCatalogPlaylist> = emptyList(),
+    val playlistSongs: Map<String, List<CloudCatalogSong>> = emptyMap(),
+    val loadingPlaylists: Set<String> = emptySet(),
 )
 
 /**
@@ -150,6 +160,106 @@ class CloudMusicCatalogViewModel(
         }
         publishStatus()
         loadMore()
+        refreshNeteasePlaylists()
+    }
+
+    fun refreshNeteasePlaylists(forceRefresh: Boolean = false) {
+        val accounts =
+            accountStore
+                .getRemoteAccounts(RemoteMusicProvider.NETEASE)
+                .associateBy(RemoteMusicAccount::id)
+        if (accounts.isEmpty()) {
+            _state.update {
+                it.copy(
+                    neteasePlaylists = emptyList(),
+                    playlistSongs = emptyMap(),
+                    loadingPlaylists = emptySet(),
+                )
+            }
+            return
+        }
+        viewModelScope.launch {
+            val refreshed = mutableListOf<CloudCatalogPlaylist>()
+            accounts.values.forEach { account ->
+                runCatching { remoteClients.listPlaylists(account, forceRefresh) }
+                    .onSuccess { playlists ->
+                        playlists.forEach { playlist ->
+                            refreshed +=
+                                CloudCatalogPlaylist(
+                                    stableId = "netease:${account.id}:${playlist.id}",
+                                    account = account,
+                                    playlist = playlist,
+                                )
+                        }
+                    }
+            }
+            _state.update { current ->
+                current.copy(
+                    neteasePlaylists =
+                        if (refreshed.isNotEmpty() || forceRefresh) {
+                            refreshed
+                        } else {
+                            current.neteasePlaylists.filter { it.account.id in accounts }
+                        },
+                )
+            }
+        }
+    }
+
+    fun loadPlaylist(
+        value: CloudCatalogPlaylist,
+        forceRefresh: Boolean = false,
+    ) {
+        if (value.stableId in _state.value.loadingPlaylists) return
+        if (!forceRefresh &&
+            _state.value.playlistSongs[value.stableId]
+                .orEmpty()
+                .isNotEmpty()
+        ) {
+            return
+        }
+        _state.update { it.copy(loadingPlaylists = it.loadingPlaylists + value.stableId) }
+        viewModelScope.launch {
+            runCatching {
+                remoteClients.listPlaylistSongs(
+                    account = value.account,
+                    playlistId = value.playlist.id,
+                    forceRefresh = forceRefresh,
+                )
+            }.onSuccess { songs ->
+                _state.update { current ->
+                    current.copy(
+                        playlistSongs =
+                            current.playlistSongs +
+                                (
+                                    value.stableId to
+                                        songs.map { song -> value.account.toCatalogSong(song) }
+                                ),
+                    )
+                }
+            }.onFailure { error ->
+                _state.update { current ->
+                    current.copy(
+                        errors =
+                            current.errors +
+                                (CloudSongSource.NETEASE to (error.message ?: "Unable to load playlist")),
+                    )
+                }
+            }
+            _state.update { it.copy(loadingPlaylists = it.loadingPlaylists - value.stableId) }
+        }
+    }
+
+    fun playPlaylistSongs(
+        selectedStableId: String,
+        songs: List<CloudCatalogSong>,
+    ) {
+        viewModelScope.launch {
+            val items = songs.mapNotNull { CatalogQueueItem.Cloud(it).toMediaItem() }
+            if (items.isEmpty()) return@launch
+            val index = songs.indexOfFirst { it.stableId == selectedStableId }.coerceAtLeast(0)
+            player.doAction(PlayerAction.PlayMediaItems(items, index.coerceIn(items.indices)))
+        }
     }
 
     /**
@@ -578,24 +688,29 @@ class CloudMusicCatalogViewModel(
                 )
             offset = page.nextOffset ?: offset
             return CatalogPage(
-                songs =
-                    page.songs.map { song ->
-                        CloudCatalogSong(
-                            stableId = "cloud:${account.provider.name.lowercase()}:${account.id}:${song.id}",
-                            source = source,
-                            accountName = account.displayName,
-                            title = song.title,
-                            artist = song.artist,
-                            album = song.album,
-                            durationMs = song.durationMs,
-                            artworkUri = song.artworkUrl?.let(Uri::parse),
-                            payload = CloudCatalogPayload.Remote(account, song),
-                        )
-                    },
+                songs = page.songs.map { song -> account.toCatalogSong(song) },
                 hasMore = page.nextOffset != null && page.songs.isNotEmpty(),
             )
         }
     }
+
+    private fun RemoteMusicAccount.toCatalogSong(song: RemoteSong): CloudCatalogSong =
+        CloudCatalogSong(
+            stableId = "cloud:${provider.name.lowercase()}:$id:${song.id}",
+            source =
+                when (provider) {
+                    RemoteMusicProvider.SUBSONIC -> CloudSongSource.SUBSONIC
+                    RemoteMusicProvider.NETEASE -> CloudSongSource.NETEASE
+                    RemoteMusicProvider.QQ_MUSIC -> CloudSongSource.QQ_MUSIC
+                },
+            accountName = displayName,
+            title = song.title,
+            artist = song.artist,
+            album = song.album,
+            durationMs = song.durationMs,
+            artworkUri = song.artworkUrl?.let(Uri::parse),
+            payload = CloudCatalogPayload.Remote(this, song),
+        )
 
     private suspend fun CatalogQueueItem.toMediaItem(): MediaItem? =
         when (this) {

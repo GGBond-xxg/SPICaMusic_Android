@@ -3,7 +3,9 @@ package me.spica27.spicamusic.service
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.core.app.NotificationCompat
@@ -33,6 +35,7 @@ import com.skydoves.landscapist.core.model.ImageResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import me.spica27.spicamusic.DesktopLyricsPermissionActivity
 import me.spica27.spicamusic.R
 import java.util.Arrays
 import kotlin.coroutines.CoroutineContext
@@ -45,6 +48,8 @@ internal class SpicaNotificationProvider(
     companion object {
         private const val FLAG_ALWAYS_SHOW_TICKER = 0x1000000
         private const val FLAG_ONLY_UPDATE_TICKER = 0x2000000
+        private const val REQUEST_DESKTOP_LYRICS = 7101
+        private const val REQUEST_CLOSE = 7102
     }
 
     override val coroutineContext: CoroutineContext = Dispatchers.IO + SupervisorJob()
@@ -87,6 +92,8 @@ internal class SpicaNotificationProvider(
 
         val compactViewIndices: IntArray =
             addNotificationActions(mediaSession, mediaButtons, builder, actionFactory)
+        builder.addAction(createDesktopLyricsAction())
+        builder.addAction(createCloseAction())
         mediaStyle.setShowActionsInCompactView(*compactViewIndices)
 
         if (player.isCommandAvailable(Player.COMMAND_GET_METADATA)) {
@@ -329,6 +336,32 @@ internal class SpicaNotificationProvider(
     }
 
     private fun createCommandButtonExtra() = Bundle().apply { putInt(COMMAND_KEY_COMPACT_VIEW_INDEX, C.INDEX_UNSET) }
+
+    private fun createDesktopLyricsAction(): NotificationCompat.Action =
+        NotificationCompat.Action
+            .Builder(
+                R.drawable.ic_notification_desktop_lyrics,
+                context.getString(R.string.notification_desktop_lyrics),
+                PendingIntent.getActivity(
+                    context,
+                    REQUEST_DESKTOP_LYRICS,
+                    Intent(context, DesktopLyricsPermissionActivity::class.java),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                ),
+            ).build()
+
+    private fun createCloseAction(): NotificationCompat.Action =
+        NotificationCompat.Action
+            .Builder(
+                R.drawable.ic_notification_close,
+                context.getString(R.string.notification_close),
+                PendingIntent.getService(
+                    context,
+                    REQUEST_CLOSE,
+                    Intent(context, PlaybackService::class.java).setAction(PlaybackService.ACTION_CLOSE_PLAYER),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                ),
+            ).build()
 
     private fun getPlaybackStartTimeEpochMs(player: Player): Long =
         if ((

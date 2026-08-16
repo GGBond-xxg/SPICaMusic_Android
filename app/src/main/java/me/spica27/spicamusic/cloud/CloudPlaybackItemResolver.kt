@@ -2,6 +2,7 @@ package me.spica27.spicamusic.cloud
 
 import android.net.Uri
 import androidx.media3.common.MediaItem
+import me.spica27.spicamusic.service.CloudAudioCache
 import org.json.JSONObject
 
 /**
@@ -18,7 +19,6 @@ class CloudPlaybackItemResolver(
     private val telegramProxy: TelegramStreamProxy,
     private val remoteProxy: RemoteMusicStreamProxy,
     private val onlineSourceProxy: OnlineSourceStreamProxy,
-    private val onlineSourceEngine: OnlineSourceEngine,
 ) {
     suspend fun resolve(item: MediaItem): MediaItem {
         if (!item.mediaId.startsWith(CLOUD_ID_PREFIX)) return item
@@ -97,23 +97,11 @@ class CloudPlaybackItemResolver(
                                 QQ_MUSIC_PROVIDER -> "tx"
                                 else -> null
                             }
-                        val usableSourceKey =
-                            sourceKey?.takeIf { key ->
-                                runCatching {
-                                    onlineSourceEngine
-                                        .status()
-                                        .takeIf(OnlineSourceStatus::ready)
-                                        ?.sources
-                                        ?.firstOrNull { it.key == key }
-                                        ?.actions
-                                        ?.contains("musicUrl") == true
-                                }.getOrDefault(false)
-                            }
                         ResolvedUrls(
                             streamUrl =
-                                if (usableSourceKey != null) {
+                                if (sourceKey != null) {
                                     onlineSourceProxy.streamUrl(
-                                        source = usableSourceKey,
+                                        source = sourceKey,
                                         songInfoJson = onlineSongInfo(item, songId),
                                         fallbackUrl = fallbackUrl,
                                     )
@@ -126,7 +114,11 @@ class CloudPlaybackItemResolver(
                 }
             }.getOrNull() ?: return item
 
-        val builder = item.buildUpon().setUri(resolved.streamUrl)
+        val builder =
+            item
+                .buildUpon()
+                .setUri(resolved.streamUrl)
+                .setCustomCacheKey(CloudAudioCache.cacheKey(item.mediaId))
         resolved.artworkUrl?.let { artworkUrl ->
             builder.setMediaMetadata(
                 item.mediaMetadata
@@ -151,13 +143,33 @@ class CloudPlaybackItemResolver(
         JSONObject()
             .put("id", songId)
             .put("songmid", songId)
-            .put("name", item.mediaMetadata.title?.toString().orEmpty())
-            .put("singer", item.mediaMetadata.artist?.toString().orEmpty())
-            .put("artist", item.mediaMetadata.artist?.toString().orEmpty())
-            .put("albumName", item.mediaMetadata.albumTitle?.toString().orEmpty())
-            .put("duration", item.mediaMetadata.durationMs ?: 0L)
-            .put("pic", item.mediaMetadata.artworkUri?.toString().orEmpty())
-            .toString()
+            .put(
+                "name",
+                item.mediaMetadata.title
+                    ?.toString()
+                    .orEmpty(),
+            ).put(
+                "singer",
+                item.mediaMetadata.artist
+                    ?.toString()
+                    .orEmpty(),
+            ).put(
+                "artist",
+                item.mediaMetadata.artist
+                    ?.toString()
+                    .orEmpty(),
+            ).put(
+                "albumName",
+                item.mediaMetadata.albumTitle
+                    ?.toString()
+                    .orEmpty(),
+            ).put("duration", item.mediaMetadata.durationMs ?: 0L)
+            .put(
+                "pic",
+                item.mediaMetadata.artworkUri
+                    ?.toString()
+                    .orEmpty(),
+            ).toString()
 
     private data class ResolvedUrls(
         val streamUrl: String,

@@ -16,6 +16,7 @@ import me.spica27.spicamusic.common.entity.LyricItem
 import me.spica27.spicamusic.common.entity.getSentenceContent
 import me.spica27.spicamusic.core.preferences.PreferencesManager
 import me.spica27.spicamusic.lyricon.LyriconProviderManager
+import me.spica27.spicamusic.service.DesktopLyricsController
 import timber.log.Timber
 
 /**
@@ -26,6 +27,7 @@ class TopDisplayModeController(
     private val lyriconManager: LyriconProviderManager,
     private val liveUpdateManager: MusicLiveUpdateManager,
     private val preferences: PreferencesManager,
+    private val desktopLyricsController: DesktopLyricsController,
 ) {
     private var player: Player? = null
     private var scope: CoroutineScope? = null
@@ -49,6 +51,7 @@ class TopDisplayModeController(
                 lastLiveLyricKey = null
                 lastLiveUpdatePositionMs = Long.MIN_VALUE
                 lyriconManager.clearLyrics()
+                desktopLyricsController.clearLyrics()
                 syncCurrentState(force = true)
                 Timber.tag(TAG).d("Song changed: mediaId=%s", mediaItem?.mediaId)
             }
@@ -134,6 +137,7 @@ class TopDisplayModeController(
         this.lyrics = lyrics.orEmpty().sortedBy(LyricItem::time)
         lyricsOffsetMs = offsetMs
         lyriconManager.updateLyrics(mediaId, lyrics, durationMs, offsetMs)
+        desktopLyricsController.updateLyrics(mediaId, lyrics, offsetMs)
         syncCurrentState(force = true)
     }
 
@@ -159,6 +163,7 @@ class TopDisplayModeController(
     fun onPlaybackStopped() {
         liveUpdateManager.cancel()
         lyriconManager.clear()
+        desktopLyricsController.clearLyrics()
         lastLiveLyricKey = null
         lastLiveUpdatePositionMs = Long.MIN_VALUE
     }
@@ -177,6 +182,7 @@ class TopDisplayModeController(
         lyricsMediaId = null
         lyrics = emptyList()
         lyricsOffsetMs = 0L
+        desktopLyricsController.clearLyrics()
     }
 
     fun isLiveUpdateSupported(): Boolean = liveUpdateManager.isSupported()

@@ -74,8 +74,7 @@ class LyricsViewModel(
                         album = mediaItem?.mediaMetadata?.albumTitle?.toString(),
                         durationMs = mediaItem?.mediaMetadata?.durationMs ?: 0L,
                     )
-                }
-                .distinctUntilChanged()
+                }.distinctUntilChanged()
                 .collectLatest { request ->
                     loadLyrics(
                         mediaId = request.mediaId,

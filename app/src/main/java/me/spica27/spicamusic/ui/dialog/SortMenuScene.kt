@@ -53,6 +53,7 @@ class SortMenuScene(
     private val options: List<SortMenuOption>,
     private val selectedId: String,
     private val onSelect: (String) -> Unit,
+    @StringRes private val titleRes: Int = R.string.music_sort_cd,
 ) : PopupMenuScene(anchorState) {
     @Composable
     override fun anchorContainerColor(): Color = MaterialTheme.colorScheme.primaryContainer
@@ -85,7 +86,7 @@ class SortMenuScene(
                     .padding(horizontal = Spacing.Small, vertical = Spacing.Medium),
         ) {
             Text(
-                text = stringResource(R.string.music_sort_cd),
+                text = stringResource(titleRes),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

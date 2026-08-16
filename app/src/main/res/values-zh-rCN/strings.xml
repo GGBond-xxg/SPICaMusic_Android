@@ -21,6 +21,8 @@
   <string name="settings_fade">淡入淡出</string>
   <string name="settings_fade_subtitle">平滑处理每首歌曲的开头和结尾</string>
   <string name="settings_fade_duration">淡入淡出时长</string>
+  <string name="settings_cloud_audio_cache">云端音乐缓存</string>
+  <string name="settings_cloud_audio_cache_subtitle">最多保留 %1$s，用于重复播放和断网播放</string>
   <string name="settings_hifi">Hi-Fi 模式</string>
   <string name="settings_hifi_subtitle">使用 32 位浮点输出；播放服务重启后生效</string>
   <string name="settings_hifi_unsupported">此设备没有 PCM 浮点输出路径</string>
@@ -36,4 +38,9 @@
   <string name="equalizer_rock">摇滚</string>
   <string name="equalizer_classical">古典</string>
   <string name="equalizer_jazz">爵士</string>
+  <string name="notification_desktop_lyrics">桌面歌词</string>
+  <string name="notification_close">关闭</string>
+  <string name="desktop_lyrics_no_lyrics">暂无歌词</string>
+  <string name="cloud_playback_restricted_skipping">《%1$s》无法播放，可能需要会员或受版权限制，已自动播放下一首</string>
+  <string name="cloud_playback_restricted_stopped">《%1$s》无法播放，可能需要会员或受版权限制</string>
 </resources>

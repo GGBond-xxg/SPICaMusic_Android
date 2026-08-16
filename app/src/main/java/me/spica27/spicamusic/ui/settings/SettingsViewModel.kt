@@ -128,6 +128,18 @@ class SettingsViewModel(
         }
     }
 
+    val cloudAudioCacheMib =
+        settingsUseCases
+            .getString(SettingsUseCases.Keys.CLOUD_AUDIO_CACHE_MIB, "1024")
+            .stateIn(viewModelScope, SharingStarted.Eagerly, "1024")
+
+    fun setCloudAudioCacheMib(value: String) {
+        val size = value.toIntOrNull()?.coerceIn(128, 8192) ?: return
+        viewModelScope.launch {
+            settingsUseCases.setString(SettingsUseCases.Keys.CLOUD_AUDIO_CACHE_MIB, size.toString())
+        }
+    }
+
     val hiFiMode =
         settingsUseCases
             .getBoolean(SettingsUseCases.Keys.HIFI_MODE, false)

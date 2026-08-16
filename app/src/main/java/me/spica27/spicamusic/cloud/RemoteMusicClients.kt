@@ -1,6 +1,8 @@
 package me.spica27.spicamusic.cloud
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
 import okhttp3.HttpUrl
@@ -53,6 +55,26 @@ class RemoteMusicClientRegistry(
             RemoteMusicProvider.SUBSONIC -> subsonic.listSongs(account, query, offset, limit)
             RemoteMusicProvider.NETEASE -> netease.listSongs(account, query, offset, limit)
             RemoteMusicProvider.QQ_MUSIC -> qqMusic.listSongs(account, query, offset, limit)
+        }
+
+    suspend fun listPlaylists(
+        account: RemoteMusicAccount,
+        forceRefresh: Boolean = false,
+    ): List<RemotePlaylist> =
+        when (account.provider) {
+            RemoteMusicProvider.NETEASE -> netease.listPlaylists(account, forceRefresh)
+            else -> emptyList()
+        }
+
+    suspend fun listPlaylistSongs(
+        account: RemoteMusicAccount,
+        playlistId: String,
+        forceRefresh: Boolean = false,
+    ): List<RemoteSong> =
+        when (account.provider) {
+            RemoteMusicProvider.NETEASE ->
+                netease.listPlaylistSongs(account, playlistId, forceRefresh)
+            else -> emptyList()
         }
 
     suspend fun resolveStreamUrl(
@@ -258,6 +280,7 @@ class SubsonicClient(
 
 class NeteaseClient(
     baseClient: OkHttpClient,
+    private val libraryStore: NeteaseLibraryStore,
 ) {
     private val client =
         baseClient
@@ -267,6 +290,10 @@ class NeteaseClient(
             .callTimeout(45, TimeUnit.SECONDS)
             .build()
     private val libraryCache = ConcurrentHashMap<String, List<RemoteSong>>()
+    private val playlistCache = ConcurrentHashMap<String, List<RemotePlaylist>>()
+    private val playlistSongCache = ConcurrentHashMap<String, List<RemoteSong>>()
+    private val playlistLocks = ConcurrentHashMap<String, Mutex>()
+    private val playlistSongLocks = ConcurrentHashMap<String, Mutex>()
 
     suspend fun authenticate(cookieHeader: String): Result<RemoteMusicAccount> =
         withContext(Dispatchers.IO) {
@@ -338,7 +365,56 @@ class NeteaseClient(
 
     fun clearCache(accountId: String) {
         libraryCache.remove(accountId)
+        playlistCache.remove(accountId)
+        playlistSongCache.keys.removeAll { it.startsWith("$accountId:") }
+        playlistLocks.remove(accountId)
+        playlistSongLocks.keys.removeAll { it.startsWith("$accountId:") }
+        libraryStore.clear(accountId)
     }
+
+    suspend fun listPlaylists(
+        account: RemoteMusicAccount,
+        forceRefresh: Boolean = false,
+    ): List<RemotePlaylist> =
+        withContext(Dispatchers.IO) {
+            playlistLocks.getOrPut(account.id) { Mutex() }.withLock {
+                if (!forceRefresh) {
+                    playlistCache[account.id]?.takeIf { it.isNotEmpty() }?.let { return@withLock it }
+                }
+                val cached = libraryStore.readPlaylists(account.id)
+                val refreshed =
+                    runCatching { loadPlaylistsFromNetwork(account) }.getOrElse { error ->
+                        if (cached.isNotEmpty()) return@withLock cached.also { playlistCache[account.id] = it }
+                        throw error
+                    }
+                playlistCache[account.id] = refreshed
+                libraryStore.writePlaylists(account.id, refreshed)
+                refreshed
+            }
+        }
+
+    suspend fun listPlaylistSongs(
+        account: RemoteMusicAccount,
+        playlistId: String,
+        forceRefresh: Boolean = false,
+    ): List<RemoteSong> =
+        withContext(Dispatchers.IO) {
+            val key = "${account.id}:$playlistId"
+            playlistSongLocks.getOrPut(key) { Mutex() }.withLock {
+                if (!forceRefresh) {
+                    playlistSongCache[key]?.takeIf { it.isNotEmpty() }?.let { return@withLock it }
+                }
+                val cached = libraryStore.readSongs(account.id, playlistId)
+                val refreshed =
+                    runCatching { loadPlaylistSongsFromNetwork(account, playlistId) }.getOrElse { error ->
+                        if (cached.isNotEmpty()) return@withLock cached.also { playlistSongCache[key] = it }
+                        throw error
+                    }
+                playlistSongCache[key] = refreshed
+                libraryStore.writeSongs(account.id, playlistId, refreshed)
+                refreshed
+            }
+        }
 
     private fun search(
         account: RemoteMusicAccount,
@@ -366,37 +442,122 @@ class NeteaseClient(
         return RemoteSongPage(songs, (offset + songs.size).takeIf { it < total && songs.isNotEmpty() })
     }
 
-    private fun loadLibrary(account: RemoteMusicAccount): List<RemoteSong> {
-        val userId = account.userId.toLongOrNull() ?: error("NetEase user id is missing")
-        val playlistUrl =
-            PLAYLISTS_URL
-                .toHttpUrl()
-                .newBuilder()
-                .addQueryParameter("uid", userId.toString())
-                .addQueryParameter("limit", "12")
-                .addQueryParameter("offset", "0")
-                .build()
-        val playlists =
-            executeJson(getRequest(playlistUrl.toString(), account.secret))
-                .optJSONArray("playlist")
+    private suspend fun loadLibrary(account: RemoteMusicAccount): List<RemoteSong> {
         val result = LinkedHashMap<String, RemoteSong>()
-        for (index in 0 until minOf(playlists?.length() ?: 0, MAX_LIBRARY_PLAYLISTS)) {
-            val playlistId = playlists?.optJSONObject(index)?.optLong("id") ?: continue
-            val detailUrl =
-                PLAYLIST_DETAIL_URL
-                    .toHttpUrl()
-                    .newBuilder()
-                    .addQueryParameter("id", playlistId.toString())
-                    .addQueryParameter("n", "1000")
-                    .addQueryParameter("s", "0")
-                    .build()
-            val tracks =
-                executeJson(getRequest(detailUrl.toString(), account.secret))
-                    .optJSONObject("playlist")
-                    ?.optJSONArray("tracks")
-            parseSongs(tracks).forEach { result.putIfAbsent(it.id, it) }
+        val playlists = listPlaylists(account)
+        playlists.forEach { playlist ->
+            val songs =
+                runCatching { listPlaylistSongs(account, playlist.id) }
+                    .getOrElse { emptyList() }
+            songs.forEach { result.putIfAbsent(it.id, it) }
         }
         return result.values.toList()
+    }
+
+    private fun loadPlaylistsFromNetwork(account: RemoteMusicAccount): List<RemotePlaylist> {
+        val userId = account.userId.toLongOrNull() ?: error("NetEase user id is missing")
+        val playlists = LinkedHashMap<String, RemotePlaylist>()
+        var offset = 0
+        var page = 0
+        var hasMore: Boolean
+        do {
+            val url =
+                PLAYLISTS_URL
+                    .toHttpUrl()
+                    .newBuilder()
+                    .addQueryParameter("uid", userId.toString())
+                    .addQueryParameter("limit", PLAYLIST_PAGE_SIZE.toString())
+                    .addQueryParameter("offset", offset.toString())
+                    .build()
+            val root = executeJson(getRequest(url.toString(), account.secret))
+            check(root.optInt("code", 200) == 200) { "NetEase playlist API ${root.optInt("code")}" }
+            val array = root.optJSONArray("playlist") ?: JSONArray()
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val id = item.optLong("id").takeIf { it > 0L }?.toString() ?: continue
+                playlists[id] =
+                    RemotePlaylist(
+                        id = id,
+                        name = item.optString("name", "网易云歌单"),
+                        coverUrl = item.optString("coverImgUrl").takeIf(String::isNotBlank),
+                        songCount = item.optInt("trackCount").coerceAtLeast(0),
+                    )
+            }
+            offset += array.length()
+            hasMore =
+                if (root.has("more")) {
+                    root.optBoolean("more", false)
+                } else {
+                    array.length() >= PLAYLIST_PAGE_SIZE
+                }
+            page += 1
+        } while (hasMore && page < MAX_PLAYLIST_PAGES)
+        return playlists.values.toList()
+    }
+
+    private fun loadPlaylistSongsFromNetwork(
+        account: RemoteMusicAccount,
+        playlistId: String,
+    ): List<RemoteSong> {
+        val detailUrl =
+            PLAYLIST_DETAIL_URL
+                .toHttpUrl()
+                .newBuilder()
+                .addQueryParameter("id", playlistId)
+                .addQueryParameter("n", "100000")
+                .addQueryParameter("s", "8")
+                .build()
+        val root = executeJson(getRequest(detailUrl.toString(), account.secret))
+        check(root.optInt("code", 200) == 200) { "NetEase playlist detail ${root.optInt("code")}" }
+        val playlist = root.optJSONObject("playlist") ?: error("NetEase playlist data is missing")
+        val songsById = LinkedHashMap<String, RemoteSong>()
+        parseSongs(playlist.optJSONArray("tracks")).forEach { songsById[it.id] = it }
+        val orderedIds =
+            buildList {
+                val trackIds = playlist.optJSONArray("trackIds")
+                for (index in 0 until (trackIds?.length() ?: 0)) {
+                    trackIds
+                        ?.optJSONObject(index)
+                        ?.optLong("id")
+                        ?.takeIf { it > 0L }
+                        ?.toString()
+                        ?.let(::add)
+                }
+            }
+        orderedIds
+            .filterNot(songsById::containsKey)
+            .chunked(SONG_DETAIL_BATCH_SIZE)
+            .forEach { ids ->
+                loadSongDetails(account, ids).forEach { song -> songsById[song.id] = song }
+            }
+        return if (orderedIds.isEmpty()) {
+            songsById.values.toList()
+        } else {
+            orderedIds.mapNotNull(songsById::get) + songsById.values.filterNot { it.id in orderedIds }
+        }
+    }
+
+    private fun loadSongDetails(
+        account: RemoteMusicAccount,
+        songIds: List<String>,
+    ): List<RemoteSong> {
+        if (songIds.isEmpty()) return emptyList()
+        val ids = JSONArray(songIds.map(String::toLong))
+        val entries = JSONArray(songIds.map { id -> JSONObject().put("id", id.toLong()) })
+        val form =
+            FormBody
+                .Builder()
+                .add("ids", ids.toString())
+                .add("c", entries.toString())
+                .build()
+        val root =
+            executeJson(
+                requestBuilder(SONG_DETAIL_URL, account.secret)
+                    .post(form)
+                    .build(),
+            )
+        check(root.optInt("code", 200) == 200) { "NetEase song detail ${root.optInt("code")}" }
+        return parseSongs(root.optJSONArray("songs"))
     }
 
     private fun parseSongs(array: JSONArray?): List<RemoteSong> =
@@ -461,7 +622,10 @@ class NeteaseClient(
         const val PLAYLIST_DETAIL_URL = "https://music.163.com/api/v6/playlist/detail"
         const val SEARCH_URL = "https://music.163.com/api/search/get/web"
         const val STREAM_URL = "https://music.163.com/api/song/enhance/player/url"
-        const val MAX_LIBRARY_PLAYLISTS = 6
+        const val SONG_DETAIL_URL = "https://music.163.com/api/v3/song/detail"
+        const val PLAYLIST_PAGE_SIZE = 50
+        const val MAX_PLAYLIST_PAGES = 200
+        const val SONG_DETAIL_BATCH_SIZE = 500
     }
 }
 

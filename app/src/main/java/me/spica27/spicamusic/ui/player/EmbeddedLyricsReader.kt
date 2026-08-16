@@ -19,8 +19,7 @@ internal class EmbeddedLyricsReader(
     private val cacheLock = Any()
     private val lyricsCache =
         object : LinkedHashMap<Long, CacheEntry>(LYRICS_CACHE_SIZE, 0.75f, true) {
-            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, CacheEntry>?): Boolean =
-                size > LYRICS_CACHE_SIZE
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, CacheEntry>?): Boolean = size > LYRICS_CACHE_SIZE
         }
 
     suspend fun read(mediaStoreId: Long): String? =

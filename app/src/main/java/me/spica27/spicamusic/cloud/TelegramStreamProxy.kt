@@ -2,9 +2,9 @@ package me.spica27.spicamusic.cloud
 
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.cio.CIO
 import io.ktor.server.cio.CIOApplicationEngine
-import io.ktor.server.application.ApplicationCall
 import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.response.header
@@ -36,8 +36,7 @@ class TelegramStreamProxy(
     @Volatile
     private var port: Int = 0
 
-    suspend fun streamUrl(song: TelegramSong): String =
-        streamUrl(song.chatId, song.messageId)
+    suspend fun streamUrl(song: TelegramSong): String = streamUrl(song.chatId, song.messageId)
 
     suspend fun streamUrl(
         chatId: Long,
@@ -57,8 +56,7 @@ class TelegramStreamProxy(
         return "http://127.0.0.1:$port/telegram/$fileId?size=$fileSize"
     }
 
-    suspend fun artworkUrl(song: TelegramSong): String? =
-        song.coverFileId?.let { artworkUrl(it) }
+    suspend fun artworkUrl(song: TelegramSong): String? = song.coverFileId?.let { artworkUrl(it) }
 
     suspend fun restoredArtworkUrl(
         chatId: Long,

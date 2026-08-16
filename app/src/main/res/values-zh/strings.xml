@@ -414,6 +414,7 @@
   <string name="music_search_albums_hint">搜索专辑…</string>
   <string name="music_search_artists_hint">搜索歌手…</string>
   <string name="music_sort_cd">排序</string>
+  <string name="music_source_selector_cd">播放列表</string>
   <string name="music_refresh_cloud_cd">刷新云端歌曲</string>
   <string name="sort_song_title_az">标题 A–Z</string>
   <string name="sort_song_title_za">标题 Z–A</string>
@@ -738,4 +739,9 @@
   <string name="telegram_joined_channels">已加入的频道</string>
   <string name="telegram_joined_empty">最近 100 个会话中没有找到其他已加入的频道。</string>
   <string name="telegram_joined_channel">已加入的频道</string>
+  <string name="notification_desktop_lyrics">桌面歌词</string>
+  <string name="notification_close">关闭</string>
+  <string name="desktop_lyrics_no_lyrics">暂无歌词</string>
+  <string name="cloud_playback_restricted_skipping">《%1$s》无法播放，可能需要会员或受版权限制，已自动播放下一首</string>
+  <string name="cloud_playback_restricted_stopped">《%1$s》无法播放，可能需要会员或受版权限制</string>
 </resources>

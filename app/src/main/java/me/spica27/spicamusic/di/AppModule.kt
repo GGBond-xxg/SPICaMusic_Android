@@ -12,6 +12,7 @@ import me.spica27.spicamusic.cloud.MediaServerClient
 import me.spica27.spicamusic.cloud.MediaServerType
 import me.spica27.spicamusic.cloud.MediaServerViewModel
 import me.spica27.spicamusic.cloud.NeteaseClient
+import me.spica27.spicamusic.cloud.NeteaseLibraryStore
 import me.spica27.spicamusic.cloud.OnlineSourceEngine
 import me.spica27.spicamusic.cloud.OnlineSourceFileStore
 import me.spica27.spicamusic.cloud.OnlineSourceRepository
@@ -41,6 +42,7 @@ import me.spica27.spicamusic.feature.lyrics.domain.LyricsUseCases
 import me.spica27.spicamusic.feature.player.domain.PlayerUseCases
 import me.spica27.spicamusic.feature.settings.domain.SettingsUseCases
 import me.spica27.spicamusic.lyricon.LyriconProviderManager
+import me.spica27.spicamusic.service.DesktopLyricsController
 import me.spica27.spicamusic.topdisplay.MusicLiveUpdateManager
 import me.spica27.spicamusic.topdisplay.TopDisplayModeController
 import me.spica27.spicamusic.ui.album.AlbumViewModel
@@ -85,9 +87,11 @@ object AppModule {
             single { PreferencesManager(androidContext()) }
             single { CloudAccountStore(androidContext()) }
             single { CloudCatalogCountStore(androidContext()) }
+            single { NeteaseLibraryStore(androidContext()) }
             single { LyriconProviderManager(androidContext()) }
             single { MusicLiveUpdateManager(androidContext()) }
-            single { TopDisplayModeController(get(), get(), get()) }
+            single { DesktopLyricsController(androidContext()) }
+            single { TopDisplayModeController(get(), get(), get(), get()) }
 
             single<OkHttpClient>(
                 createdAtStart = true,
@@ -129,7 +133,7 @@ object AppModule {
 
             single { MediaServerClient(get(named("cloudHttpClient"))) }
             single { SubsonicClient(get(named("cloudHttpClient"))) }
-            single { NeteaseClient(get(named("cloudHttpClient"))) }
+            single { NeteaseClient(get(named("cloudHttpClient")), get()) }
             single { QqMusicClient(get(named("cloudHttpClient"))) }
             single { RemoteMusicClientRegistry(get(), get(), get()) }
             single { OnlineSourceFileStore(androidContext(), get(named("cloudHttpClient"))) }
@@ -146,7 +150,7 @@ object AppModule {
             single { TelegramClientManager(androidContext(), get()) }
             single { TelegramRepository(get(), get()) }
             single { TelegramStreamProxy(get()) }
-            single { CloudPlaybackItemResolver(get(), get(), get(), get(), get(), get()) }
+            single { CloudPlaybackItemResolver(get(), get(), get(), get(), get()) }
 
             viewModel { parameters ->
                 MediaServerViewModel(

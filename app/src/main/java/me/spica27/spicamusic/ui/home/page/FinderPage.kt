@@ -1,5 +1,6 @@
 package me.spica27.spicamusic.ui.home.page
 
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -84,6 +85,9 @@ import kotlinx.coroutines.delay
 import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.spicamusic.App
 import me.spica27.spicamusic.R
+import me.spica27.spicamusic.cloud.CloudCatalogPlaylist
+import me.spica27.spicamusic.cloud.CloudMusicCatalogViewModel
+import me.spica27.spicamusic.cloud.NeteasePlaylistScene
 import me.spica27.spicamusic.common.entity.Song
 import me.spica27.spicamusic.common.entity.getAlbumCoverUri
 import me.spica27.spicamusic.common.entity.getCoverUri
@@ -137,6 +141,7 @@ private val ItemPlacementSpec: FiniteAnimationSpec<IntOffset> =
 fun FinderPage(playEntrance: Boolean = true) {
     val path = LocalNavigationPath.current
     val homeViewModel: HomeViewModel = koinActivityViewModel()
+    val cloudCatalogViewModel: CloudMusicCatalogViewModel = koinActivityViewModel()
     val playerViewModel = LocalPlayerViewModel.current
 
     val frequentSongs by homeViewModel.frequentSongs.collectAsStateWithLifecycle()
@@ -147,6 +152,9 @@ fun FinderPage(playEntrance: Boolean = true) {
     val playlistsWithCover by homeViewModel.playlistsWithCover.collectAsStateWithLifecycle()
     val allSongs by homeViewModel.allSongs.collectAsStateWithLifecycle()
     val snackbarMessage by homeViewModel.snackbarMessage.collectAsStateWithLifecycle()
+    val cloudCatalog by cloudCatalogViewModel.state.collectAsStateWithLifecycle()
+    val cloudPlaylists = cloudCatalog.neteasePlaylists
+    val totalPlaylistCount = playlists.size + cloudPlaylists.size
     val frequentCardSongs = remember(frequentSongs) { ImmutableList.copyOf(frequentSongs) }
     val favoritePreviewSongs =
         remember(favoriteSongs) {
@@ -189,7 +197,7 @@ fun FinderPage(playEntrance: Boolean = true) {
                 FinderMasthead(
                     frequentCount = frequentSongs.size,
                     favoriteCount = favoriteSongs.size,
-                    playlistCount = playlists.size,
+                    playlistCount = totalPlaylistCount,
                     summaryReady = frequentSongsInitialized,
                     modifier =
                         Modifier
@@ -350,7 +358,7 @@ fun FinderPage(playEntrance: Boolean = true) {
                 val entrance = rememberEntrance(order = 6, play = playEntrance)
                 SectionHeader(
                     title = stringResource(R.string.finder_playlists_overview_title),
-                    subtitle = stringResource(R.string.library_summary_playlists, playlists.size),
+                    subtitle = stringResource(R.string.library_summary_playlists, totalPlaylistCount),
                     actionLabel = stringResource(R.string.finder_more).takeIf { playlists.size >= 2 },
                     onActionClick = { path.push(AllPlaylistsScene()) }.takeIf { playlists.size >= 2 },
                     modifier =
@@ -364,7 +372,7 @@ fun FinderPage(playEntrance: Boolean = true) {
                 )
             }
 
-            if (playlistsWithCover.isEmpty()) {
+            if (playlistsWithCover.isEmpty() && cloudPlaylists.isEmpty()) {
                 item(key = "playlists_empty", contentType = "empty") {
                     val entrance = rememberEntrance(order = 6, play = playEntrance)
                     FinderEmptyRow(
@@ -380,7 +388,7 @@ fun FinderPage(playEntrance: Boolean = true) {
                                 ).entranceGraphics(entrance),
                     )
                 }
-            } else {
+            } else if (playlistsWithCover.isNotEmpty()) {
                 item(key = "playlists_rail", contentType = "rail") {
                     val entrance = rememberEntrance(order = 6, play = playEntrance)
                     PlaylistRail(
@@ -393,6 +401,16 @@ fun FinderPage(playEntrance: Boolean = true) {
                                     placementSpec = null,
                                     fadeOutSpec = ListItemFadeOutSpec,
                                 ).entranceGraphics(entrance),
+                    )
+                }
+            }
+            if (cloudPlaylists.isNotEmpty()) {
+                item(key = "cloud_playlists_rail", contentType = "rail") {
+                    val entrance = rememberEntrance(order = 6, play = playEntrance)
+                    CloudPlaylistRail(
+                        playlists = cloudPlaylists,
+                        onPlaylistClick = { item -> path.push(NeteasePlaylistScene(item)) },
+                        modifier = Modifier.entranceGraphics(entrance),
                     )
                 }
             }
@@ -1316,6 +1334,68 @@ private fun PlaylistRail(
                         fadeOutSpec = ListItemFadeOutSpec,
                     ),
             )
+        }
+    }
+}
+
+@Composable
+private fun CloudPlaylistRail(
+    playlists: List<CloudCatalogPlaylist>,
+    onPlaylistClick: (CloudCatalogPlaylist) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyRow(
+        modifier = modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = LayoutTokens.MusicHeaderHorizontalPadding),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
+        overscrollEffect = rememberIOSOverScrollEffect(orientation = Orientation.Horizontal),
+    ) {
+        items(
+            items = playlists,
+            key = CloudCatalogPlaylist::stableId,
+            contentType = { "cloud_playlist" },
+        ) { item ->
+            Column(
+                modifier =
+                    Modifier
+                        .width(148.dp)
+                        .clip(Shapes.ExtraLargeCornerBasedShape)
+                        .clickHighlight(onClick = { onPlaylistClick(item) }),
+                verticalArrangement = Arrangement.spacedBy(Spacing.Small),
+            ) {
+                AudioCover(
+                    uri = item.playlist.coverUrl?.let(Uri::parse),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .clip(Shapes.ExtraLargeCornerBasedShape)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    placeHolder = {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.LibraryMusic, null)
+                        }
+                    },
+                )
+                Column(
+                    modifier = Modifier.padding(bottom = Spacing.Small),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        text = item.playlist.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = "网易云 · ${item.playlist.songCount} 首",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+            }
         }
     }
 }

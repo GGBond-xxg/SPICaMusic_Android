@@ -101,7 +101,9 @@ class SongInfoScene private constructor(
         val slideOffsetPx = with(density) { 72.dp.toPx() }
         val dismissDistancePx = with(density) { 72.dp.toPx() }
         val dismissVelocityPx = with(density) { 1_250.dp.toPx() }
-        val screenHeightPx = LocalWindowInfo.current.containerSize.height.toFloat()
+        val screenHeightPx =
+            LocalWindowInfo.current.containerSize.height
+                .toFloat()
         var dragOffsetPx by remember { mutableFloatStateOf(0f) }
         val handleDragState =
             rememberDraggableState { delta ->
@@ -142,8 +144,7 @@ class SongInfoScene private constructor(
                                 (dragOffsetPx / (screenHeightPx * 0.65f))
                                     .coerceIn(0f, 1f)
                             alpha = enterProgress.value * (1f - dragProgress)
-                        }
-                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.42f))
+                        }.background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.42f))
                         .clickable(
                             interactionSource = interactionSource,
                             indication = null,

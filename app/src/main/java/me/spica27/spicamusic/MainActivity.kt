@@ -1,6 +1,9 @@
 package me.spica27.spicamusic
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
@@ -9,6 +12,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
@@ -30,9 +34,27 @@ class MainActivity :
     ComponentActivity(),
     CustomAdapt {
     private val musicPlayer: IMusicPlayer by inject()
+    private var exitReceiverRegistered = false
+    private val exitReceiver =
+        object : BroadcastReceiver() {
+            override fun onReceive(
+                context: Context?,
+                intent: Intent?,
+            ) {
+                if (intent?.action == ACTION_EXIT_APP) finishAndRemoveTask()
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        ContextCompat.registerReceiver(
+            this,
+            exitReceiver,
+            IntentFilter(ACTION_EXIT_APP),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        exitReceiverRegistered = true
 
         // 启用边缘到边缘显示
         enableEdgeToEdge(
@@ -59,6 +81,14 @@ class MainActivity :
         super.onNewIntent(intent)
         setIntent(intent)
         playExternalAudio(intent)
+    }
+
+    override fun onDestroy() {
+        if (exitReceiverRegistered) {
+            unregisterReceiver(exitReceiver)
+            exitReceiverRegistered = false
+        }
+        super.onDestroy()
     }
 
     override fun isBaseOnWidth(): Boolean = true
@@ -128,7 +158,8 @@ class MainActivity :
         }
     }
 
-    private companion object {
+    companion object {
+        const val ACTION_EXIT_APP = "me.spica27.spicamusic.action.EXIT_APP"
         const val EXTERNAL_PLAYBACK_READY_TIMEOUT_MS = 5_000L
     }
 }

@@ -9,16 +9,19 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.widget.Toast
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
@@ -37,6 +40,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.guava.future
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import me.spica27.spicamusic.MainActivity
+import me.spica27.spicamusic.R
 import me.spica27.spicamusic.cloud.CloudPlaybackItemResolver
 import me.spica27.spicamusic.feature.settings.domain.SettingsUseCases
 import me.spica27.spicamusic.player.api.IMusicPlayer
@@ -55,8 +60,10 @@ import timber.log.Timber
 class PlaybackService : MediaLibraryService() {
     private val player: IMusicPlayer by inject()
     private val topDisplayModeController: TopDisplayModeController by inject()
+    private val desktopLyricsController: DesktopLyricsController by inject()
     private val cloudPlaybackItemResolver: CloudPlaybackItemResolver by inject()
     private val settingsUseCases: SettingsUseCases by inject()
+    private val cloudAudioCache by lazy { CloudAudioCache(this) }
 
     private var mediaSession: MediaLibrarySession? = null
     private lateinit var exoPlayer: ExoPlayer
@@ -86,11 +93,16 @@ class PlaybackService : MediaLibraryService() {
     @Volatile
     private var hiFiOutputEnabled = false
 
+    @Volatile
+    private var maxCloudAudioCacheBytes =
+        CloudAudioCache.DEFAULT_MAX_MIB.toLong() * 1024L * 1024L
+
     private var resumeAfterDisconnect = false
     private var disconnectPauseAtMs = 0L
     private var fadeInStartedAtMs = 0L
     private var fadeMonitorJob: Job? = null
     private var manualFadeJob: Job? = null
+    private var cloudErrorSkipJob: Job? = null
     private var manualFadeActive = false
     private val audioDeviceCallback =
         object : AudioDeviceCallback() {
@@ -126,6 +138,7 @@ class PlaybackService : MediaLibraryService() {
                 mediaItem: MediaItem?,
                 reason: Int,
             ) {
+                cloudErrorSkipJob?.cancel()
                 if (fadeEnabled && mediaItem != null) {
                     beginFadeIn()
                 } else {
@@ -138,6 +151,10 @@ class PlaybackService : MediaLibraryService() {
                 if (isPlaying && fadeEnabled && exoPlayer.volume <= 0.01f) {
                     fadeInStartedAtMs = SystemClock.elapsedRealtime()
                 }
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                handleCloudPlaybackError(error)
             }
         }
 
@@ -226,7 +243,8 @@ class PlaybackService : MediaLibraryService() {
                         this
                     },
                     renderersFactory,
-                ).setWakeMode(C.WAKE_MODE_LOCAL)
+                ).setMediaSourceFactory(DefaultMediaSourceFactory(cloudAudioCache.dataSourceFactory))
+                .setWakeMode(C.WAKE_MODE_LOCAL)
                 .setMaxSeekToPreviousPositionMs(Long.MAX_VALUE)
                 .setHandleAudioBecomingNoisy(true)
                 .setAudioAttributes(
@@ -244,8 +262,10 @@ class PlaybackService : MediaLibraryService() {
         sessionPlayer = FadeAwarePlayer(exoPlayer)
         audioManager.registerAudioDeviceCallback(audioDeviceCallback, Handler(Looper.getMainLooper()))
         startSettingsObservers()
+        startCacheTrimMonitor()
         startFadeMonitor()
         topDisplayModeController.start(exoPlayer)
+        desktopLyricsController.start(exoPlayer)
 
         mediaSession =
             MediaLibrarySession
@@ -340,6 +360,30 @@ class PlaybackService : MediaLibraryService() {
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = mediaSession
 
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int,
+    ): Int =
+        when (intent?.action) {
+            ACTION_TOGGLE_DESKTOP_LYRICS -> {
+                desktopLyricsController.toggle()
+                START_STICKY
+            }
+
+            ACTION_SHOW_DESKTOP_LYRICS -> {
+                desktopLyricsController.show()
+                START_STICKY
+            }
+
+            ACTION_CLOSE_PLAYER -> {
+                closePlayerAndApp()
+                START_NOT_STICKY
+            }
+
+            else -> super.onStartCommand(intent, flags, startId)
+        }
+
     override fun onTaskRemoved(rootIntent: Intent?) {
         if (!backgroundPlaybackEnabled) {
             exoPlayer.pause()
@@ -353,8 +397,10 @@ class PlaybackService : MediaLibraryService() {
         runCatching { audioManager.unregisterAudioDeviceCallback(audioDeviceCallback) }
         fadeMonitorJob?.cancel()
         manualFadeJob?.cancel()
+        cloudErrorSkipJob?.cancel()
         exoPlayer.removeListener(playbackListener)
         topDisplayModeController.release()
+        desktopLyricsController.release()
         serviceScope.cancel()
         playerScope.cancel()
         mediaSession?.run {
@@ -362,6 +408,7 @@ class PlaybackService : MediaLibraryService() {
             release()
             mediaSession = null
         }
+        cloudAudioCache.release()
         super.onDestroy()
     }
 
@@ -399,7 +446,8 @@ class PlaybackService : MediaLibraryService() {
                     this
                 },
                 renderersFactory,
-            ).setWakeMode(C.WAKE_MODE_LOCAL)
+            ).setMediaSourceFactory(DefaultMediaSourceFactory(cloudAudioCache.dataSourceFactory))
+            .setWakeMode(C.WAKE_MODE_LOCAL)
             .setMaxSeekToPreviousPositionMs(Long.MAX_VALUE)
             .setHandleAudioBecomingNoisy(true)
             .setAudioAttributes(
@@ -450,6 +498,7 @@ class PlaybackService : MediaLibraryService() {
             replacement.prepare()
         }
         topDisplayModeController.start(replacement)
+        desktopLyricsController.start(replacement)
         hiFiOutputEnabled = enableHiFi
         replacement.playWhenReady = playWhenReady
         if (playWhenReady && fadeEnabled && mediaItems.isNotEmpty()) beginFadeIn()
@@ -458,7 +507,79 @@ class PlaybackService : MediaLibraryService() {
             .i("Audio pipeline rebuilt: Hi-Fi=$enableHiFi, EQ=${!enableHiFi}")
     }
 
+    private fun handleCloudPlaybackError(error: PlaybackException) {
+        val failedItem = exoPlayer.currentMediaItem ?: return
+        if (!failedItem.mediaId.startsWith(CLOUD_MEDIA_ID_PREFIX)) return
+        val failedMediaId = failedItem.mediaId
+        val failedTitle =
+            failedItem.mediaMetadata.title
+                ?.toString()
+                ?.takeIf(String::isNotBlank)
+                ?: getString(R.string.unknown_song)
+        val nextIndex = exoPlayer.currentMediaItemIndex + 1
+        val canSkip = nextIndex in 0 until exoPlayer.mediaItemCount
+        Toast
+            .makeText(
+                this,
+                getString(
+                    if (canSkip) {
+                        R.string.cloud_playback_restricted_skipping
+                    } else {
+                        R.string.cloud_playback_restricted_stopped
+                    },
+                    failedTitle,
+                ),
+                Toast.LENGTH_LONG,
+            ).show()
+        Timber
+            .tag("PlaybackService")
+            .w(error, "Cloud playback failed: mediaId=%s, skip=%s", failedMediaId, canSkip)
+        cloudErrorSkipJob?.cancel()
+        cloudErrorSkipJob =
+            playerScope.launch {
+                delay(CLOUD_ERROR_SKIP_DELAY_MS)
+                if (exoPlayer.currentMediaItem?.mediaId != failedMediaId) return@launch
+                if (canSkip) {
+                    exoPlayer.seekTo(nextIndex, 0L)
+                    exoPlayer.prepare()
+                    exoPlayer.play()
+                } else {
+                    exoPlayer.pause()
+                    exoPlayer.stop()
+                    exoPlayer.clearMediaItems()
+                }
+            }
+    }
+
+    private fun closePlayerAndApp() {
+        cloudErrorSkipJob?.cancel()
+        desktopLyricsController.hide()
+        exoPlayer.pause()
+        exoPlayer.stop()
+        exoPlayer.clearMediaItems()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        sendBroadcast(Intent(MainActivity.ACTION_EXIT_APP).setPackage(packageName))
+        stopSelf()
+        Handler(Looper.getMainLooper()).postDelayed(
+            { android.os.Process.killProcess(android.os.Process.myPid()) },
+            PROCESS_EXIT_DELAY_MS,
+        )
+    }
+
     private fun startSettingsObservers() {
+        serviceScope.launch {
+            settingsUseCases
+                .getString(
+                    SettingsUseCases.Keys.CLOUD_AUDIO_CACHE_MIB,
+                    CloudAudioCache.DEFAULT_MAX_MIB.toString(),
+                ).collect { saved ->
+                    val maxMib =
+                        saved.toLongOrNull()?.coerceIn(128L, 8192L)
+                            ?: CloudAudioCache.DEFAULT_MAX_MIB.toLong()
+                    maxCloudAudioCacheBytes = maxMib * 1024L * 1024L
+                    cloudAudioCache.trimTo(maxCloudAudioCacheBytes)
+                }
+        }
         serviceScope.launch {
             settingsUseCases
                 .getBoolean(SettingsUseCases.Keys.BACKGROUND_PLAYBACK, true)
@@ -544,6 +665,15 @@ class PlaybackService : MediaLibraryService() {
                             .first()
                     player.setReverb(level, room)
                 }
+        }
+    }
+
+    private fun startCacheTrimMonitor() {
+        serviceScope.launch {
+            while (isActive) {
+                delay(CACHE_TRIM_INTERVAL_MS)
+                cloudAudioCache.trimTo(maxCloudAudioCacheBytes)
+            }
         }
     }
 
@@ -695,10 +825,20 @@ class PlaybackService : MediaLibraryService() {
             else -> false
         }
 
-    private companion object {
+    companion object {
+        const val ACTION_TOGGLE_DESKTOP_LYRICS =
+            "me.spica27.spicamusic.action.TOGGLE_DESKTOP_LYRICS"
+        const val ACTION_SHOW_DESKTOP_LYRICS =
+            "me.spica27.spicamusic.action.SHOW_DESKTOP_LYRICS"
+        const val ACTION_CLOSE_PLAYER = "me.spica27.spicamusic.action.CLOSE_PLAYER"
+
         const val DEFAULT_FADE_DURATION_MS = 4_000L
         const val FADE_TICK_MS = 50L
         const val CONTROL_FADE_MAX_MS = 600L
+        const val CACHE_TRIM_INTERVAL_MS = 30_000L
         const val HEADSET_RESUME_WINDOW_MS = 10 * 60 * 1_000L
+        const val CLOUD_MEDIA_ID_PREFIX = "cloud:"
+        const val CLOUD_ERROR_SKIP_DELAY_MS = 600L
+        const val PROCESS_EXIT_DELAY_MS = 500L
     }
 }

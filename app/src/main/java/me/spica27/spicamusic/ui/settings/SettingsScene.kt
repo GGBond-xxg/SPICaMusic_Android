@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.SwapCalls
 import androidx.compose.material.icons.filled.Usb
 import androidx.compose.material.icons.filled.Visibility
@@ -110,6 +111,7 @@ class SettingsScene : StackScene() {
         val resumeOnHeadset by viewModel.resumeOnHeadset.collectAsStateWithLifecycle()
         val fadeEnabled by viewModel.fadeEnabled.collectAsStateWithLifecycle()
         val fadeDurationMs by viewModel.fadeDurationMs.collectAsStateWithLifecycle()
+        val cloudAudioCacheMib by viewModel.cloudAudioCacheMib.collectAsStateWithLifecycle()
         val hiFiMode by viewModel.hiFiMode.collectAsStateWithLifecycle()
         val usbDacOutput by viewModel.usbDacOutput.collectAsStateWithLifecycle()
         val usbDeviceName by viewModel.usbDeviceName.collectAsStateWithLifecycle()
@@ -188,6 +190,19 @@ class SettingsScene : StackScene() {
                         SelectOption("4000", "4 s"),
                         SelectOption("6000", "6 s"),
                         SelectOption("8000", "8 s"),
+                    ),
+                )
+            }
+        val cloudCacheOptions =
+            remember {
+                ImmutableList.copyOf(
+                    listOf(
+                        SelectOption("256", "256 MB"),
+                        SelectOption("512", "512 MB"),
+                        SelectOption("1024", "1 GB"),
+                        SelectOption("2048", "2 GB"),
+                        SelectOption("4096", "4 GB"),
+                        SelectOption("8192", "8 GB"),
                     ),
                 )
             }
@@ -356,6 +371,22 @@ class SettingsScene : StackScene() {
                                     onValueChange = viewModel::setFadeDuration,
                                 )
                             }
+                            SettingsItemDivider()
+                            ModernSettingsSelectItem(
+                                title = stringResource(R.string.settings_cloud_audio_cache),
+                                subtitle =
+                                    stringResource(
+                                        R.string.settings_cloud_audio_cache_subtitle,
+                                        cloudCacheOptions
+                                            .firstOrNull { it.value == cloudAudioCacheMib }
+                                            ?.label
+                                            ?: "$cloudAudioCacheMib MB",
+                                    ),
+                                icon = Icons.Default.Storage,
+                                options = cloudCacheOptions,
+                                currentValue = cloudAudioCacheMib,
+                                onValueChange = viewModel::setCloudAudioCacheMib,
+                            )
                             SettingsItemDivider()
                             ModernSettingsSwitchItem(
                                 title = stringResource(R.string.settings_hifi),

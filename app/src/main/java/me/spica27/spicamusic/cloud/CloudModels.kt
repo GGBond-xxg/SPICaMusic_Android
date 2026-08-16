@@ -47,6 +47,14 @@ data class RemoteSongPage(
 )
 
 @Immutable
+data class RemotePlaylist(
+    val id: String,
+    val name: String,
+    val coverUrl: String?,
+    val songCount: Int,
+)
+
+@Immutable
 data class MediaServerAccount(
     val id: String,
     val type: MediaServerType,
