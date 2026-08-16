@@ -311,7 +311,8 @@ class PlaybackService : MediaLibraryService() {
                                 .AcceptedResultBuilder(session)
                                 .setAvailableSessionCommands(
                                     notificationSessionCommands,
-                                ).setCustomLayout(notificationButtons)
+                                ).setAvailablePlayerCommands(notificationPlayerCommands(session))
+                                .setCustomLayout(notificationButtons)
                                 .build()
 
                         override fun onPostConnect(
@@ -323,7 +324,7 @@ class PlaybackService : MediaLibraryService() {
                             session.setAvailableCommands(
                                 controller,
                                 notificationSessionCommands,
-                                session.player.availableCommands,
+                                notificationPlayerCommands(session),
                             )
                             session.setCustomLayout(controller, notificationButtons)
                         }
@@ -473,7 +474,7 @@ class PlaybackService : MediaLibraryService() {
                     .first { it.name == "getPlayerWrapper" && it.parameterCount == 0 }
                     .apply { isAccessible = true }
                     .invoke(impl)
-            val availablePlayerCommands = session.player.availableCommands
+            val availablePlayerCommands = notificationPlayerCommands(session)
             legacyStub.javaClass
                 .getDeclaredMethod(
                     "setAvailableCommands",
@@ -509,6 +510,15 @@ class PlaybackService : MediaLibraryService() {
         val commands = legacyNotificationCommands ?: return
         publishLegacySystemCustomActions(session, legacyNotificationButtons, commands)
     }
+
+    private fun notificationPlayerCommands(session: MediaSession): Player.Commands =
+        session.player.availableCommands
+            .buildUpon()
+            .add(Player.COMMAND_SEEK_TO_PREVIOUS)
+            .add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+            .add(Player.COMMAND_SEEK_TO_NEXT)
+            .add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+            .build()
 
     private fun notificationCommandButtons(
         desktopLyricsCommand: SessionCommand,
