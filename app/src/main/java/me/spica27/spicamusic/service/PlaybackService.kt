@@ -27,6 +27,7 @@ import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
 import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionCommands
 import androidx.media3.session.SessionError
 import androidx.media3.session.SessionResult
 import com.google.common.collect.ImmutableList
@@ -108,6 +109,10 @@ class PlaybackService : MediaLibraryService() {
     private var manualFadeJob: Job? = null
     private var cloudErrorSkipJob: Job? = null
     private var manualFadeActive = false
+    private var legacyNotificationButtons: List<CommandButton> = emptyList()
+    private var legacyNotificationCommands: SessionCommands? = null
+    private val legacyActionRefreshHandler = Handler(Looper.getMainLooper())
+    private val legacyActionRefreshRunnable = Runnable { refreshLegacySystemCustomActions() }
     private val audioDeviceCallback =
         object : AudioDeviceCallback() {
             override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
@@ -159,6 +164,15 @@ class PlaybackService : MediaLibraryService() {
 
             override fun onPlayerError(error: PlaybackException) {
                 handleCloudPlaybackError(error)
+            }
+
+            override fun onEvents(
+                player: Player,
+                events: Player.Events,
+            ) {
+                // Media3 rebuilds the platform PlaybackState after player changes. HyperOS reads
+                // only that legacy state, so restore our custom actions after Media3 has updated it.
+                scheduleLegacySystemCustomActionsRefresh()
             }
         }
 
@@ -274,6 +288,14 @@ class PlaybackService : MediaLibraryService() {
         val desktopLyricsCommand = SessionCommand(ACTION_TOGGLE_DESKTOP_LYRICS, android.os.Bundle.EMPTY)
         val closePlayerCommand = SessionCommand(ACTION_CLOSE_PLAYER, android.os.Bundle.EMPTY)
         val notificationButtons = notificationCommandButtons(desktopLyricsCommand, closePlayerCommand)
+        val notificationSessionCommands =
+            MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS
+                .buildUpon()
+                .add(desktopLyricsCommand)
+                .add(closePlayerCommand)
+                .build()
+        legacyNotificationButtons = notificationButtons
+        legacyNotificationCommands = notificationSessionCommands
 
         mediaSession =
             MediaLibrarySession
@@ -288,14 +310,23 @@ class PlaybackService : MediaLibraryService() {
                             MediaSession.ConnectionResult
                                 .AcceptedResultBuilder(session)
                                 .setAvailableSessionCommands(
-                                    MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS
-                                        .buildUpon()
-                                        .add(desktopLyricsCommand)
-                                        .add(closePlayerCommand)
-                                        .build(),
+                                    notificationSessionCommands,
                                 ).setCustomLayout(notificationButtons)
-                                .setMediaButtonPreferences(notificationButtons)
                                 .build()
+
+                        override fun onPostConnect(
+                            session: MediaSession,
+                            controller: MediaSession.ControllerInfo,
+                        ) {
+                            // Platform/legacy SystemUI reads PlaybackState.customActions. Re-applying
+                            // commands after connection makes Media3 publish these buttons there too.
+                            session.setAvailableCommands(
+                                controller,
+                                notificationSessionCommands,
+                                session.player.availableCommands,
+                            )
+                            session.setCustomLayout(controller, notificationButtons)
+                        }
 
                         override fun onCustomCommand(
                             session: MediaSession,
@@ -405,8 +436,78 @@ class PlaybackService : MediaLibraryService() {
                         android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
                     ),
                 ).setCustomLayout(notificationButtons)
-                .setMediaButtonPreferences(notificationButtons)
                 .build()
+        publishLegacySystemCustomActions(
+            requireNotNull(mediaSession),
+            notificationButtons,
+            notificationSessionCommands,
+        )
+        scheduleLegacySystemCustomActionsRefresh(1_000L)
+    }
+
+    /**
+     * Media3 1.10 exposes the buttons to modern controllers but its platform compatibility
+     * session can keep the default command set, causing PlaybackState.customActions to stay
+     * empty on HyperOS. Synchronize that internal compatibility state so SystemUI receives the
+     * same buttons. The reflection is deliberately isolated and safely falls back to Media3's
+     * regular behavior if its internals change in a future upgrade.
+     */
+    private fun publishLegacySystemCustomActions(
+        session: MediaSession,
+        buttons: List<CommandButton>,
+        commands: SessionCommands,
+    ) {
+        runCatching {
+            val implField = MediaSession::class.java.getDeclaredField("impl").apply { isAccessible = true }
+            val impl = requireNotNull(implField.get(session))
+            val legacyStubField =
+                generateSequence(impl.javaClass) { it.superclass }
+                    .mapNotNull { type ->
+                        runCatching { type.getDeclaredField("sessionLegacyStub") }.getOrNull()
+                    }.first()
+                    .apply { isAccessible = true }
+            val legacyStub = requireNotNull(legacyStubField.get(impl))
+            val playerWrapper =
+                generateSequence(impl.javaClass) { it.superclass }
+                    .flatMap { it.declaredMethods.asSequence() }
+                    .first { it.name == "getPlayerWrapper" && it.parameterCount == 0 }
+                    .apply { isAccessible = true }
+                    .invoke(impl)
+            val availablePlayerCommands = session.player.availableCommands
+            legacyStub.javaClass
+                .getDeclaredMethod(
+                    "setAvailableCommands",
+                    SessionCommands::class.java,
+                    Player.Commands::class.java,
+                ).apply { isAccessible = true }
+                .invoke(legacyStub, commands, availablePlayerCommands)
+
+            val immutableButtons = ImmutableList.copyOf(buttons)
+            legacyStub.javaClass
+                .getDeclaredMethod("setPlatformCustomLayout", ImmutableList::class.java)
+                .apply { isAccessible = true }
+                .invoke(legacyStub, immutableButtons)
+            legacyStub.javaClass.declaredMethods
+                .first {
+                    it.name == "updateLegacySessionPlaybackStateAndQueue" &&
+                        it.parameterCount == 1
+                }.apply { isAccessible = true }
+                .invoke(legacyStub, playerWrapper)
+        }.onFailure { error ->
+            Timber.tag("PlaybackService").w(error, "Unable to publish legacy system custom actions")
+        }
+    }
+
+    private fun scheduleLegacySystemCustomActionsRefresh(delayMs: Long = 100L) {
+        if (legacyNotificationButtons.isEmpty() || legacyNotificationCommands == null) return
+        legacyActionRefreshHandler.removeCallbacks(legacyActionRefreshRunnable)
+        legacyActionRefreshHandler.postDelayed(legacyActionRefreshRunnable, delayMs)
+    }
+
+    private fun refreshLegacySystemCustomActions() {
+        val session = mediaSession ?: return
+        val commands = legacyNotificationCommands ?: return
+        publishLegacySystemCustomActions(session, legacyNotificationButtons, commands)
     }
 
     private fun notificationCommandButtons(
@@ -467,6 +568,7 @@ class PlaybackService : MediaLibraryService() {
 
     override fun onDestroy() {
         runCatching { audioManager.unregisterAudioDeviceCallback(audioDeviceCallback) }
+        legacyActionRefreshHandler.removeCallbacks(legacyActionRefreshRunnable)
         fadeMonitorJob?.cancel()
         manualFadeJob?.cancel()
         cloudErrorSkipJob?.cancel()
