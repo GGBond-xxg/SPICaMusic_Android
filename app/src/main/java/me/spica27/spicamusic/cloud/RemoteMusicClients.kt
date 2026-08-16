@@ -63,6 +63,7 @@ class RemoteMusicClientRegistry(
     ): List<RemotePlaylist> =
         when (account.provider) {
             RemoteMusicProvider.NETEASE -> netease.listPlaylists(account, forceRefresh)
+            RemoteMusicProvider.QQ_MUSIC -> qqMusic.listPlaylists(account, forceRefresh)
             else -> emptyList()
         }
 
@@ -74,6 +75,8 @@ class RemoteMusicClientRegistry(
         when (account.provider) {
             RemoteMusicProvider.NETEASE ->
                 netease.listPlaylistSongs(account, playlistId, forceRefresh)
+            RemoteMusicProvider.QQ_MUSIC ->
+                qqMusic.listPlaylistSongs(account, playlistId, forceRefresh)
             else -> emptyList()
         }
 
@@ -422,13 +425,19 @@ class NeteaseClient(
         offset: Int,
         limit: Int,
     ): RemoteSongPage {
+        val encrypted =
+            NeteaseWebApiCrypto.encrypt(
+                JSONObject()
+                    .put("s", query)
+                    .put("type", 1)
+                    .put("offset", offset)
+                    .put("limit", limit),
+            )
         val form =
             FormBody
                 .Builder()
-                .add("s", query)
-                .add("type", "1")
-                .add("offset", offset.toString())
-                .add("limit", limit.toString())
+                .add("params", encrypted.getValue("params"))
+                .add("encSecKey", encrypted.getValue("encSecKey"))
                 .build()
         val root =
             executeJson(
@@ -620,7 +629,7 @@ class NeteaseClient(
         const val ACCOUNT_URL = "https://music.163.com/api/nuser/account/get"
         const val PLAYLISTS_URL = "https://music.163.com/api/user/playlist/"
         const val PLAYLIST_DETAIL_URL = "https://music.163.com/api/v6/playlist/detail"
-        const val SEARCH_URL = "https://music.163.com/api/search/get/web"
+        const val SEARCH_URL = "https://music.163.com/weapi/search/get"
         const val STREAM_URL = "https://music.163.com/api/song/enhance/player/url"
         const val SONG_DETAIL_URL = "https://music.163.com/api/v3/song/detail"
         const val PLAYLIST_PAGE_SIZE = 50
@@ -640,6 +649,10 @@ class QqMusicClient(
             .callTimeout(45, TimeUnit.SECONDS)
             .build()
     private val libraryCache = ConcurrentHashMap<String, List<RemoteSong>>()
+    private val playlistCache = ConcurrentHashMap<String, List<RemotePlaylist>>()
+    private val playlistSongCache = ConcurrentHashMap<String, List<RemoteSong>>()
+    private val playlistLocks = ConcurrentHashMap<String, Mutex>()
+    private val playlistSongLocks = ConcurrentHashMap<String, Mutex>()
 
     suspend fun authenticate(cookieHeader: String): Result<RemoteMusicAccount> =
         withContext(Dispatchers.IO) {
@@ -739,8 +752,42 @@ class QqMusicClient(
             }
         }
 
+    suspend fun listPlaylists(
+        account: RemoteMusicAccount,
+        forceRefresh: Boolean = false,
+    ): List<RemotePlaylist> =
+        withContext(Dispatchers.IO) {
+            playlistLocks.getOrPut(account.id) { Mutex() }.withLock {
+                if (!forceRefresh) {
+                    playlistCache[account.id]?.let { return@withLock it }
+                }
+                loadPlaylistsFromNetwork(account).also { playlistCache[account.id] = it }
+            }
+        }
+
+    suspend fun listPlaylistSongs(
+        account: RemoteMusicAccount,
+        playlistId: String,
+        forceRefresh: Boolean = false,
+    ): List<RemoteSong> =
+        withContext(Dispatchers.IO) {
+            val key = "${account.id}:$playlistId"
+            playlistSongLocks.getOrPut(key) { Mutex() }.withLock {
+                if (!forceRefresh) {
+                    playlistSongCache[key]?.let { return@withLock it }
+                }
+                loadPlaylistSongsFromNetwork(account, playlistId).also {
+                    playlistSongCache[key] = it
+                }
+            }
+        }
+
     fun clearCache(accountId: String) {
         libraryCache.remove(accountId)
+        playlistCache.remove(accountId)
+        playlistSongCache.keys.removeAll { it.startsWith("$accountId:") }
+        playlistLocks.remove(accountId)
+        playlistSongLocks.keys.removeAll { it.startsWith("$accountId:") }
     }
 
     private fun search(
@@ -767,7 +814,17 @@ class QqMusicClient(
         return RemoteSongPage(songs, (offset + songs.size).takeIf { it < total && songs.isNotEmpty() })
     }
 
-    private fun loadLibrary(account: RemoteMusicAccount): List<RemoteSong> {
+    private suspend fun loadLibrary(account: RemoteMusicAccount): List<RemoteSong> {
+        val result = LinkedHashMap<String, RemoteSong>()
+        listPlaylists(account).forEach { playlist ->
+            runCatching { listPlaylistSongs(account, playlist.id) }
+                .getOrDefault(emptyList())
+                .forEach { song -> result.putIfAbsent(song.id, song) }
+        }
+        return result.values.toList()
+    }
+
+    private fun loadPlaylistsFromNetwork(account: RemoteMusicAccount): List<RemotePlaylist> {
         val uin = extractUin(account.secret)
         val gtk = gtk(account.secret)
         val createdUrl =
@@ -780,44 +837,57 @@ class QqMusicClient(
                 .addQueryParameter("hostuin", uin)
                 .addQueryParameter("g_tk", gtk.toString())
                 .addQueryParameter("sin", "0")
-                .addQueryParameter("size", "12")
+                .addQueryParameter("size", "100")
                 .build()
-        val created =
-            JSONObject(executeText(requestBuilder(createdUrl.toString(), account.secret).get().build()))
-                .optJSONObject("data")
-                ?.optJSONArray("disslist")
-        val playlistIds = LinkedHashSet<Long>()
-        for (index in 0 until (created?.length() ?: 0)) {
-            created
-                ?.optJSONObject(index)
-                ?.optLong("tid")
-                ?.takeIf { it > 0L }
-                ?.let(playlistIds::add)
+        val root = JSONObject(executeText(requestBuilder(createdUrl.toString(), account.secret).get().build()))
+        val created = root.optJSONObject("data")?.optJSONArray("disslist") ?: JSONArray()
+        return buildList {
+            for (index in 0 until created.length()) {
+                val item = created.optJSONObject(index) ?: continue
+                val id =
+                    item.optLong("tid").takeIf { it > 0L }
+                        ?: item.optLong("disstid").takeIf { it > 0L }
+                        ?: continue
+                val name =
+                    item
+                        .optString("diss_name")
+                        .ifBlank {
+                            item.optString("title").ifBlank { item.optString("name") }
+                        }.ifBlank { "QQ 音乐歌单" }
+                val cover =
+                    sequenceOf("diss_cover", "logo", "cover")
+                        .map(item::optString)
+                        .firstOrNull(String::isNotBlank)
+                val songCount =
+                    sequenceOf("song_cnt", "songnum", "song_count")
+                        .map(item::optInt)
+                        .firstOrNull { it > 0 }
+                        ?: 0
+                add(RemotePlaylist(id.toString(), name, cover, songCount))
+            }
         }
-        val result = LinkedHashMap<String, RemoteSong>()
-        playlistIds.take(MAX_LIBRARY_PLAYLISTS).forEach { playlistId ->
-            val detailUrl =
-                PLAYLIST_DETAIL_URL
-                    .toHttpUrl()
-                    .newBuilder()
-                    .addQueryParameter("type", "1")
-                    .addQueryParameter("json", "1")
-                    .addQueryParameter("utf8", "1")
-                    .addQueryParameter("onlysong", "0")
-                    .addQueryParameter("disstid", playlistId.toString())
-                    .addQueryParameter("song_begin", "0")
-                    .addQueryParameter("song_num", "1000")
-                    .addQueryParameter("g_tk", gtk.toString())
-                    .addQueryParameter("format", "json")
-                    .build()
-            val songs =
-                JSONObject(executeText(requestBuilder(detailUrl.toString(), account.secret).get().build()))
-                    .optJSONArray("cdlist")
-                    ?.optJSONObject(0)
-                    ?.optJSONArray("songlist")
-            parseSongs(songs).forEach { result.putIfAbsent(it.id, it) }
-        }
-        return result.values.toList()
+    }
+
+    private fun loadPlaylistSongsFromNetwork(
+        account: RemoteMusicAccount,
+        playlistId: String,
+    ): List<RemoteSong> {
+        val detailUrl =
+            PLAYLIST_DETAIL_URL
+                .toHttpUrl()
+                .newBuilder()
+                .addQueryParameter("type", "1")
+                .addQueryParameter("json", "1")
+                .addQueryParameter("utf8", "1")
+                .addQueryParameter("onlysong", "0")
+                .addQueryParameter("disstid", playlistId)
+                .addQueryParameter("song_begin", "0")
+                .addQueryParameter("song_num", "1000")
+                .addQueryParameter("g_tk", gtk(account.secret).toString())
+                .addQueryParameter("format", "json")
+                .build()
+        val root = JSONObject(executeText(requestBuilder(detailUrl.toString(), account.secret).get().build()))
+        return parseSongs(root.optJSONArray("cdlist")?.optJSONObject(0)?.optJSONArray("songlist"))
     }
 
     private fun parseSongs(array: JSONArray?): List<RemoteSong> =
@@ -919,7 +989,6 @@ class QqMusicClient(
             "https://c.y.qq.com/qzone/fcg-bin/fcg_ucc_getcdinfo_byids_cp.fcg"
         const val SEARCH_URL = "https://c.y.qq.com/soso/fcgi-bin/client_search_cp"
         const val VKEY_URL = "https://u6.y.qq.com/cgi-bin/musics.fcg"
-        const val MAX_LIBRARY_PLAYLISTS = 6
         val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 }

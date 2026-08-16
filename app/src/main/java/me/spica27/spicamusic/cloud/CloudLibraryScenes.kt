@@ -117,6 +117,26 @@ class CloudLibraryScene : StackScene() {
                         onClick = { path.push(OnlineSourceScene()) },
                     )
                 }
+                item(key = "qq_music", contentType = "provider") {
+                    ProviderCard(
+                        title = stringResource(R.string.qq_music),
+                        subtitle = stringResource(R.string.qq_music_provider_subtitle),
+                        icon = Icons.Default.Cloud,
+                        onClick = {
+                            path.push(RemoteMusicScene(RemoteMusicProvider.QQ_MUSIC))
+                        },
+                    )
+                }
+                item(key = "netease", contentType = "provider") {
+                    ProviderCard(
+                        title = stringResource(R.string.netease_music),
+                        subtitle = stringResource(R.string.netease_provider_subtitle),
+                        icon = Icons.Default.MusicNote,
+                        onClick = {
+                            path.push(RemoteMusicScene(RemoteMusicProvider.NETEASE))
+                        },
+                    )
+                }
                 item(key = "telegram", contentType = "provider") {
                     ProviderCard(
                         title = "Telegram",
@@ -150,26 +170,6 @@ class CloudLibraryScene : StackScene() {
                         subtitle = stringResource(R.string.jellyfin_provider_subtitle),
                         icon = Icons.Default.Storage,
                         onClick = { path.push(MediaServerScene(MediaServerType.JELLYFIN)) },
-                    )
-                }
-                item(key = "netease", contentType = "provider") {
-                    ProviderCard(
-                        title = stringResource(R.string.netease_music),
-                        subtitle = stringResource(R.string.netease_provider_subtitle),
-                        icon = Icons.Default.MusicNote,
-                        onClick = {
-                            path.push(RemoteMusicScene(RemoteMusicProvider.NETEASE))
-                        },
-                    )
-                }
-                item(key = "qq_music", contentType = "provider") {
-                    ProviderCard(
-                        title = stringResource(R.string.qq_music),
-                        subtitle = stringResource(R.string.qq_music_provider_subtitle),
-                        icon = Icons.Default.Cloud,
-                        onClick = {
-                            path.push(RemoteMusicScene(RemoteMusicProvider.QQ_MUSIC))
-                        },
                     )
                 }
                 item(key = "emby", contentType = "provider") {

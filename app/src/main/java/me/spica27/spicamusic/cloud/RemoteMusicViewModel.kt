@@ -25,6 +25,12 @@ import me.spica27.spicamusic.player.api.PlayerAction
 data class RemoteMusicUiState(
     val accounts: List<RemoteMusicAccount> = emptyList(),
     val selectedAccount: RemoteMusicAccount? = null,
+    val localPlaylists: List<CloudUserPlaylist> = emptyList(),
+    val remotePlaylists: List<RemotePlaylist> = emptyList(),
+    val remotePlaylistSongs: Map<String, List<RemoteSong>> = emptyMap(),
+    val loadingRemotePlaylists: Boolean = false,
+    val loadingRemotePlaylistIds: Set<String> = emptySet(),
+    val remotePlaylistError: String? = null,
     val isConnecting: Boolean = false,
     val error: String? = null,
 )
@@ -36,6 +42,7 @@ class RemoteMusicViewModel(
     private val clients: RemoteMusicClientRegistry,
     private val proxy: RemoteMusicStreamProxy,
     private val player: PlayerUseCases,
+    private val playlistStore: CloudUserPlaylistStore,
 ) : ViewModel() {
     private val _state = MutableStateFlow(RemoteMusicUiState())
     val state = _state.asStateFlow()
@@ -85,9 +92,15 @@ class RemoteMusicViewModel(
     }
 
     fun selectAccount(id: String) {
+        val account = _state.value.accounts.firstOrNull { it.id == id }
         _state.update { current ->
             current.copy(
-                selectedAccount = current.accounts.firstOrNull { it.id == id },
+                selectedAccount = account,
+                localPlaylists = account?.let { playlistStore.read(provider, it.id) }.orEmpty(),
+                remotePlaylists = emptyList(),
+                remotePlaylistSongs = emptyMap(),
+                loadingRemotePlaylistIds = emptySet(),
+                remotePlaylistError = null,
                 error = null,
             )
         }
@@ -105,8 +118,86 @@ class RemoteMusicViewModel(
         query.value = value.trim()
     }
 
+    fun refreshRemotePlaylists(forceRefresh: Boolean = false) {
+        if (provider != RemoteMusicProvider.QQ_MUSIC || _state.value.loadingRemotePlaylists) return
+        val account = _state.value.selectedAccount ?: return
+        _state.update { it.copy(loadingRemotePlaylists = true, remotePlaylistError = null) }
+        viewModelScope.launch {
+            runCatching { clients.listPlaylists(account, forceRefresh) }
+                .onSuccess { playlists ->
+                    _state.update {
+                        it.copy(
+                            remotePlaylists = playlists,
+                            loadingRemotePlaylists = false,
+                            remotePlaylistError = null,
+                        )
+                    }
+                }.onFailure { error ->
+                    _state.update {
+                        it.copy(
+                            loadingRemotePlaylists = false,
+                            remotePlaylistError = error.message ?: "无法获取 QQ 音乐歌单",
+                        )
+                    }
+                }
+        }
+    }
+
+    fun loadRemotePlaylist(
+        playlistId: String,
+        forceRefresh: Boolean = false,
+    ) {
+        val account = _state.value.selectedAccount ?: return
+        if (provider != RemoteMusicProvider.QQ_MUSIC || playlistId in _state.value.loadingRemotePlaylistIds) return
+        if (!forceRefresh && _state.value.remotePlaylistSongs.containsKey(playlistId)) return
+        _state.update {
+            it.copy(
+                loadingRemotePlaylistIds = it.loadingRemotePlaylistIds + playlistId,
+                remotePlaylistError = null,
+            )
+        }
+        viewModelScope.launch {
+            runCatching { clients.listPlaylistSongs(account, playlistId, forceRefresh) }
+                .onSuccess { songs ->
+                    _state.update {
+                        it.copy(
+                            remotePlaylistSongs = it.remotePlaylistSongs + (playlistId to songs),
+                            loadingRemotePlaylistIds = it.loadingRemotePlaylistIds - playlistId,
+                        )
+                    }
+                }.onFailure { error ->
+                    _state.update {
+                        it.copy(
+                            loadingRemotePlaylistIds = it.loadingRemotePlaylistIds - playlistId,
+                            remotePlaylistError = error.message ?: "无法获取 QQ 音乐歌单内容",
+                        )
+                    }
+                }
+        }
+    }
+
     fun clearError() {
         _state.update { it.copy(error = null) }
+    }
+
+    fun createLocalPlaylist(
+        name: String,
+        initialSong: RemoteSong? = null,
+    ) {
+        val account = _state.value.selectedAccount ?: return
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        val updated = playlistStore.create(provider, account.id, trimmed, initialSong)
+        _state.update { it.copy(localPlaylists = updated) }
+    }
+
+    fun addSongToLocalPlaylist(
+        playlistId: String,
+        song: RemoteSong,
+    ) {
+        val account = _state.value.selectedAccount ?: return
+        val updated = playlistStore.addSong(provider, account.id, playlistId, song)
+        _state.update { it.copy(localPlaylists = updated) }
     }
 
     fun play(
@@ -176,12 +267,14 @@ class RemoteMusicViewModel(
     private fun refreshAccounts(preferredId: String? = null) {
         val accounts = accountStore.getRemoteAccounts(provider)
         val currentId = preferredId ?: _state.value.selectedAccount?.id
+        val selected =
+            accounts.firstOrNull { it.id == currentId }
+                ?: accounts.firstOrNull()
         _state.value =
             RemoteMusicUiState(
                 accounts = accounts,
-                selectedAccount =
-                    accounts.firstOrNull { it.id == currentId }
-                        ?: accounts.firstOrNull(),
+                selectedAccount = selected,
+                localPlaylists = selected?.let { playlistStore.read(provider, it.id) }.orEmpty(),
             )
     }
 }

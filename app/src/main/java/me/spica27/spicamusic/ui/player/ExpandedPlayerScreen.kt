@@ -775,6 +775,7 @@ private data class AudioQualityInfo(
     val sampleRate: Int,
     val bitRate: Int,
     val isLossless: Boolean,
+    val cloudProvider: String?,
 )
 
 private fun MediaItem?.toAudioQualityInfo(): AudioQualityInfo {
@@ -782,6 +783,7 @@ private fun MediaItem?.toAudioQualityInfo(): AudioQualityInfo {
     val sampleRate = extras?.getInt("sampleRate") ?: 0
     val bitRate = extras?.getInt("bitRate") ?: 0
     val mimeType = extras?.getString("mimeType").orEmpty()
+    val cloudProvider = extras?.getString("cloudProvider")?.takeIf(String::isNotBlank)
     val isLossless =
         mimeType.contains("flac", ignoreCase = true) ||
             mimeType.contains("alac", ignoreCase = true) ||
@@ -791,6 +793,7 @@ private fun MediaItem?.toAudioQualityInfo(): AudioQualityInfo {
         sampleRate = sampleRate,
         bitRate = bitRate,
         isLossless = isLossless,
+        cloudProvider = cloudProvider,
     )
 }
 
@@ -1105,6 +1108,10 @@ private fun PlayerPage(
                 if (audioQualityInfo.bitRate >= 320000 && !audioQualityInfo.isLossless) {
                     add(stringResource(R.string.high_quality))
                 }
+                audioQualityInfo.cloudProvider?.let { provider ->
+                    if (isEmpty()) add(stringResource(R.string.cloud_streaming))
+                    add(provider.cloudProviderLabel())
+                }
             }
         Box(
             modifier =
@@ -1151,6 +1158,18 @@ private fun PlayerPage(
         Spacer(modifier = Modifier.height(playbackSectionHeight))
     }
 }
+
+private fun String.cloudProviderLabel(): String =
+    when (uppercase(Locale.ROOT)) {
+        "NETEASE" -> "网易云音乐"
+        "QQ_MUSIC" -> "QQ 音乐"
+        "TELEGRAM" -> "Telegram"
+        "JELLYFIN" -> "Jellyfin"
+        "EMBY" -> "Emby"
+        "SUBSONIC" -> "Subsonic"
+        "ONLINE_SOURCE" -> "在线音源"
+        else -> replace('_', ' ').lowercase().replaceFirstChar(Char::uppercase)
+    }
 
 // ============================================
 // UI 子组件

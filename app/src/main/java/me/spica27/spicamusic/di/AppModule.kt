@@ -8,6 +8,7 @@ import me.spica27.spicamusic.cloud.CloudAccountStore
 import me.spica27.spicamusic.cloud.CloudCatalogCountStore
 import me.spica27.spicamusic.cloud.CloudMusicCatalogViewModel
 import me.spica27.spicamusic.cloud.CloudPlaybackItemResolver
+import me.spica27.spicamusic.cloud.CloudUserPlaylistStore
 import me.spica27.spicamusic.cloud.MediaServerClient
 import me.spica27.spicamusic.cloud.MediaServerType
 import me.spica27.spicamusic.cloud.MediaServerViewModel
@@ -88,6 +89,7 @@ object AppModule {
             single { CloudAccountStore(androidContext()) }
             single { CloudCatalogCountStore(androidContext()) }
             single { NeteaseLibraryStore(androidContext()) }
+            single { CloudUserPlaylistStore(androidContext()) }
             single { LyriconProviderManager(androidContext()) }
             single { MusicLiveUpdateManager(androidContext()) }
             single { DesktopLyricsController(androidContext()) }
@@ -182,6 +184,7 @@ object AppModule {
                     clients = get(),
                     proxy = get(),
                     player = get(),
+                    playlistStore = get(),
                 )
             }
             viewModel {

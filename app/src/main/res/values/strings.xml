@@ -238,6 +238,7 @@
   <string name="kbps_format">%dkbps</string>
   <string name="lossless">Lossless</string>
   <string name="high_quality">High quality</string>
+  <string name="cloud_streaming">Cloud stream</string>
   <string name="visualization_requires_android13">Requires Android 13+\n to show 3D visualization</string>
   <string name="waiting_to_play">Waiting to play</string>
   <string name="play">Play</string>

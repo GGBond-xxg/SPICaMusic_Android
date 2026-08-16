@@ -238,6 +238,7 @@
   <string name="kbps_format">%dkbps</string>
   <string name="lossless">无损</string>
   <string name="high_quality">高品质</string>
+  <string name="cloud_streaming">云端串流</string>
   <string name="visualization_requires_android13">需要 Android 13+\n才能显示 3D 可视化</string>
   <string name="waiting_to_play">等待播放</string>
   <string name="play">播放</string>

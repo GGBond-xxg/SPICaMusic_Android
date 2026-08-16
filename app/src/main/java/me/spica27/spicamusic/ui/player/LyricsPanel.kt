@@ -153,7 +153,9 @@ fun LyricsPanel(
         // 浮动工具栏（右下角）
         if (uiState.lyrics != null || uiState.errorMessage != null) {
             val toolbarEndPadding = if (displayMode == LyricsDisplayMode.Compact) 12.dp else 16.dp
-            val toolbarBottomPadding = if (displayMode == LyricsDisplayMode.Compact) 12.dp else 112.dp
+            // Keep the edit button clear of the seek bar's gesture area. On the fullscreen page
+            // the progress slider lives at the bottom and has a deliberately generous touch target.
+            val toolbarBottomPadding = if (displayMode == LyricsDisplayMode.Compact) 12.dp else 184.dp
             AnimatedVisibility(
                 visible = showFloatingToolbar || uiState.errorMessage != null,
                 modifier =

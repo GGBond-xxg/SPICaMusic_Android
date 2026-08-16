@@ -265,7 +265,7 @@ fun PlayerPlaybackBottomSection(
                     ),
         ) {
             Column {
-                Spacer(modifier = Modifier.height(Spacing.Medium))
+                Spacer(modifier = Modifier.height(Spacing.Large))
                 PlayerTransportControls(
                     modifier = controlsModifier.fillMaxWidth(),
                     isPlaying = isPlaying,

@@ -1483,10 +1483,10 @@ private fun MusicSongRow(
 ) {
     val revealOrigin = rememberThemeRevealOriginState()
     val song =
-        remember(artist, album, sourceLabel) {
+        remember(artist, album) {
             SongRowSubtitle(
                 artist = artist,
-                album = listOfNotNull(album, sourceLabel).joinToString(" · "),
+                album = album,
             )
         }
     Row(
@@ -1551,23 +1551,33 @@ private fun MusicSongRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        AnimatedContent(isPlaying) { isPlaying ->
-            if (isPlaying) {
+        AnimatedContent(isPlaying) { playing ->
+            Column(
+                modifier = Modifier.width(64.dp),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
                 Text(
-                    text = stringResource(R.string.playing),
+                    text = if (playing) stringResource(R.string.playing) else formatDuration(durationMs),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier,
+                    color =
+                        if (playing) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                     textAlign = TextAlign.End,
                 )
-            } else {
-                Text(
-                    text = formatDuration(durationMs),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.width(42.dp),
-                    textAlign = TextAlign.End,
-                )
+                sourceLabel?.let { source ->
+                    Text(
+                        text = source,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.End,
+                    )
+                }
             }
         }
     }

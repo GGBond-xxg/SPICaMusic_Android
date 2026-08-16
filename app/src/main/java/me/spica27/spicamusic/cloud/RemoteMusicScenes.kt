@@ -19,11 +19,13 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -34,6 +36,7 @@ import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -46,16 +49,19 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -88,11 +94,56 @@ class RemoteMusicScene(
         val songs = viewModel.songs.collectAsLazyPagingItems()
         var showLogin by rememberSaveable(provider) { mutableStateOf(state.accounts.isEmpty()) }
         var searchText by rememberSaveable(provider) { mutableStateOf("") }
+        var hasSubmittedSearch by rememberSaveable(provider) { mutableStateOf(false) }
+        var showCreatePlaylist by remember { mutableStateOf(false) }
+        var showPlaylistPicker by remember { mutableStateOf(false) }
+        var pendingPlaylistSong by remember { mutableStateOf<RemoteSong?>(null) }
+        val showsRemotePlaylistLanding =
+            !hasSubmittedSearch &&
+                (provider == RemoteMusicProvider.NETEASE || provider == RemoteMusicProvider.QQ_MUSIC)
+
+        if (showCreatePlaylist) {
+            CloudPlaylistNameDialog(
+                provider = provider,
+                onDismiss = {
+                    showCreatePlaylist = false
+                    pendingPlaylistSong = null
+                },
+                onConfirm = { name ->
+                    viewModel.createLocalPlaylist(name, pendingPlaylistSong)
+                    showCreatePlaylist = false
+                    pendingPlaylistSong = null
+                },
+            )
+        }
+        if (showPlaylistPicker) {
+            CloudPlaylistPickerDialog(
+                playlists = state.localPlaylists,
+                onDismiss = {
+                    showPlaylistPicker = false
+                    pendingPlaylistSong = null
+                },
+                onCreate = {
+                    showPlaylistPicker = false
+                    showCreatePlaylist = true
+                },
+                onSelect = { playlistId ->
+                    pendingPlaylistSong?.let { viewModel.addSongToLocalPlaylist(playlistId, it) }
+                    showPlaylistPicker = false
+                    pendingPlaylistSong = null
+                },
+            )
+        }
 
         LaunchedEffect(state.accounts.size) {
             if (state.accounts.isEmpty()) showLogin = true
             if (state.accounts.isNotEmpty() && !state.isConnecting && state.error == null) {
                 showLogin = false
+            }
+        }
+        LaunchedEffect(provider, state.selectedAccount?.id) {
+            if (provider == RemoteMusicProvider.QQ_MUSIC && state.selectedAccount != null) {
+                viewModel.refreshRemotePlaylists()
             }
         }
 
@@ -103,10 +154,12 @@ class RemoteMusicScene(
                 if (state.selectedAccount != null && !showLogin) {
                     IconButton(
                         onClick = {
-                            if (provider == RemoteMusicProvider.NETEASE) {
-                                catalogViewModel.refreshNeteasePlaylists(forceRefresh = true)
-                            } else {
-                                songs.refresh()
+                            when (provider) {
+                                RemoteMusicProvider.NETEASE ->
+                                    catalogViewModel.refreshNeteasePlaylists(forceRefresh = true)
+                                RemoteMusicProvider.QQ_MUSIC ->
+                                    viewModel.refreshRemotePlaylists(forceRefresh = true)
+                                RemoteMusicProvider.SUBSONIC -> songs.refresh()
                             }
                         },
                     ) {
@@ -178,6 +231,11 @@ class RemoteMusicScene(
                                     IconButton(onClick = viewModel::removeSelectedAccount) {
                                         Icon(Icons.Default.DeleteOutline, "Remove account")
                                     }
+                                    if (provider != RemoteMusicProvider.SUBSONIC) {
+                                        IconButton(onClick = { showCreatePlaylist = true }) {
+                                            Icon(Icons.Default.PlaylistPlay, "创建本地歌单")
+                                        }
+                                    }
                                     IconButton(onClick = { showLogin = true }) {
                                         Icon(Icons.Default.Add, "Add account")
                                     }
@@ -204,31 +262,76 @@ class RemoteMusicScene(
                                     }
                                 }
                             }
-                            if (provider != RemoteMusicProvider.NETEASE) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                OutlinedTextField(
+                                    value = searchText,
+                                    onValueChange = { searchText = it },
+                                    modifier = Modifier.weight(1f).height(58.dp),
+                                    singleLine = true,
+                                    placeholder = { Text("搜索${provider.displayName}歌曲") },
+                                    leadingIcon = { Icon(Icons.Default.Search, null) },
+                                    shape = RoundedCornerShape(20.dp),
+                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                    keyboardActions =
+                                        KeyboardActions(
+                                            onSearch = {
+                                                hasSubmittedSearch = searchText.isNotBlank()
+                                                viewModel.search(searchText)
+                                            },
+                                        ),
+                                )
+                                FilledTonalButton(
+                                    onClick = {
+                                        hasSubmittedSearch = searchText.isNotBlank()
+                                        viewModel.search(searchText)
+                                    },
+                                    modifier = Modifier.height(58.dp),
+                                    shape = RoundedCornerShape(20.dp),
+                                    contentPadding = PaddingValues(horizontal = 20.dp),
                                 ) {
-                                    OutlinedTextField(
-                                        value = searchText,
-                                        onValueChange = { searchText = it },
-                                        modifier = Modifier.weight(1f),
-                                        singleLine = true,
-                                        label = { Text("搜索云端音乐") },
-                                        leadingIcon = { Icon(Icons.Default.Search, null) },
-                                    )
-                                    FilledTonalButton(onClick = { viewModel.search(searchText) }) {
-                                        Text("搜索")
-                                    }
+                                    Text("搜索")
                                 }
                             }
                         }
                     }
 
-                    if (provider == RemoteMusicProvider.NETEASE) {
+                    if (provider != RemoteMusicProvider.SUBSONIC && state.localPlaylists.isNotEmpty()) {
+                        item(key = "local_playlist_title", contentType = "section_title") {
+                            Column(modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)) {
+                                Text("本地歌单", fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    "仅保存在本机，不会同步到${provider.displayName}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        items(
+                            count = state.localPlaylists.size,
+                            key = { index -> "local:${state.localPlaylists[index].id}" },
+                            contentType = { "local_cloud_playlist" },
+                        ) { index ->
+                            val playlist = state.localPlaylists[index]
+                            CloudUserPlaylistRow(playlist) {
+                                path.push(CloudUserPlaylistScene(playlist))
+                            }
+                        }
+                    }
+
+                    if (provider == RemoteMusicProvider.NETEASE && !hasSubmittedSearch) {
                         val accountId = state.selectedAccount?.id
                         val playlists =
                             catalogState.neteasePlaylists.filter { it.account.id == accountId }
+                        item(key = "netease_collection_title", contentType = "section_title") {
+                            Text(
+                                "网易云收藏歌单",
+                                modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
                         if (playlists.isEmpty()) {
                             item(key = "netease_playlists_empty", contentType = "empty") {
                                 Column(
@@ -261,19 +364,96 @@ class RemoteMusicScene(
                         }
                     }
 
-                    items(
-                        count = if (provider == RemoteMusicProvider.NETEASE) 0 else songs.itemCount,
-                        key = songs.itemKey(RemoteSong::id),
-                        contentType = songs.itemContentType { "remote_song" },
-                    ) { index ->
-                        songs[index]?.let { song ->
-                            RemoteSongRow(song) {
-                                viewModel.play(song, songs.itemSnapshotList.items)
+                    if (provider == RemoteMusicProvider.QQ_MUSIC && !hasSubmittedSearch) {
+                        item(key = "qq_collection_title", contentType = "section_title") {
+                            Text(
+                                "QQ 音乐歌单",
+                                modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                        when {
+                            state.loadingRemotePlaylists -> {
+                                item(key = "qq_playlists_loading", contentType = "loading") {
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        CircularProgressIndicator(modifier = Modifier.size(28.dp))
+                                    }
+                                }
+                            }
+                            state.remotePlaylistError != null -> {
+                                item(key = "qq_playlists_error", contentType = "error") {
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth().padding(20.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        Text(
+                                            state.remotePlaylistError.orEmpty(),
+                                            color = MaterialTheme.colorScheme.error,
+                                        )
+                                        OutlinedButton(
+                                            onClick = { viewModel.refreshRemotePlaylists(forceRefresh = true) },
+                                        ) {
+                                            Text("重试")
+                                        }
+                                    }
+                                }
+                            }
+                            state.remotePlaylists.isEmpty() -> {
+                                item(key = "qq_playlists_empty", contentType = "empty") {
+                                    Text(
+                                        "还没有获取到 QQ 音乐歌单",
+                                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                            else -> {
+                                items(
+                                    count = state.remotePlaylists.size,
+                                    key = { index -> "qq:${state.remotePlaylists[index].id}" },
+                                    contentType = { "qq_playlist" },
+                                ) { index ->
+                                    val playlist = state.remotePlaylists[index]
+                                    RemotePlaylistRow(playlist) {
+                                        path.push(QqPlaylistScene(playlist))
+                                    }
+                                }
                             }
                         }
                     }
 
-                    if (provider != RemoteMusicProvider.NETEASE) {
+                    items(
+                        count =
+                            if (showsRemotePlaylistLanding) {
+                                0
+                            } else {
+                                songs.itemCount
+                            },
+                        key = songs.itemKey(RemoteSong::id),
+                        contentType = songs.itemContentType { "remote_song" },
+                    ) { index ->
+                        songs[index]?.let { song ->
+                            RemoteSongRow(
+                                song = song,
+                                onClick = { viewModel.play(song, songs.itemSnapshotList.items) },
+                                onAddToPlaylist =
+                                    if (provider == RemoteMusicProvider.SUBSONIC) {
+                                        null
+                                    } else {
+                                        {
+                                            pendingPlaylistSong = song
+                                            showPlaylistPicker = true
+                                        }
+                                    },
+                            )
+                        }
+                    }
+
+                    if (!showsRemotePlaylistLanding) {
                         when {
                             songs.loadState.refresh is LoadState.Loading ||
                                 songs.loadState.append is LoadState.Loading -> {
@@ -305,6 +485,15 @@ class RemoteMusicScene(
                                             Text("重试")
                                         }
                                     }
+                                }
+                            }
+                            hasSubmittedSearch && songs.itemCount == 0 -> {
+                                item(key = "search_empty", contentType = "empty") {
+                                    Text(
+                                        "没有找到相关歌曲",
+                                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
                                 }
                             }
                         }
@@ -385,6 +574,147 @@ class NeteasePlaylistScene(
     }
 }
 
+class QqPlaylistScene(
+    private val playlist: RemotePlaylist,
+) : StackScene() {
+    @Composable
+    override fun Content() {
+        val path = LocalNavigationPath.current
+        val viewModel: RemoteMusicViewModel =
+            koinViewModel(key = "remote_music_${RemoteMusicProvider.QQ_MUSIC.name}") {
+                parametersOf(RemoteMusicProvider.QQ_MUSIC)
+            }
+        val state by viewModel.state.collectAsStateWithLifecycle()
+        val songs = state.remotePlaylistSongs[playlist.id].orEmpty()
+        val loading = playlist.id in state.loadingRemotePlaylistIds
+
+        LaunchedEffect(playlist.id) {
+            viewModel.loadRemotePlaylist(playlist.id)
+        }
+        RemoteSceneScaffold(
+            title = playlist.name,
+            onBack = { path.popTop() },
+            actions = {
+                IconButton(
+                    onClick = { viewModel.loadRemotePlaylist(playlist.id, forceRefresh = true) },
+                ) {
+                    Icon(Icons.Default.Refresh, "Refresh")
+                }
+            },
+        ) { padding ->
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding =
+                    PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = padding.calculateTopPadding() + 10.dp,
+                        bottom = 36.dp,
+                    ),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                item(key = "playlist_header", contentType = "header") {
+                    RemotePlaylistRow(playlist, onClick = null)
+                }
+                items(
+                    count = songs.size,
+                    key = { index -> songs[index].id },
+                    contentType = { "qq_playlist_song" },
+                ) { index ->
+                    val song = songs[index]
+                    RemoteSongRow(
+                        song = song,
+                        onClick = { viewModel.play(song, songs) },
+                    )
+                }
+                if (loading) {
+                    item(key = "loading", contentType = "loading") {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(28.dp))
+                        }
+                    }
+                } else if (state.remotePlaylistError != null) {
+                    item(key = "error", contentType = "error") {
+                        Text(
+                            state.remotePlaylistError.orEmpty(),
+                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                } else if (songs.isEmpty()) {
+                    item(key = "empty", contentType = "empty") {
+                        Text(
+                            "歌单中暂无可播放歌曲",
+                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+class CloudUserPlaylistScene(
+    private val playlist: CloudUserPlaylist,
+) : StackScene() {
+    @Composable
+    override fun Content() {
+        val path = LocalNavigationPath.current
+        val viewModel: RemoteMusicViewModel =
+            koinViewModel(key = "remote_music_${playlist.provider.name}") {
+                parametersOf(playlist.provider)
+            }
+        RemoteSceneScaffold(
+            title = playlist.name,
+            onBack = { path.popTop() },
+        ) { padding ->
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding =
+                    PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = padding.calculateTopPadding() + 10.dp,
+                        bottom = 36.dp,
+                    ),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                item(key = "local_hint", contentType = "hint") {
+                    Text(
+                        "本地歌单 · ${playlist.songs.size} 首 · 不同步到云端",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                items(
+                    count = playlist.songs.size,
+                    key = { index -> playlist.songs[index].id },
+                    contentType = { "local_playlist_song" },
+                ) { index ->
+                    val song = playlist.songs[index]
+                    RemoteSongRow(
+                        song = song,
+                        onClick = { viewModel.play(song, playlist.songs) },
+                    )
+                }
+                if (playlist.songs.isEmpty()) {
+                    item(key = "empty", contentType = "empty") {
+                        Text(
+                            "歌单还是空的，请从搜索结果右侧的 + 添加歌曲。",
+                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun NeteasePlaylistRow(
     value: CloudCatalogPlaylist,
@@ -419,6 +749,93 @@ private fun NeteasePlaylistRow(
                 )
                 Text(
                     "${value.playlist.songCount} 首 · ${value.account.displayName}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RemotePlaylistRow(
+    playlist: RemotePlaylist,
+    onClick: (() -> Unit)?,
+) {
+    val clickableModifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+    Surface(
+        modifier = Modifier.fillMaxWidth().then(clickableModifier),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            AudioCover(
+                uri = playlist.coverUrl?.let(Uri::parse),
+                modifier = Modifier.size(64.dp),
+                placeHolder = {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.PlaylistPlay, null)
+                    }
+                },
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    playlist.name,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "${playlist.songCount} 首 · QQ 音乐",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CloudUserPlaylistRow(
+    playlist: CloudUserPlaylist,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            AudioCover(
+                uri =
+                    playlist.songs
+                        .firstOrNull()
+                        ?.artworkUrl
+                        ?.let(Uri::parse),
+                modifier = Modifier.size(64.dp),
+                placeHolder = {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.PlaylistPlay, null)
+                    }
+                },
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    playlist.name,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "${playlist.songs.size} 首 · 仅保存在本机",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -698,9 +1115,98 @@ private fun LoginError(message: String) {
 }
 
 @Composable
+private fun CloudPlaylistNameDialog(
+    provider: RemoteMusicProvider,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("创建本地歌单") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "当前没有稳定的${provider.displayName}歌单写入接口，新歌单只保存在本机。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("歌单名称") },
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(name) },
+                enabled = name.isNotBlank(),
+            ) {
+                Text("创建")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        },
+    )
+}
+
+@Composable
+private fun CloudPlaylistPickerDialog(
+    playlists: List<CloudUserPlaylist>,
+    onDismiss: () -> Unit,
+    onCreate: () -> Unit,
+    onSelect: (String) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("添加到歌单") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (playlists.isEmpty()) {
+                    Text(
+                        "还没有本地歌单，请先创建一个。",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    playlists.take(8).forEach { playlist ->
+                        TextButton(
+                            onClick = { onSelect(playlist.id) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Text(playlist.name, color = MaterialTheme.colorScheme.onSurface)
+                                Text(
+                                    "${playlist.songs.size} 首 · 仅保存在本机",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onCreate) {
+                Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
+                Text("新建歌单")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        },
+    )
+}
+
+@Composable
 private fun RemoteSongRow(
     song: RemoteSong,
     onClick: () -> Unit,
+    onAddToPlaylist: (() -> Unit)? = null,
 ) {
     Row(
         modifier =
@@ -711,18 +1217,24 @@ private fun RemoteSongRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(46.dp)
-                    .background(
-                        MaterialTheme.colorScheme.surfaceContainerHigh,
-                        RoundedCornerShape(13.dp),
-                    ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.Default.MusicNote, null, tint = MaterialTheme.colorScheme.primary)
-        }
+        AudioCover(
+            uri = song.artworkUrl?.let(Uri::parse),
+            modifier = Modifier.size(46.dp),
+            placeHolder = {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .background(
+                                MaterialTheme.colorScheme.surfaceContainerHigh,
+                                RoundedCornerShape(13.dp),
+                            ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Default.MusicNote, null, tint = MaterialTheme.colorScheme.primary)
+                }
+            },
+        )
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 song.title,
@@ -743,6 +1255,11 @@ private fun RemoteSongRow(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        onAddToPlaylist?.let { add ->
+            IconButton(onClick = add) {
+                Icon(Icons.Default.Add, "添加到歌单")
+            }
+        }
     }
 }
 
