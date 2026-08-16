@@ -1,5 +1,6 @@
 package me.spica27.spicamusic.ui.home.page
 
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -57,6 +58,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOff
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicOff
 import androidx.compose.material.icons.filled.Scanner
 import androidx.compose.material.icons.rounded.MusicNote
@@ -98,6 +100,10 @@ import kotlinx.coroutines.launch
 import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.cloud.CloudLibraryScene
+import me.spica27.spicamusic.cloud.CloudMusicCatalogViewModel
+import me.spica27.spicamusic.cloud.CloudUserPlaylistScene
+import me.spica27.spicamusic.cloud.NeteasePlaylistScene
+import me.spica27.spicamusic.cloud.RemoteMusicProvider
 import me.spica27.spicamusic.common.entity.PlayStats
 import me.spica27.spicamusic.feature.library.domain.ScanFolder
 import me.spica27.spicamusic.ui.home.LocalBottomBarScrollConnection
@@ -113,6 +119,7 @@ import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
 import me.spica27.spicamusic.ui.theme.ListItemFadeOutSpec
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
+import me.spica27.spicamusic.ui.widget.AudioCover
 import me.spica27.spicamusic.ui.widget.PlaylistCoverView
 import me.spica27.spicamusic.ui.widget.clickHighlight
 import me.spica27.spicamusic.ui.widget.materialSharedAxisZ
@@ -142,8 +149,13 @@ fun LibraryPage() {
     val context = LocalContext.current
     val viewModel: LibraryPageViewModel = koinActivityViewModel()
     val sourceViewModel: MediaLibrarySourceViewModel = koinActivityViewModel()
+    val cloudCatalogViewModel: CloudMusicCatalogViewModel = koinActivityViewModel()
 
     val playlists by viewModel.playlistsWithCover.collectAsStateWithLifecycle()
+    val cloudCatalog by cloudCatalogViewModel.state.collectAsStateWithLifecycle()
+    val remotePlaylists = cloudCatalog.remotePlaylists
+    val userCloudPlaylists = cloudCatalog.userPlaylists
+    val totalPlaylistCount = playlists.size + remotePlaylists.size + userCloudPlaylists.size
     val weeklyStats by viewModel.weeklyStats.collectAsStateWithLifecycle()
     val extraFolders by viewModel.extraFolders.collectAsStateWithLifecycle()
     val ignoreFolders by viewModel.ignoreFolders.collectAsStateWithLifecycle()
@@ -219,7 +231,7 @@ fun LibraryPage() {
             item(key = "masthead", span = { GridItemSpan(maxLineSpan) }, contentType = "masthead") {
                 val entrance = rememberEntrance(order = 0, play = playEntrance)
                 LibraryMasthead(
-                    playlistCount = playlists.size,
+                    playlistCount = totalPlaylistCount,
                     modifier =
                         Modifier
                             .padding(top = Spacing.Large)
@@ -328,7 +340,7 @@ fun LibraryPage() {
                 )
             }
 
-            if (playlists.isEmpty()) {
+            if (playlists.isEmpty() && remotePlaylists.isEmpty() && userCloudPlaylists.isEmpty()) {
                 item(key = "playlists_empty", span = { GridItemSpan(maxLineSpan) }, contentType = "empty") {
                     PlaylistsEmptyState(
                         modifier =
@@ -381,6 +393,34 @@ fun LibraryPage() {
                         modifier = entranceModifier,
                     )
                 }
+            }
+
+            itemsIndexed(
+                items = remotePlaylists,
+                key = { _, item -> item.stableId },
+                contentType = { _, _ -> "remote_playlist" },
+            ) { _, item ->
+                LibraryCloudPlaylistCard(
+                    name = item.playlist.name,
+                    subtitle =
+                        "${if (item.account.provider == RemoteMusicProvider.NETEASE) "网易云" else "QQ 音乐"} · " +
+                            "${item.playlist.songCount} 首",
+                    coverUrl = item.playlist.coverUrl,
+                    onClick = { path.push(NeteasePlaylistScene(item)) },
+                )
+            }
+
+            itemsIndexed(
+                items = userCloudPlaylists,
+                key = { _, item -> "user_cloud_${item.id}" },
+                contentType = { _, _ -> "user_cloud_playlist" },
+            ) { _, item ->
+                LibraryCloudPlaylistCard(
+                    name = item.name,
+                    subtitle = "本地云端歌单 · ${item.songs.size} 首",
+                    coverUrl = item.songs.firstOrNull()?.artworkUrl,
+                    onClick = { path.push(CloudUserPlaylistScene(item)) },
+                )
             }
 
             item(key = "sources_header", span = { GridItemSpan(maxLineSpan) }, contentType = "section_header") {
@@ -888,6 +928,57 @@ private fun PlaylistCard(
             )
             Text(
                 text = stringResource(R.string.songs_count, item.songCount),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LibraryCloudPlaylistCard(
+    name: String,
+    subtitle: String,
+    coverUrl: String?,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(Shapes.ExtraLargeCornerBasedShape)
+                .clickHighlight(onClick = onClick),
+        verticalArrangement = Arrangement.spacedBy(Spacing.Small),
+    ) {
+        AudioCover(
+            uri = coverUrl?.let(Uri::parse),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .clip(Shapes.ExtraLargeCornerBasedShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            placeHolder = {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.LibraryMusic, null, tint = MaterialTheme.colorScheme.primary)
+                }
+            },
+        )
+        Column(
+            modifier = Modifier.padding(horizontal = Spacing.ExtraSmall, vertical = Spacing.Small),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

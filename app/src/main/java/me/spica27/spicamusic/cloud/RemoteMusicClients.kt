@@ -80,6 +80,16 @@ class RemoteMusicClientRegistry(
             else -> emptyList()
         }
 
+    suspend fun dailyRecommendations(
+        account: RemoteMusicAccount,
+        forceRefresh: Boolean = false,
+    ): List<RemoteSong> {
+        require(account.provider == RemoteMusicProvider.NETEASE) {
+            "Daily recommendations are only available for NetEase accounts"
+        }
+        return netease.dailyRecommendations(account, forceRefresh)
+    }
+
     suspend fun resolveStreamUrl(
         account: RemoteMusicAccount,
         songId: String,
@@ -295,6 +305,7 @@ class NeteaseClient(
     private val libraryCache = ConcurrentHashMap<String, List<RemoteSong>>()
     private val playlistCache = ConcurrentHashMap<String, List<RemotePlaylist>>()
     private val playlistSongCache = ConcurrentHashMap<String, List<RemoteSong>>()
+    private val dailyRecommendationCache = ConcurrentHashMap<String, List<RemoteSong>>()
     private val playlistLocks = ConcurrentHashMap<String, Mutex>()
     private val playlistSongLocks = ConcurrentHashMap<String, Mutex>()
 
@@ -366,10 +377,47 @@ class NeteaseClient(
                 ?: "https://music.163.com/song/media/outer/url?id=$songId.mp3"
         }
 
+    suspend fun dailyRecommendations(
+        account: RemoteMusicAccount,
+        forceRefresh: Boolean = false,
+    ): List<RemoteSong> =
+        withContext(Dispatchers.IO) {
+            if (!forceRefresh) {
+                dailyRecommendationCache[account.id]?.takeIf { it.isNotEmpty() }?.let { return@withContext it }
+            }
+            val encrypted =
+                NeteaseWebApiCrypto.encrypt(
+                    JSONObject()
+                        .put("offset", 0)
+                        .put("total", true)
+                        .put("limit", 100)
+                        .put("csrf_token", cookieValue(account.secret, "__csrf")),
+                )
+            val form =
+                FormBody
+                    .Builder()
+                    .add("params", encrypted.getValue("params"))
+                    .add("encSecKey", encrypted.getValue("encSecKey"))
+                    .build()
+            val root =
+                executeJson(
+                    requestBuilder(DAILY_RECOMMENDATIONS_URL, account.secret)
+                        .post(form)
+                        .build(),
+                )
+            check(root.optInt("code", 200) == 200) {
+                "NetEase daily recommendations ${root.optInt("code")}"
+            }
+            val songs = parseSongs(root.optJSONObject("data")?.optJSONArray("dailySongs"))
+            check(songs.isNotEmpty()) { "网易云暂未返回每日推荐" }
+            songs.also { dailyRecommendationCache[account.id] = it }
+        }
+
     fun clearCache(accountId: String) {
         libraryCache.remove(accountId)
         playlistCache.remove(accountId)
         playlistSongCache.keys.removeAll { it.startsWith("$accountId:") }
+        dailyRecommendationCache.remove(accountId)
         playlistLocks.remove(accountId)
         playlistSongLocks.keys.removeAll { it.startsWith("$accountId:") }
         libraryStore.clear(accountId)
@@ -632,6 +680,8 @@ class NeteaseClient(
         const val SEARCH_URL = "https://music.163.com/weapi/search/get"
         const val STREAM_URL = "https://music.163.com/api/song/enhance/player/url"
         const val SONG_DETAIL_URL = "https://music.163.com/api/v3/song/detail"
+        const val DAILY_RECOMMENDATIONS_URL =
+            "https://music.163.com/weapi/v3/discovery/recommend/songs"
         const val PLAYLIST_PAGE_SIZE = 50
         const val MAX_PLAYLIST_PAGES = 200
         const val SONG_DETAIL_BATCH_SIZE = 500

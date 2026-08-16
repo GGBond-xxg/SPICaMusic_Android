@@ -73,6 +73,8 @@ import androidx.paging.compose.itemContentType
 import androidx.paging.compose.itemKey
 import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.navkit.scene.StackScene
+import me.spica27.spicamusic.common.entity.Playlist
+import me.spica27.spicamusic.ui.playlist.PlaylistViewModel
 import me.spica27.spicamusic.ui.widget.AudioCover
 import org.koin.compose.viewmodel.koinActivityViewModel
 import org.koin.compose.viewmodel.koinViewModel
@@ -91,6 +93,8 @@ class RemoteMusicScene(
         val state by viewModel.state.collectAsStateWithLifecycle()
         val catalogViewModel: CloudMusicCatalogViewModel = koinActivityViewModel()
         val catalogState by catalogViewModel.state.collectAsStateWithLifecycle()
+        val playlistViewModel: PlaylistViewModel = koinActivityViewModel()
+        val homePlaylists by playlistViewModel.playlists.collectAsStateWithLifecycle()
         val songs = viewModel.songs.collectAsLazyPagingItems()
         var showLogin by rememberSaveable(provider) { mutableStateOf(state.accounts.isEmpty()) }
         var searchText by rememberSaveable(provider) { mutableStateOf("") }
@@ -118,7 +122,8 @@ class RemoteMusicScene(
         }
         if (showPlaylistPicker) {
             CloudPlaylistPickerDialog(
-                playlists = state.localPlaylists,
+                cloudPlaylists = state.localPlaylists,
+                homePlaylists = homePlaylists,
                 onDismiss = {
                     showPlaylistPicker = false
                     pendingPlaylistSong = null
@@ -129,6 +134,15 @@ class RemoteMusicScene(
                 },
                 onSelect = { playlistId ->
                     pendingPlaylistSong?.let { viewModel.addSongToLocalPlaylist(playlistId, it) }
+                    showPlaylistPicker = false
+                    pendingPlaylistSong = null
+                },
+                onSelectHome = { playlistId ->
+                    val account = state.selectedAccount
+                    val song = pendingPlaylistSong
+                    if (account != null && song != null) {
+                        catalogViewModel.addRemoteSongToLocalPlaylist(playlistId, account, song)
+                    }
                     showPlaylistPicker = false
                     pendingPlaylistSong = null
                 },
@@ -324,7 +338,10 @@ class RemoteMusicScene(
                     if (provider == RemoteMusicProvider.NETEASE && !hasSubmittedSearch) {
                         val accountId = state.selectedAccount?.id
                         val playlists =
-                            catalogState.neteasePlaylists.filter { it.account.id == accountId }
+                            catalogState.remotePlaylists.filter {
+                                it.account.provider == RemoteMusicProvider.NETEASE &&
+                                    it.account.id == accountId
+                            }
                         item(key = "netease_collection_title", contentType = "section_title") {
                             Text(
                                 "网易云收藏歌单",
@@ -1156,23 +1173,42 @@ private fun CloudPlaylistNameDialog(
 
 @Composable
 private fun CloudPlaylistPickerDialog(
-    playlists: List<CloudUserPlaylist>,
+    cloudPlaylists: List<CloudUserPlaylist>,
+    homePlaylists: List<Playlist>,
     onDismiss: () -> Unit,
     onCreate: () -> Unit,
     onSelect: (String) -> Unit,
+    onSelectHome: (Long) -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("添加到歌单") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (playlists.isEmpty()) {
+                if (cloudPlaylists.isEmpty() && homePlaylists.isEmpty()) {
                     Text(
                         "还没有本地歌单，请先创建一个。",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
-                    playlists.take(8).forEach { playlist ->
+                    homePlaylists.take(8).forEach { playlist ->
+                        playlist.playlistId?.let { playlistId ->
+                            TextButton(
+                                onClick = { onSelectHome(playlistId) },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    Text(playlist.playlistName, color = MaterialTheme.colorScheme.onSurface)
+                                    Text(
+                                        "首页/资料库歌单 · 可添加所有音乐源",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    cloudPlaylists.take(8).forEach { playlist ->
                         TextButton(
                             onClick = { onSelect(playlist.id) },
                             modifier = Modifier.fillMaxWidth(),

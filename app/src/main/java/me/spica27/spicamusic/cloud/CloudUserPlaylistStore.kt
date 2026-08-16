@@ -2,6 +2,9 @@ package me.spica27.spicamusic.cloud
 
 import android.content.Context
 import androidx.compose.runtime.Immutable
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -27,6 +30,8 @@ class CloudUserPlaylistStore(
     context: Context,
 ) {
     private val root = File(context.applicationContext.filesDir, "cloud_user_playlists").apply { mkdirs() }
+    private val _revision = MutableStateFlow(0L)
+    val revision = _revision.asStateFlow()
 
     @Synchronized
     fun read(
@@ -83,7 +88,10 @@ class CloudUserPlaylistStore(
                 name = name.trim(),
                 songs = listOfNotNull(initialSong),
             )
-        return (current + playlist).also(::write)
+        return (current + playlist).also {
+            write(it)
+            _revision.update(Long::inc)
+        }
     }
 
     @Synchronized
@@ -102,6 +110,7 @@ class CloudUserPlaylistStore(
                 }
             }
         write(updated)
+        _revision.update(Long::inc)
         return updated
     }
 

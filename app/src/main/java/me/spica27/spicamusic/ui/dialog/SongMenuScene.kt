@@ -80,7 +80,9 @@ import me.spica27.spicamusic.common.entity.getCoverUri
 import me.spica27.spicamusic.ui.albumdetail.AlbumDetailScene
 import me.spica27.spicamusic.ui.artistdetail.ArtistDetailScene
 import me.spica27.spicamusic.ui.playlist.PlaylistCreatorScene
+import me.spica27.spicamusic.ui.playlist.PlaylistViewModel
 import me.spica27.spicamusic.ui.widget.CoverFallback
+import org.koin.compose.viewmodel.koinActivityViewModel
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 
@@ -242,7 +244,11 @@ class CloudSongMenuScene(
         val scope = rememberCoroutineScope()
         val density = LocalDensity.current
         val slideOffsetPx = with(density) { 72.dp.toPx() }
-        val viewModel: CloudMusicCatalogViewModel = koinViewModel()
+        val viewModel: CloudMusicCatalogViewModel = koinActivityViewModel()
+        val playlistViewModel: PlaylistViewModel = koinActivityViewModel()
+        val playlists by playlistViewModel.playlists.collectAsStateWithLifecycle()
+        var showPlaylistDialog by remember { mutableStateOf(false) }
+        var showCreatePlaylistDialog by remember { mutableStateOf(false) }
 
         fun closeMenu() {
             path.pop(scene)
@@ -300,7 +306,7 @@ class CloudSongMenuScene(
                         closeMenu()
                     },
                     onToggleLike = null,
-                    onShowPlaylistDialog = null,
+                    onShowPlaylistDialog = { showPlaylistDialog = true },
                     onOpenAlbum = null,
                     onOpenArtist = null,
                     onOpenSongInfo = {
@@ -309,6 +315,37 @@ class CloudSongMenuScene(
                     onIgnoreSong = null,
                 )
             }
+        }
+
+        if (showPlaylistDialog) {
+            PlaylistPickerDialog(
+                playlists = playlists,
+                onDismiss = { showPlaylistDialog = false },
+                onCreatePlaylist = {
+                    showPlaylistDialog = false
+                    showCreatePlaylistDialog = true
+                },
+                onSelectPlaylist = { playlist ->
+                    playlist.playlistId?.let { viewModel.addToLocalPlaylist(it, song) }
+                    showPlaylistDialog = false
+                    closeMenu()
+                },
+            )
+        }
+
+        if (showCreatePlaylistDialog) {
+            CreatePlaylistDialog(
+                onDismiss = { showCreatePlaylistDialog = false },
+                onConfirm = { name ->
+                    viewModel.createLocalPlaylistAndAdd(name, song)
+                    showCreatePlaylistDialog = false
+                    closeMenu()
+                },
+                onOpenFullCreator = {
+                    showCreatePlaylistDialog = false
+                    closeAndNavigate { path.push(PlaylistCreatorScene()) }
+                },
+            )
         }
     }
 

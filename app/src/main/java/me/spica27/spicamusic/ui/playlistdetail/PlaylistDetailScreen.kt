@@ -51,6 +51,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -147,10 +148,14 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.spicamusic.R
+import me.spica27.spicamusic.cloud.CatalogQueueItem
+import me.spica27.spicamusic.cloud.CloudCatalogSong
+import me.spica27.spicamusic.cloud.CloudMusicCatalogViewModel
 import me.spica27.spicamusic.common.entity.Playlist
 import me.spica27.spicamusic.common.entity.Song
 import me.spica27.spicamusic.common.entity.getAlbumCoverUri
 import me.spica27.spicamusic.common.entity.getCoverUri
+import me.spica27.spicamusic.ui.dialog.CloudSongMenuScene
 import me.spica27.spicamusic.ui.dialog.SongMenuScene
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.theme.LayoutTokens
@@ -158,6 +163,7 @@ import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
 import me.spica27.spicamusic.ui.theme.ListItemFadeOutSpec
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
+import me.spica27.spicamusic.ui.widget.AudioCover
 import me.spica27.spicamusic.ui.widget.CoverFallback
 import me.spica27.spicamusic.ui.widget.PlaylistCoverView
 import me.spica27.spicamusic.ui.widget.clickHighlight
@@ -166,6 +172,7 @@ import me.spica27.spicamusic.ui.widget.highlightKeyword
 import me.spica27.spicamusic.ui.widget.materialSharedAxisZ
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
 import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.viewmodel.koinActivityViewModel
 import org.koin.core.parameter.parametersOf
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -207,16 +214,26 @@ private enum class SearchContentState { Idle, Loading, Empty, Results }
 @Composable
 fun PlaylistDetailScreen(playlist: Playlist) {
     val path = LocalNavigationPath.current
+    val playlistId = playlist.playlistId ?: return
     val viewModel =
         koinViewModel<PlaylistDetailViewModel>(
             key = "PlaylistDetailViewModel_${playlist.playlistId}",
-        ) { parametersOf(playlist.playlistId) }
+        ) { parametersOf(playlistId) }
+    val cloudCatalogViewModel: CloudMusicCatalogViewModel = koinActivityViewModel()
 
     // ── State collection ───────────────────────────────────────────────────
     val currentPlaylist by viewModel.playlist.collectAsStateWithLifecycle()
     val browseSongs = viewModel.browseSongs.collectAsLazyPagingItems()
     val coverAlbumIds by viewModel.coverAlbumIds.collectAsStateWithLifecycle()
     val songCount by viewModel.songCount.collectAsStateWithLifecycle()
+    val allPlaylistSongs by viewModel.allPlaylistSongs.collectAsStateWithLifecycle()
+    val cloudCatalog by cloudCatalogViewModel.state.collectAsStateWithLifecycle()
+    val cloudSongs = cloudCatalog.localPlaylistCloudSongs[playlistId].orEmpty()
+    val combinedSongCount = songCount + cloudSongs.size
+    val combinedQueue =
+        remember(allPlaylistSongs, cloudSongs) {
+            allPlaylistSongs.map(CatalogQueueItem::Local) + cloudSongs.map(CatalogQueueItem::Cloud)
+        }
     val isSearchMode by viewModel.isSearchMode.collectAsStateWithLifecycle()
     val isSortMode by viewModel.isSortMode.collectAsStateWithLifecycle()
     val sortModeSongs by viewModel.sortModeSongs.collectAsStateWithLifecycle()
@@ -241,7 +258,9 @@ fun PlaylistDetailScreen(playlist: Playlist) {
 
     // 歌单确实为空（区别于"首屏还没加载完"）：空态提示与搜索入口都以它为准
     val isPlaylistEmpty =
-        browseSongs.itemCount == 0 && browseSongs.loadState.refresh is LoadState.NotLoading
+        browseSongs.itemCount == 0 &&
+            cloudSongs.isEmpty() &&
+            browseSongs.loadState.refresh is LoadState.NotLoading
 
     // 歌单被删除时返回上一页
     LaunchedEffect(playlistDeleted) {
@@ -384,7 +403,7 @@ fun PlaylistDetailScreen(playlist: Playlist) {
                     )
                     Spacer(Modifier.height(Spacing.ExtraSmall))
                     Text(
-                        text = stringResource(R.string.songs_count, songCount),
+                        text = stringResource(R.string.songs_count, combinedSongCount),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -396,7 +415,15 @@ fun PlaylistDetailScreen(playlist: Playlist) {
                 ActionRow(
                     isSortMode = isSortMode,
                     playEnabled = !isPlaylistEmpty,
-                    onPlayAll = viewModel::playAll,
+                    onPlayAll = {
+                        if (cloudSongs.isEmpty()) {
+                            viewModel.playAll()
+                        } else {
+                            combinedQueue.firstOrNull()?.let { first ->
+                                cloudCatalogViewModel.play(first.stableId, combinedQueue)
+                            }
+                        }
+                    },
                     onAddSongs = viewModel::showAddSongsSheet,
                     modifier = Modifier.entranceGraphics(actionRowEntrance),
                 )
@@ -467,7 +494,11 @@ fun PlaylistDetailScreen(playlist: Playlist) {
                                 if (isMultiSelectMode) {
                                     viewModel.toggleSongSelection(song.mediaStoreId)
                                 } else {
-                                    viewModel.playSongInList(song)
+                                    if (cloudSongs.isEmpty()) {
+                                        viewModel.playSongInList(song)
+                                    } else {
+                                        cloudCatalogViewModel.play("local:${song.mediaStoreId}", combinedQueue)
+                                    }
                                 }
                             },
                             onLongClick = {
@@ -490,6 +521,21 @@ fun PlaylistDetailScreen(playlist: Playlist) {
                                             ),
                                         fadeOutSpec = ListItemFadeOutSpec,
                                     ).entranceGraphics(entrance),
+                        )
+                    }
+                }
+                if (!isSortMode) {
+                    items(
+                        items = cloudSongs,
+                        key = CloudCatalogSong::stableId,
+                        contentType = { "cloud_song" },
+                    ) { song ->
+                        PlaylistCloudSongRow(
+                            song = song,
+                            isPlaying = playingMediaId == song.stableId,
+                            onClick = { cloudCatalogViewModel.play(song.stableId, combinedQueue) },
+                            onMore = { path.push(CloudSongMenuScene(song)) },
+                            modifier = Modifier.animateItem(),
                         )
                     }
                 }
@@ -1245,6 +1291,57 @@ private fun FloatingHintIcon(
 }
 
 // ── 歌曲列表行（浏览 / 多选 / 排序共用一个家族）─────────────────────────────────
+
+@Composable
+private fun PlaylistCloudSongRow(
+    song: CloudCatalogSong,
+    isPlaying: Boolean,
+    onClick: () -> Unit,
+    onMore: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .combinedClickHighlight(onClick = onClick, onLongClick = onMore)
+                .padding(horizontal = LayoutTokens.MusicHeaderHorizontalPadding, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        AudioCover(
+            uri = song.artworkUri,
+            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(13.dp)),
+            placeHolder = {
+                Box(
+                    modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Default.MusicNote, null, tint = MaterialTheme.colorScheme.primary)
+                }
+            },
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = song.title,
+                fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Medium,
+                color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = "${song.artist} · ${song.accountName}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        IconButton(onClick = onMore) {
+            Icon(Icons.Default.MoreVert, "更多")
+        }
+    }
+}
 
 @Composable
 private fun PlaylistSongRow(

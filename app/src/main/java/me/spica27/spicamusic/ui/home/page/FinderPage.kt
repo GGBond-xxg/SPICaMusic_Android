@@ -87,7 +87,10 @@ import me.spica27.spicamusic.App
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.cloud.CloudCatalogPlaylist
 import me.spica27.spicamusic.cloud.CloudMusicCatalogViewModel
+import me.spica27.spicamusic.cloud.CloudUserPlaylist
+import me.spica27.spicamusic.cloud.CloudUserPlaylistScene
 import me.spica27.spicamusic.cloud.NeteasePlaylistScene
+import me.spica27.spicamusic.cloud.RemoteMusicProvider
 import me.spica27.spicamusic.common.entity.Song
 import me.spica27.spicamusic.common.entity.getAlbumCoverUri
 import me.spica27.spicamusic.common.entity.getCoverUri
@@ -153,8 +156,9 @@ fun FinderPage(playEntrance: Boolean = true) {
     val allSongs by homeViewModel.allSongs.collectAsStateWithLifecycle()
     val snackbarMessage by homeViewModel.snackbarMessage.collectAsStateWithLifecycle()
     val cloudCatalog by cloudCatalogViewModel.state.collectAsStateWithLifecycle()
-    val cloudPlaylists = cloudCatalog.neteasePlaylists
-    val totalPlaylistCount = playlists.size + cloudPlaylists.size
+    val cloudPlaylists = cloudCatalog.remotePlaylists
+    val userCloudPlaylists = cloudCatalog.userPlaylists
+    val totalPlaylistCount = playlists.size + cloudPlaylists.size + userCloudPlaylists.size
     val frequentCardSongs = remember(frequentSongs) { ImmutableList.copyOf(frequentSongs) }
     val favoritePreviewSongs =
         remember(favoriteSongs) {
@@ -372,7 +376,7 @@ fun FinderPage(playEntrance: Boolean = true) {
                 )
             }
 
-            if (playlistsWithCover.isEmpty() && cloudPlaylists.isEmpty()) {
+            if (playlistsWithCover.isEmpty() && cloudPlaylists.isEmpty() && userCloudPlaylists.isEmpty()) {
                 item(key = "playlists_empty", contentType = "empty") {
                     val entrance = rememberEntrance(order = 6, play = playEntrance)
                     FinderEmptyRow(
@@ -410,6 +414,16 @@ fun FinderPage(playEntrance: Boolean = true) {
                     CloudPlaylistRail(
                         playlists = cloudPlaylists,
                         onPlaylistClick = { item -> path.push(NeteasePlaylistScene(item)) },
+                        modifier = Modifier.entranceGraphics(entrance),
+                    )
+                }
+            }
+            if (userCloudPlaylists.isNotEmpty()) {
+                item(key = "user_cloud_playlists_rail", contentType = "rail") {
+                    val entrance = rememberEntrance(order = 6, play = playEntrance)
+                    CloudUserPlaylistRail(
+                        playlists = userCloudPlaylists,
+                        onPlaylistClick = { item -> path.push(CloudUserPlaylistScene(item)) },
                         modifier = Modifier.entranceGraphics(entrance),
                     )
                 }
@@ -1389,7 +1403,75 @@ private fun CloudPlaylistRail(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        text = "网易云 · ${item.playlist.songCount} 首",
+                        text =
+                            "${if (item.account.provider == RemoteMusicProvider.NETEASE) "网易云" else "QQ 音乐"} · " +
+                                "${item.playlist.songCount} 首",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CloudUserPlaylistRail(
+    playlists: List<CloudUserPlaylist>,
+    onPlaylistClick: (CloudUserPlaylist) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyRow(
+        modifier = modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = LayoutTokens.MusicHeaderHorizontalPadding),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
+        overscrollEffect = rememberIOSOverScrollEffect(orientation = Orientation.Horizontal),
+    ) {
+        items(
+            items = playlists,
+            key = CloudUserPlaylist::id,
+            contentType = { "user_cloud_playlist" },
+        ) { item ->
+            Column(
+                modifier =
+                    Modifier
+                        .width(148.dp)
+                        .clip(Shapes.ExtraLargeCornerBasedShape)
+                        .clickHighlight(onClick = { onPlaylistClick(item) }),
+                verticalArrangement = Arrangement.spacedBy(Spacing.Small),
+            ) {
+                AudioCover(
+                    uri =
+                        item.songs
+                            .firstOrNull()
+                            ?.artworkUrl
+                            ?.let(Uri::parse),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .clip(Shapes.ExtraLargeCornerBasedShape)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    placeHolder = {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.LibraryMusic, null)
+                        }
+                    },
+                )
+                Column(
+                    modifier = Modifier.padding(bottom = Spacing.Small),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        text = item.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = "本地云端歌单 · ${item.songs.size} 首",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,

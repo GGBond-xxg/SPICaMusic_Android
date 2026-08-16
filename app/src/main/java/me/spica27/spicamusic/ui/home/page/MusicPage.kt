@@ -63,6 +63,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Today
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -175,6 +176,12 @@ private enum class MusicBrowserTab(
         countRes = R.string.music_tab_artists_count,
         searchHintRes = R.string.music_search_artists_hint,
         icon = Icons.Default.Person,
+    ),
+    Daily(
+        titleRes = R.string.music_tab_daily,
+        countRes = R.string.music_tab_daily_count,
+        searchHintRes = R.string.music_search_daily_hint,
+        icon = Icons.Default.Today,
     ),
 }
 
@@ -462,6 +469,12 @@ fun MusicPage() {
         }
     LaunchedEffect(availableSources) {
         if (selectedSource !in availableSources) selectedSource = SongLibrarySource.All
+        if (
+            selectedTab == MusicBrowserTab.Daily &&
+            CloudSongSource.NETEASE !in cloudCatalog.availableSources
+        ) {
+            selectedTab = MusicBrowserTab.Songs
+        }
     }
     val allBrowserSongs =
         remember(allSongs, cloudCatalog.songs) {
@@ -494,6 +507,15 @@ fun MusicPage() {
                 .filterBrowserSongsBy(searchQuery)
                 .sortedWith(songSortMode.browserComparator())
         }
+    val filteredDailySongs =
+        remember(cloudCatalog.dailyRecommendations, searchQuery, songSortMode) {
+            cloudCatalog.dailyRecommendations
+                .map(BrowserSongItem::Cloud)
+                .filterBrowserSongsBy(searchQuery)
+                .sortedWith(songSortMode.browserComparator())
+        }
+    val displayedBrowserSongs =
+        if (selectedTab == MusicBrowserTab.Daily) filteredDailySongs else filteredSongs
     val knownCloudSongCount = cloudCatalog.songCounts.values.sum()
     val knownAllSongCount = allSongs.size + knownCloudSongCount
     val displayedSongCount =
@@ -510,8 +532,8 @@ fun MusicPage() {
             }
         }
     val visibleQueue =
-        remember(filteredSongs) {
-            filteredSongs.map {
+        remember(displayedBrowserSongs) {
+            displayedBrowserSongs.map {
                 when (it) {
                     is BrowserSongItem.Local -> CatalogQueueItem.Local(it.song)
                     is BrowserSongItem.Cloud -> CatalogQueueItem.Cloud(it.song)
@@ -566,6 +588,19 @@ fun MusicPage() {
         val scene =
             when (selectedTab) {
                 MusicBrowserTab.Songs ->
+                    SortMenuScene(
+                        anchorState = sortAnchor,
+                        anchorIcon = Icons.AutoMirrored.Filled.Sort,
+                        options = SongSortMode.entries.map { it.option },
+                        selectedId = songSortMode.option.id,
+                        onSelect = { id ->
+                            SongSortMode.entries
+                                .firstOrNull { it.option.id == id }
+                                ?.let { songSortMode = it }
+                        },
+                    )
+
+                MusicBrowserTab.Daily ->
                     SortMenuScene(
                         anchorState = sortAnchor,
                         anchorIcon = Icons.AutoMirrored.Filled.Sort,
@@ -677,6 +712,8 @@ fun MusicPage() {
                     songsCount = knownAllSongCount,
                     albumsCount = albums.size,
                     artistsCount = artists.size,
+                    dailyCount = cloudCatalog.dailyRecommendations.size,
+                    showDaily = CloudSongSource.NETEASE in cloudCatalog.availableSources,
                     onSelect = {
                         selectedTab = it
                         searchQuery = ""
@@ -719,6 +756,7 @@ fun MusicPage() {
                             MusicBrowserTab.Songs -> displayedSongCount
                             MusicBrowserTab.Albums -> filteredAlbums.size
                             MusicBrowserTab.Artists -> filteredArtists.size
+                            MusicBrowserTab.Daily -> filteredDailySongs.size
                         },
                     sortAnchor = sortAnchor,
                     onSortClick = ::openSortMenu,
@@ -727,11 +765,25 @@ fun MusicPage() {
                     showSourceSelector = selectedTab == MusicBrowserTab.Songs,
                     onSourceClick = ::openSourceMenu,
                     showCloudRefresh =
-                        selectedTab == MusicBrowserTab.Songs &&
-                            selectedSource != SongLibrarySource.Local &&
-                            cloudCatalog.availableSources.isNotEmpty(),
-                    cloudRefreshing = cloudCatalog.isRefreshing,
-                    onCloudRefresh = cloudCatalogViewModel::refreshCatalog,
+                        (
+                            selectedTab == MusicBrowserTab.Songs &&
+                                selectedSource != SongLibrarySource.Local &&
+                                cloudCatalog.availableSources.isNotEmpty()
+                        ) ||
+                            selectedTab == MusicBrowserTab.Daily,
+                    cloudRefreshing =
+                        if (selectedTab == MusicBrowserTab.Daily) {
+                            cloudCatalog.isLoadingDailyRecommendations
+                        } else {
+                            cloudCatalog.isRefreshing
+                        },
+                    onCloudRefresh = {
+                        if (selectedTab == MusicBrowserTab.Daily) {
+                            cloudCatalogViewModel.refreshDailyRecommendations(forceRefresh = true)
+                        } else {
+                            cloudCatalogViewModel.refreshCatalog()
+                        }
+                    },
                     modifier =
                         Modifier.animateItem(
                             fadeInSpec = ListItemFadeInSpec,
@@ -747,19 +799,27 @@ fun MusicPage() {
             }
 
             when (selectedTab) {
-                MusicBrowserTab.Songs -> {
-                    if (filteredSongs.isEmpty()) {
+                MusicBrowserTab.Songs,
+                MusicBrowserTab.Daily,
+                -> {
+                    if (displayedBrowserSongs.isEmpty()) {
                         item(key = "songs_empty", contentType = "empty") {
                             if (
-                                selectedSource != SongLibrarySource.Local &&
-                                cloudCatalog.loadingSources.isNotEmpty()
+                                (selectedTab == MusicBrowserTab.Daily && cloudCatalog.isLoadingDailyRecommendations) ||
+                                (
+                                    selectedTab == MusicBrowserTab.Songs &&
+                                        selectedSource != SongLibrarySource.Local &&
+                                        cloudCatalog.loadingSources.isNotEmpty()
+                                )
                             ) {
                                 MusicCloudLoadingState()
                             } else {
                                 MusicEmptyState(
                                     title =
                                         stringResource(
-                                            if (allSongs.isEmpty() && cloudCatalog.songs.isEmpty()) {
+                                            if (selectedTab == MusicBrowserTab.Daily) {
+                                                R.string.music_tab_daily
+                                            } else if (allSongs.isEmpty() && cloudCatalog.songs.isEmpty()) {
                                                 R.string.music_no_songs_title
                                             } else {
                                                 R.string.music_empty_songs_title
@@ -767,7 +827,9 @@ fun MusicPage() {
                                         ),
                                     subtitle =
                                         stringResource(
-                                            if (allSongs.isEmpty() && cloudCatalog.songs.isEmpty()) {
+                                            if (selectedTab == MusicBrowserTab.Daily) {
+                                                R.string.music_search_daily_hint
+                                            } else if (allSongs.isEmpty() && cloudCatalog.songs.isEmpty()) {
                                                 R.string.music_no_songs_subtitle
                                             } else {
                                                 R.string.music_empty_songs_subtitle
@@ -790,7 +852,7 @@ fun MusicPage() {
                         }
                     } else {
                         itemsIndexed(
-                            items = filteredSongs,
+                            items = displayedBrowserSongs,
                             key = { _, song -> song.stableId },
                             contentType = { _, _ -> "song" },
                         ) { index, item ->
@@ -850,6 +912,7 @@ fun MusicPage() {
                             )
                         }
                         if (
+                            selectedTab == MusicBrowserTab.Songs &&
                             selectedSource != SongLibrarySource.Local &&
                             cloudCatalog.loadingSources.isNotEmpty()
                         ) {
@@ -1187,6 +1250,8 @@ private fun MusicTabStrip(
     songsCount: Int,
     albumsCount: Int,
     artistsCount: Int,
+    dailyCount: Int,
+    showDaily: Boolean,
     onSelect: (MusicBrowserTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1197,12 +1262,13 @@ private fun MusicTabStrip(
                 .padding(horizontal = LayoutTokens.MusicHeaderHorizontalPadding),
         horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
     ) {
-        MusicBrowserTab.entries.forEach { tab ->
+        MusicBrowserTab.entries.filter { it != MusicBrowserTab.Daily || showDaily }.forEach { tab ->
             val count =
                 when (tab) {
                     MusicBrowserTab.Songs -> songsCount
                     MusicBrowserTab.Albums -> albumsCount
                     MusicBrowserTab.Artists -> artistsCount
+                    MusicBrowserTab.Daily -> dailyCount
                 }
             MusicTabChip(
                 tab = tab,

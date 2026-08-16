@@ -22,10 +22,13 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.session.CommandButton
 import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
+import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionError
+import androidx.media3.session.SessionResult
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
@@ -40,6 +43,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.guava.future
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import me.spica27.spicamusic.DesktopLyricsPermissionActivity
 import me.spica27.spicamusic.MainActivity
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.cloud.CloudPlaybackItemResolver
@@ -267,12 +271,57 @@ class PlaybackService : MediaLibraryService() {
         topDisplayModeController.start(exoPlayer)
         desktopLyricsController.start(exoPlayer)
 
+        val desktopLyricsCommand = SessionCommand(ACTION_TOGGLE_DESKTOP_LYRICS, android.os.Bundle.EMPTY)
+        val closePlayerCommand = SessionCommand(ACTION_CLOSE_PLAYER, android.os.Bundle.EMPTY)
+        val notificationButtons = notificationCommandButtons(desktopLyricsCommand, closePlayerCommand)
+
         mediaSession =
             MediaLibrarySession
                 .Builder(
                     this,
                     sessionPlayer,
                     object : MediaLibrarySession.Callback {
+                        override fun onConnect(
+                            session: MediaSession,
+                            controller: MediaSession.ControllerInfo,
+                        ): MediaSession.ConnectionResult =
+                            MediaSession.ConnectionResult
+                                .AcceptedResultBuilder(session)
+                                .setAvailableSessionCommands(
+                                    MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS
+                                        .buildUpon()
+                                        .add(desktopLyricsCommand)
+                                        .add(closePlayerCommand)
+                                        .build(),
+                                ).setCustomLayout(notificationButtons)
+                                .setMediaButtonPreferences(notificationButtons)
+                                .build()
+
+                        override fun onCustomCommand(
+                            session: MediaSession,
+                            controller: MediaSession.ControllerInfo,
+                            customCommand: SessionCommand,
+                            args: android.os.Bundle,
+                        ): ListenableFuture<SessionResult> {
+                            when (customCommand.customAction) {
+                                ACTION_TOGGLE_DESKTOP_LYRICS -> {
+                                    startActivity(
+                                        Intent(
+                                            this@PlaybackService,
+                                            DesktopLyricsPermissionActivity::class.java,
+                                        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                    )
+                                }
+
+                                ACTION_CLOSE_PLAYER -> closePlayerAndApp()
+                                else ->
+                                    return Futures.immediateFuture(
+                                        SessionResult(SessionError.ERROR_NOT_SUPPORTED),
+                                    )
+                            }
+                            return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                        }
+
                         override fun onAddMediaItems(
                             session: MediaSession,
                             controller: MediaSession.ControllerInfo,
@@ -355,8 +404,31 @@ class PlaybackService : MediaLibraryService() {
                         packageManager.getLaunchIntentForPackage(packageName),
                         android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
                     ),
-                ).build()
+                ).setCustomLayout(notificationButtons)
+                .setMediaButtonPreferences(notificationButtons)
+                .build()
     }
+
+    private fun notificationCommandButtons(
+        desktopLyricsCommand: SessionCommand,
+        closePlayerCommand: SessionCommand,
+    ): List<CommandButton> =
+        listOf(
+            CommandButton
+                .Builder(CommandButton.ICON_UNDEFINED)
+                .setCustomIconResId(R.drawable.ic_notification_desktop_lyrics)
+                .setDisplayName(getString(R.string.notification_desktop_lyrics))
+                .setSessionCommand(desktopLyricsCommand)
+                .setSlots(CommandButton.SLOT_BACK_SECONDARY)
+                .build(),
+            CommandButton
+                .Builder(CommandButton.ICON_STOP)
+                .setCustomIconResId(R.drawable.ic_notification_close)
+                .setDisplayName(getString(R.string.notification_close))
+                .setSessionCommand(closePlayerCommand)
+                .setSlots(CommandButton.SLOT_FORWARD_SECONDARY)
+                .build(),
+        )
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = mediaSession
 

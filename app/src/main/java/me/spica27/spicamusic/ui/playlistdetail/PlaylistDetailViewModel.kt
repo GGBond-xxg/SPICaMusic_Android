@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import me.spica27.spicamusic.cloud.CloudPlaylistEntryStore
 import me.spica27.spicamusic.common.entity.Playlist
 import me.spica27.spicamusic.common.entity.Song
 import me.spica27.spicamusic.feature.library.domain.PlaylistUseCases
@@ -40,6 +41,7 @@ class PlaylistDetailViewModel(
     private val playlistRepository: PlaylistUseCases,
     private val player: PlayerUseCases,
     private val songRepository: SongUseCases,
+    private val cloudPlaylistEntryStore: CloudPlaylistEntryStore,
 ) : ViewModel() {
     companion object {
         const val SORT_MODE_FULL_LIST_LIMIT = 5000
@@ -68,6 +70,16 @@ class PlaylistDetailViewModel(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = 0,
         )
+
+    val allPlaylistSongs: StateFlow<List<Song>> =
+        playlistRepository
+            .getPlaylistWithSongsFlow(playlistId)
+            .map { it?.songs.orEmpty() }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList(),
+            )
 
     // ===== 搜索功能 =====
     private val _isSearchMode = MutableStateFlow(false)
@@ -425,6 +437,7 @@ class PlaylistDetailViewModel(
         viewModelScope.launch {
             try {
                 playlistRepository.deletePlaylist(playlistId)
+                cloudPlaylistEntryStore.removePlaylist(playlistId)
                 _playlistDeleted.value = true
                 hideDeleteConfirmDialog()
                 Timber.d("删除歌单成功: $playlistId")

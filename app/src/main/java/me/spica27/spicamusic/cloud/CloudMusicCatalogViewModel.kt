@@ -10,12 +10,14 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import me.spica27.spicamusic.common.entity.Song
 import me.spica27.spicamusic.common.entity.getCoverUri
+import me.spica27.spicamusic.feature.library.domain.PlaylistUseCases
 import me.spica27.spicamusic.feature.player.domain.PlayerUseCases
 import me.spica27.spicamusic.player.api.PlayerAction
 import org.drinkless.tdlib.TdApi
@@ -93,9 +95,14 @@ data class CloudMusicCatalogState(
     val errors: Map<CloudSongSource, String> = emptyMap(),
     val sourcesWithMore: Set<CloudSongSource> = emptySet(),
     val isRefreshing: Boolean = false,
-    val neteasePlaylists: List<CloudCatalogPlaylist> = emptyList(),
+    val remotePlaylists: List<CloudCatalogPlaylist> = emptyList(),
+    val userPlaylists: List<CloudUserPlaylist> = emptyList(),
     val playlistSongs: Map<String, List<CloudCatalogSong>> = emptyMap(),
     val loadingPlaylists: Set<String> = emptySet(),
+    val dailyRecommendations: List<CloudCatalogSong> = emptyList(),
+    val isLoadingDailyRecommendations: Boolean = false,
+    val dailyRecommendationsError: String? = null,
+    val localPlaylistCloudSongs: Map<Long, List<CloudCatalogSong>> = emptyMap(),
 )
 
 /**
@@ -111,6 +118,9 @@ class CloudMusicCatalogViewModel(
     private val telegramRepository: TelegramRepository,
     private val telegramProxy: TelegramStreamProxy,
     private val player: PlayerUseCases,
+    private val playlistRepository: PlaylistUseCases,
+    private val userPlaylistStore: CloudUserPlaylistStore,
+    private val playlistEntryStore: CloudPlaylistEntryStore,
 ) : ViewModel() {
     private val _state = MutableStateFlow(CloudMusicCatalogState())
     val state = _state.asStateFlow()
@@ -122,6 +132,13 @@ class CloudMusicCatalogViewModel(
 
     init {
         refreshSources()
+        publishLocalPlaylistEntries()
+        viewModelScope.launch {
+            userPlaylistStore.revision.drop(1).collect { refreshUserPlaylists() }
+        }
+        viewModelScope.launch {
+            playlistEntryStore.revision.drop(1).collect { publishLocalPlaylistEntries() }
+        }
         viewModelScope.launch {
             telegramRepository.authorizationState.collect { authorization ->
                 val ready = authorization is TdApi.AuthorizationStateReady
@@ -160,18 +177,21 @@ class CloudMusicCatalogViewModel(
         }
         publishStatus()
         loadMore()
-        refreshNeteasePlaylists()
+        refreshRemotePlaylists()
+        refreshDailyRecommendations()
+        refreshUserPlaylists()
     }
 
-    fun refreshNeteasePlaylists(forceRefresh: Boolean = false) {
+    fun refreshRemotePlaylists(forceRefresh: Boolean = false) {
         val accounts =
             accountStore
-                .getRemoteAccounts(RemoteMusicProvider.NETEASE)
+                .getRemoteAccounts()
+                .filter { it.provider == RemoteMusicProvider.NETEASE || it.provider == RemoteMusicProvider.QQ_MUSIC }
                 .associateBy(RemoteMusicAccount::id)
         if (accounts.isEmpty()) {
             _state.update {
                 it.copy(
-                    neteasePlaylists = emptyList(),
+                    remotePlaylists = emptyList(),
                     playlistSongs = emptyMap(),
                     loadingPlaylists = emptySet(),
                 )
@@ -186,7 +206,7 @@ class CloudMusicCatalogViewModel(
                         playlists.forEach { playlist ->
                             refreshed +=
                                 CloudCatalogPlaylist(
-                                    stableId = "netease:${account.id}:${playlist.id}",
+                                    stableId = "${account.provider.name.lowercase()}:${account.id}:${playlist.id}",
                                     account = account,
                                     playlist = playlist,
                                 )
@@ -195,15 +215,165 @@ class CloudMusicCatalogViewModel(
             }
             _state.update { current ->
                 current.copy(
-                    neteasePlaylists =
+                    remotePlaylists =
                         if (refreshed.isNotEmpty() || forceRefresh) {
                             refreshed
                         } else {
-                            current.neteasePlaylists.filter { it.account.id in accounts }
+                            current.remotePlaylists.filter { it.account.id in accounts }
                         },
                 )
             }
         }
+    }
+
+    /** Compatibility entry point used by the NetEase account screen. */
+    fun refreshNeteasePlaylists(forceRefresh: Boolean = false) = refreshRemotePlaylists(forceRefresh)
+
+    fun refreshDailyRecommendations(forceRefresh: Boolean = false) {
+        val account = accountStore.getRemoteAccounts(RemoteMusicProvider.NETEASE).firstOrNull()
+        if (account == null) {
+            _state.update {
+                it.copy(
+                    dailyRecommendations = emptyList(),
+                    isLoadingDailyRecommendations = false,
+                    dailyRecommendationsError = null,
+                )
+            }
+            return
+        }
+        if (_state.value.isLoadingDailyRecommendations) return
+        _state.update { it.copy(isLoadingDailyRecommendations = true, dailyRecommendationsError = null) }
+        viewModelScope.launch {
+            runCatching { remoteClients.dailyRecommendations(account, forceRefresh) }
+                .onSuccess { songs ->
+                    _state.update {
+                        it.copy(
+                            dailyRecommendations = songs.map { song -> account.toCatalogSong(song) },
+                            isLoadingDailyRecommendations = false,
+                            dailyRecommendationsError = null,
+                        )
+                    }
+                }.onFailure { error ->
+                    _state.update {
+                        it.copy(
+                            isLoadingDailyRecommendations = false,
+                            dailyRecommendationsError = error.message ?: "无法获取网易云每日推荐",
+                        )
+                    }
+                }
+        }
+    }
+
+    fun addToLocalPlaylist(
+        playlistId: Long,
+        song: CloudCatalogSong,
+    ) {
+        playlistEntryStore.add(playlistId, song)
+    }
+
+    fun addRemoteSongToLocalPlaylist(
+        playlistId: Long,
+        account: RemoteMusicAccount,
+        song: RemoteSong,
+    ) {
+        addToLocalPlaylist(playlistId, account.toCatalogSong(song))
+    }
+
+    fun createLocalPlaylistAndAdd(
+        name: String,
+        song: CloudCatalogSong,
+    ) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            val playlistId = playlistRepository.createPlaylist(trimmed)
+            playlistEntryStore.add(playlistId, song)
+        }
+    }
+
+    fun removeLocalPlaylistEntries(playlistId: Long) {
+        playlistEntryStore.removePlaylist(playlistId)
+    }
+
+    private fun refreshUserPlaylists() {
+        val playlists =
+            accountStore.getRemoteAccounts().flatMap { account ->
+                userPlaylistStore.read(account.provider, account.id)
+            }
+        _state.update { it.copy(userPlaylists = playlists) }
+    }
+
+    private fun publishLocalPlaylistEntries() {
+        val resolved =
+            playlistEntryStore.readAll().mapValues { (_, songs) ->
+                songs.mapNotNull(::resolveStoredPlaylistSong)
+            }
+        _state.update { it.copy(localPlaylistCloudSongs = resolved) }
+    }
+
+    private fun resolveStoredPlaylistSong(value: StoredCloudPlaylistSong): CloudCatalogSong? {
+        val payload =
+            when (value.payloadType) {
+                "remote" -> {
+                    val account = accountStore.getRemoteAccounts().firstOrNull { it.id == value.accountId } ?: return null
+                    CloudCatalogPayload.Remote(
+                        account,
+                        RemoteSong(
+                            value.itemId,
+                            value.title,
+                            value.artist,
+                            value.album,
+                            value.durationMs,
+                            value.mimeType,
+                            value.artworkUrl,
+                        ),
+                    )
+                }
+
+                "media" -> {
+                    val account = accountStore.getAccounts().firstOrNull { it.id == value.accountId } ?: return null
+                    CloudCatalogPayload.MediaServer(
+                        account,
+                        CloudSong(
+                            value.itemId,
+                            value.title,
+                            value.artist,
+                            value.album,
+                            value.durationMs,
+                            value.mimeType,
+                            value.imageItemId,
+                        ),
+                    )
+                }
+
+                "telegram" ->
+                    CloudCatalogPayload.Telegram(
+                        TelegramSong(
+                            value.telegramMessageId,
+                            value.telegramChatId,
+                            value.telegramFileId,
+                            value.telegramFileSize,
+                            value.title,
+                            value.artist,
+                            value.durationMs,
+                            value.mimeType,
+                            value.telegramCoverFileId,
+                        ),
+                    )
+
+                else -> return null
+            }
+        return CloudCatalogSong(
+            stableId = value.stableId,
+            source = value.source,
+            accountName = value.accountName,
+            title = value.title,
+            artist = value.artist,
+            album = value.album,
+            durationMs = value.durationMs,
+            artworkUri = value.artworkUrl?.let(Uri::parse),
+            payload = payload,
+        )
     }
 
     fun loadPlaylist(
@@ -242,7 +412,10 @@ class CloudMusicCatalogViewModel(
                     current.copy(
                         errors =
                             current.errors +
-                                (CloudSongSource.NETEASE to (error.message ?: "Unable to load playlist")),
+                                (
+                                    value.account.provider.toCloudSongSource() to
+                                        (error.message ?: "Unable to load playlist")
+                                ),
                     )
                 }
             }
@@ -843,6 +1016,13 @@ internal fun CloudCatalogSong.endpointKey(): String =
         is CloudCatalogPayload.Telegram -> "telegram:${value.song.chatId}"
         is CloudCatalogPayload.MediaServer -> "media:${value.account.id}"
         is CloudCatalogPayload.Remote -> "remote:${value.account.id}"
+    }
+
+private fun RemoteMusicProvider.toCloudSongSource(): CloudSongSource =
+    when (this) {
+        RemoteMusicProvider.SUBSONIC -> CloudSongSource.SUBSONIC
+        RemoteMusicProvider.NETEASE -> CloudSongSource.NETEASE
+        RemoteMusicProvider.QQ_MUSIC -> CloudSongSource.QQ_MUSIC
     }
 
 internal fun mergeCatalogSongs(

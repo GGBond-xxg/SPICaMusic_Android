@@ -404,12 +404,15 @@
   <string name="music_page_title">音樂</string>
   <string name="music_summary_format">%1$d 首歌曲 · %2$d 張專輯 · %3$d 位歌手</string>
   <string name="music_tab_songs">全部歌曲</string>
+  <string name="music_tab_daily">每日推薦</string>
   <string name="music_tab_albums">專輯</string>
   <string name="music_tab_artists">歌手</string>
   <string name="music_tab_songs_count">%d首</string>
+  <string name="music_tab_daily_count">%d首</string>
   <string name="music_tab_albums_count">%d張</string>
   <string name="music_tab_artists_count">%d位</string>
   <string name="music_search_songs_hint">搜尋歌曲…</string>
+  <string name="music_search_daily_hint">搜尋每日推薦…</string>
   <string name="music_search_albums_hint">搜尋專輯…</string>
   <string name="music_search_artists_hint">搜尋歌手…</string>
   <string name="music_sort_cd">排序</string>
