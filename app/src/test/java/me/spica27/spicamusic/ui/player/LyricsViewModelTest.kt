@@ -30,4 +30,34 @@ class LyricsViewModelTest {
         assertEquals(1, parsed?.size)
         assertTrue(parsed?.single() is LyricItem.NormalLyric)
     }
+
+    @Test
+    fun lyricsStorageId_keepsLocalIdAndCreatesStableRemoteKey() {
+        assertEquals(123L, LyricsViewModel.lyricsStorageId("123"))
+
+        val first = LyricsViewModel.lyricsStorageId("cloud:qq:account:track-1")
+        val second = LyricsViewModel.lyricsStorageId("cloud:qq:account:track-2")
+
+        assertTrue(first < 0L)
+        assertEquals(first, LyricsViewModel.lyricsStorageId("cloud:qq:account:track-1"))
+        assertTrue(first != second)
+    }
+
+    @Test
+    fun persistedRemoteLyricsOverridesEmbeddedDefault() {
+        assertTrue(
+            !LyricsViewModel.shouldPreferEmbeddedLyrics(
+                cachedSourceName = "网络歌手 - 用户选择的歌词",
+                hasCachedLyrics = true,
+                hasEmbeddedLyrics = true,
+            ),
+        )
+        assertTrue(
+            LyricsViewModel.shouldPreferEmbeddedLyrics(
+                cachedSourceName = null,
+                hasCachedLyrics = false,
+                hasEmbeddedLyrics = true,
+            ),
+        )
+    }
 }

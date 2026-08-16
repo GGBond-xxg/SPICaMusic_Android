@@ -48,7 +48,7 @@ class LyricsViewModel(
         val allLyricSources: List<SongLyrics> = emptyList(),
         val allParsedLyrics: List<List<LyricItem>> = emptyList(),
         val currentSourceIndex: Int = 0,
-        val currentMediaStoreId: Long = 0L,
+        val currentLyricsStorageId: Long = 0L,
         val currentMediaId: String? = null,
     )
 
@@ -113,12 +113,13 @@ class LyricsViewModel(
             return
         }
 
-        val mediaStoreId = mediaId.toLongOrNull() ?: 0L
+        val mediaStoreId = mediaId.toLongOrNull()?.takeIf { it > 0L } ?: 0L
+        val lyricsStorageId = lyricsStorageId(mediaId)
 
         _uiState.update {
             UiState(
                 isLoading = true,
-                currentMediaStoreId = mediaStoreId,
+                currentLyricsStorageId = lyricsStorageId,
                 currentMediaId = mediaId,
             )
         }
@@ -153,18 +154,25 @@ class LyricsViewModel(
 
                 val cached =
                     withContext(Dispatchers.IO) {
-                        lyricsUseCases.getCachedLyrics(mediaStoreId)
+                        lyricsUseCases.getCachedLyrics(lyricsStorageId)
                     }
 
                 var currentLyrics: List<LyricItem>? = null
                 var currentOffset = cached?.delay ?: 0L
                 var errorMsg: String? = null
 
-                if (embeddedLyricsText != null) {
+                val preferEmbeddedLyrics =
+                    shouldPreferEmbeddedLyrics(
+                        cachedSourceName = cached?.lyricSourceName,
+                        hasCachedLyrics = !cached?.lyrics.isNullOrBlank(),
+                        hasEmbeddedLyrics = embeddedLyricsText != null,
+                    )
+
+                if (preferEmbeddedLyrics) {
                     currentLyrics = parsedEmbeddedLyrics
                     Timber.d("使用本地内嵌歌词: mediaId=$mediaStoreId")
                 } else if (cached != null && cached.lyrics.isNotBlank()) {
-                    Timber.d("使用缓存歌词: mediaId=$mediaStoreId, source=${cached.lyricSourceName}")
+                    Timber.d("使用缓存歌词: storageId=$lyricsStorageId, source=${cached.lyricSourceName}")
                     currentLyrics = parseLyricsInBackground(cached.lyrics)
                     if (currentLyrics.isNullOrEmpty()) {
                         errorMsg = "歌词解析失败"
@@ -202,18 +210,29 @@ class LyricsViewModel(
                 val parsedAll = parseLyricsSourcesInBackground(results)
 
                 val sourceIndex: Int
-                if (embeddedSource != null) {
+                if (cached != null && cached.lyrics.isNotBlank()) {
+                    sourceIndex =
+                        results
+                            .indexOfFirst { source ->
+                                "${source.artist} - ${source.name}" == cached.lyricSourceName ||
+                                    source.lyrics == cached.lyrics
+                            }.coerceAtLeast(0)
+                    if (preferEmbeddedLyrics) {
+                        currentLyrics = parsedEmbeddedLyrics
+                        errorMsg = null
+                    }
+                } else if (embeddedSource != null) {
                     sourceIndex = 0
                     errorMsg = null
                     withContext(Dispatchers.IO) {
                         lyricsUseCases.saveLyricsSource(
-                            mediaStoreId = mediaStoreId,
+                            mediaStoreId = lyricsStorageId,
                             lyrics = embeddedSource.lyrics,
                             sourceName = "$LOCAL_LYRICS_ARTIST - $LOCAL_LYRICS_NAME",
                             delayMs = currentOffset,
                         )
                     }
-                } else if (cached == null || cached.lyrics.isBlank()) {
+                } else {
                     sourceIndex = 0
                     if (results.isEmpty()) {
                         errorMsg = "暂无歌词"
@@ -221,11 +240,6 @@ class LyricsViewModel(
                         currentLyrics = parsedAll.firstOrNull()?.ifEmpty { null }
                         if (currentLyrics == null) errorMsg = "歌词解析失败"
                     }
-                } else {
-                    sourceIndex =
-                        results
-                            .indexOfFirst { "${it.artist} - ${it.name}" == cached.lyricSourceName }
-                            .coerceAtLeast(0)
                 }
 
                 _uiState.update {
@@ -258,13 +272,13 @@ class LyricsViewModel(
 
     /** 更新歌词偏移量并持久化到数据库 */
     fun updateOffset(offsetMs: Long) {
-        val mediaStoreId = _uiState.value.currentMediaStoreId
+        val lyricsStorageId = _uiState.value.currentLyricsStorageId
         _uiState.update { it.copy(lyricsOffsetMs = offsetMs) }
-        if (mediaStoreId <= 0L) return
+        if (lyricsStorageId == 0L) return
         viewModelScope.launch(Dispatchers.IO) {
-            val existing = lyricsUseCases.getCachedLyrics(mediaStoreId)
+            val existing = lyricsUseCases.getCachedLyrics(lyricsStorageId)
             if (existing != null) {
-                lyricsUseCases.updateDelay(mediaStoreId, offsetMs)
+                lyricsUseCases.updateDelay(lyricsStorageId, offsetMs)
             }
         }
     }
@@ -283,13 +297,13 @@ class LyricsViewModel(
             )
         }
 
-        val mediaStoreId = state.currentMediaStoreId
-        if (mediaStoreId <= 0L) return
+        val lyricsStorageId = state.currentLyricsStorageId
+        if (lyricsStorageId == 0L) return
 
         viewModelScope.launch(Dispatchers.IO) {
             val sourceName = "${source.artist} - ${source.name}"
-            lyricsUseCases.saveLyricsSource(mediaStoreId, source.lyrics, sourceName, state.lyricsOffsetMs)
-            Timber.d("已缓存歌词: mediaId=$mediaStoreId, source=$sourceName")
+            lyricsUseCases.saveLyricsSource(lyricsStorageId, source.lyrics, sourceName, state.lyricsOffsetMs)
+            Timber.d("已缓存歌词: storageId=$lyricsStorageId, source=$sourceName")
         }
     }
 
@@ -349,6 +363,28 @@ class LyricsViewModel(
     companion object {
         private const val LOCAL_LYRICS_NAME = "本地歌词"
         private const val LOCAL_LYRICS_ARTIST = "内嵌标签"
+        private const val LOCAL_LYRICS_SOURCE_NAME = "$LOCAL_LYRICS_ARTIST - $LOCAL_LYRICS_NAME"
+        private const val FNV_64_OFFSET_BASIS = -3750763034362895579L
+        private const val FNV_64_PRIME = 1099511628211L
+
+        /** 本地歌曲沿用 MediaStore ID；云端/外部歌曲使用稳定的负数键写入同一歌词缓存。 */
+        internal fun lyricsStorageId(mediaId: String): Long {
+            mediaId.toLongOrNull()?.takeIf { it > 0L }?.let { return it }
+
+            var hash = FNV_64_OFFSET_BASIS
+            mediaId.encodeToByteArray().forEach { byte ->
+                hash = (hash xor (byte.toLong() and 0xffL)) * FNV_64_PRIME
+            }
+            return (hash or Long.MIN_VALUE).takeUnless { it == 0L } ?: Long.MIN_VALUE
+        }
+
+        internal fun shouldPreferEmbeddedLyrics(
+            cachedSourceName: String?,
+            hasCachedLyrics: Boolean,
+            hasEmbeddedLyrics: Boolean,
+        ): Boolean =
+            hasEmbeddedLyrics &&
+                (!hasCachedLyrics || cachedSourceName == LOCAL_LYRICS_SOURCE_NAME)
 
         private fun String.isYrcFormat(): Boolean =
             lineSequence().any { line ->
