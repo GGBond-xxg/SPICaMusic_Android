@@ -20,3 +20,20 @@
 # Ktor's optional IDE debugger detector probes these desktop-JVM classes.
 -dontwarn java.lang.management.ManagementFactory
 -dontwarn java.lang.management.RuntimeMXBean
+
+# PlaybackService synchronizes HyperOS' legacy media controls with Media3 through these
+# package-private members. Preserve their names so the reflective compatibility bridge keeps
+# SEEK_TO/rewind/fast-forward in PlaybackState after R8; HyperOS requires SEEK_TO to show its
+# notification seek bar.
+-keepclassmembers class androidx.media3.session.MediaSession {
+    androidx.media3.session.MediaSessionImpl impl;
+}
+-keepclassmembers class androidx.media3.session.MediaSessionImpl {
+    androidx.media3.session.MediaSessionLegacyStub sessionLegacyStub;
+    androidx.media3.session.PlayerWrapper getPlayerWrapper();
+}
+-keepclassmembers class androidx.media3.session.MediaSessionLegacyStub {
+    void setAvailableCommands(androidx.media3.session.SessionCommands, androidx.media3.common.Player$Commands);
+    void setPlatformCustomLayout(com.google.common.collect.ImmutableList);
+    void updateLegacySessionPlaybackStateAndQueue(androidx.media3.session.PlayerWrapper);
+}

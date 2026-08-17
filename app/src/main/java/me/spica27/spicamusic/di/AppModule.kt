@@ -252,6 +252,8 @@ object AppModule {
             viewModel {
                 SearchViewModel(
                     songRepository = get<SongUseCases>(),
+                    accountStore = get(),
+                    remoteClients = get(),
                 )
             }
 

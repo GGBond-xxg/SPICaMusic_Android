@@ -44,4 +44,13 @@
   <string name="desktop_lyrics_no_lyrics">暂无歌词</string>
   <string name="cloud_playback_restricted_skipping">《%1$s》无法播放，可能需要会员或受版权限制，已自动播放下一首</string>
   <string name="cloud_playback_restricted_stopped">《%1$s》无法播放，可能需要会员或受版权限制</string>
+  <string name="cloud_playback_failed_skipping">《%1$s》加载失败，请检查网络或重新登录云音乐，已自动播放下一首</string>
+  <string name="cloud_playback_failed_stopped">《%1$s》加载失败，请检查网络或重新登录云音乐</string>
+  <string name="search_songs_albums_artists">搜索本地和云端音乐</string>
+  <string name="search_your_music_title">搜索本地与云端音乐</string>
+  <string name="search_your_music_subtitle">同时搜索现有曲库以及网易云、QQ 音乐中未收藏的歌曲</string>
+  <string name="search_source_netease">网易云音乐</string>
+  <string name="search_source_qq_music">QQ 音乐</string>
+  <string name="search_source_local_library">现有曲库与收藏</string>
+  <string name="search_remote_source_failed">部分云端音乐搜索失败，请检查网络或重新登录</string>
 </resources>

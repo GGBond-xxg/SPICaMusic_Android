@@ -358,23 +358,25 @@ class NeteaseClient(
         songId: String,
     ): String =
         withContext(Dispatchers.IO) {
-            val form =
-                FormBody
-                    .Builder()
-                    .add("ids", "[$songId]")
-                    .add("br", "999000")
-                    .build()
-            val request =
-                requestBuilder(STREAM_URL, account.secret)
-                    .post(form)
-                    .build()
-            val root = executeJson(request)
-            root
-                .optJSONArray("data")
-                ?.optJSONObject(0)
-                ?.optString("url")
-                ?.takeIf(String::isNotBlank)
-                ?: "https://music.163.com/song/media/outer/url?id=$songId.mp3"
+            for (bitrate in STREAM_BITRATE_ORDER) {
+                val form =
+                    FormBody
+                        .Builder()
+                        .add("ids", "[$songId]")
+                        .add("br", bitrate.toString())
+                        .build()
+                val request =
+                    requestBuilder(STREAM_URL, account.secret)
+                        .post(form)
+                        .build()
+                executeJson(request)
+                    .optJSONArray("data")
+                    ?.optJSONObject(0)
+                    ?.optString("url")
+                    ?.takeIf(String::isNotBlank)
+                    ?.let { return@withContext it }
+            }
+            "https://music.163.com/song/media/outer/url?id=$songId.mp3"
         }
 
     suspend fun dailyRecommendations(
@@ -685,6 +687,7 @@ class NeteaseClient(
         const val PLAYLIST_PAGE_SIZE = 50
         const val MAX_PLAYLIST_PAGES = 200
         const val SONG_DETAIL_BATCH_SIZE = 500
+        val STREAM_BITRATE_ORDER = intArrayOf(999_000, 320_000, 128_000)
     }
 }
 

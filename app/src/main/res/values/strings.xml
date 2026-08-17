@@ -575,10 +575,14 @@
   <string name="scanner_rules_summary_formats">%1$d formats</string>
 
   <!-- Search -->
-  <string name="search_songs_albums_artists">Search songs, albums, artists</string>
+  <string name="search_songs_albums_artists">Search local and cloud music</string>
   <string name="clear_input">Clear</string>
-  <string name="search_your_music_title">Search your music</string>
-  <string name="search_your_music_subtitle">Enter a song name, album, or artist to find songs</string>
+  <string name="search_your_music_title">Search local and cloud music</string>
+  <string name="search_your_music_subtitle">Search your library plus uncollected songs from NetEase Cloud Music and QQ Music</string>
+  <string name="search_source_netease">NetEase Cloud Music</string>
+  <string name="search_source_qq_music">QQ Music</string>
+  <string name="search_source_local_library">Library and collected songs</string>
+  <string name="search_remote_source_failed">Some cloud sources could not be searched. Check the network or sign in again.</string>
   <string name="search_no_results_format">No results for \"%s\"</string>
   <string name="search_try_different_keywords">Try different keywords, or check your spelling</string>
 
@@ -787,4 +791,6 @@
   <string name="desktop_lyrics_no_lyrics">No lyrics</string>
   <string name="cloud_playback_restricted_skipping">%1$s cannot be played. It may require a membership or be restricted by copyright. Skipping to the next song.</string>
   <string name="cloud_playback_restricted_stopped">%1$s cannot be played. It may require a membership or be restricted by copyright.</string>
+  <string name="cloud_playback_failed_skipping">%1$s failed to load. Check the network or sign in to the music service again. Skipping to the next song.</string>
+  <string name="cloud_playback_failed_stopped">%1$s failed to load. Check the network or sign in to the music service again.</string>
 </resources>

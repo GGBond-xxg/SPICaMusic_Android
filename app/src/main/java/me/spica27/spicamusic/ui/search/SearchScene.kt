@@ -88,9 +88,14 @@ import kotlinx.coroutines.flow.first
 import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.navkit.scene.StackScene
 import me.spica27.spicamusic.R
+import me.spica27.spicamusic.cloud.CloudCatalogSong
+import me.spica27.spicamusic.cloud.CloudMusicCatalogViewModel
+import me.spica27.spicamusic.cloud.CloudSongSource
+import me.spica27.spicamusic.cloud.RemoteMusicProvider
 import me.spica27.spicamusic.common.entity.Song
 import me.spica27.spicamusic.common.entity.getAlbumCoverUri
 import me.spica27.spicamusic.common.entity.getCoverUri
+import me.spica27.spicamusic.ui.dialog.CloudSongMenuScene
 import me.spica27.spicamusic.ui.dialog.SongMenuScene
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.theme.LayoutTokens
@@ -105,6 +110,7 @@ import me.spica27.spicamusic.ui.widget.combinedClickHighlight
 import me.spica27.spicamusic.ui.widget.materialSharedAxisZ
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
 import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.viewmodel.koinActivityViewModel
 
 /** 首屏入场节拍（与刊头页共用的节奏） */
 private const val ENTRANCE_STAGGER_MILLIS = 55L
@@ -134,6 +140,17 @@ class SearchScene : StackScene() {
         val searchViewModel = koinViewModel<SearchViewModel>()
         val searchKey by searchViewModel.searchKeyword.collectAsStateWithLifecycle()
         val searchResult = searchViewModel.searchPagingResults.collectAsLazyPagingItems()
+        val remoteSearch by searchViewModel.remoteSearchState.collectAsStateWithLifecycle()
+        val remoteSongs =
+            remember(searchKey, remoteSearch) {
+                remoteSearch.songs.takeIf { remoteSearch.query == searchKey }.orEmpty()
+            }
+        val remoteFailures =
+            remember(searchKey, remoteSearch) {
+                remoteSearch.failedProviders.takeIf { remoteSearch.query == searchKey }.orEmpty()
+            }
+        val remoteLoading = remoteSearch.query == searchKey && remoteSearch.isLoading
+        val cloudCatalogViewModel: CloudMusicCatalogViewModel = koinActivityViewModel()
         val playerViewModel = LocalPlayerViewModel.current
         val currentMediaItem by playerViewModel.currentMediaItem.collectAsStateWithLifecycle()
 
@@ -168,15 +185,27 @@ class SearchScene : StackScene() {
 
         // 只有 refresh 完成且确实没有条目才算"无结果"，
         // 加载中（含防抖窗口，见 SearchViewModel 的停驻 Loading 处理）显示骨架
-        val contentState by remember(searchResult) {
+        val contentState by remember(
+            searchResult,
+            searchKey,
+            remoteSongs,
+            remoteFailures,
+            remoteLoading,
+        ) {
             derivedStateOf {
                 when {
                     searchKey.isBlank() -> SearchContentState.Idle
 
                     searchResult.loadState.refresh is LoadState.Loading &&
-                        searchResult.itemCount == 0 -> SearchContentState.Loading
+                        searchResult.itemCount == 0 &&
+                        remoteSongs.isEmpty() -> SearchContentState.Loading
 
-                    searchResult.itemCount == 0 -> SearchContentState.Empty
+                    searchResult.itemCount == 0 && remoteSongs.isEmpty() && remoteLoading ->
+                        SearchContentState.Loading
+
+                    searchResult.itemCount == 0 &&
+                        remoteSongs.isEmpty() &&
+                        remoteFailures.isEmpty() -> SearchContentState.Empty
 
                     else -> SearchContentState.Results
                 }
@@ -245,10 +274,20 @@ class SearchScene : StackScene() {
                             SearchResultList(
                                 listState = listState,
                                 searchResult = searchResult,
+                                remoteSongs = remoteSongs,
+                                remoteFailures = remoteFailures,
+                                remoteLoading = remoteLoading,
                                 keyword = searchKey,
                                 playingMediaId = currentMediaItem?.mediaId,
                                 onPlay = { song -> playerViewModel.playSong(song) },
                                 onMore = { song -> path.push(SongMenuScene(song)) },
+                                onPlayRemote = { song ->
+                                    cloudCatalogViewModel.playPlaylistSongs(
+                                        selectedStableId = song.stableId,
+                                        songs = remoteSongs,
+                                    )
+                                },
+                                onMoreRemote = { song -> path.push(CloudSongMenuScene(song)) },
                                 modifier = Modifier.fillMaxSize(),
                             )
                     }
@@ -427,12 +466,24 @@ private fun SearchInputField(
 private fun SearchResultList(
     listState: LazyListState,
     searchResult: LazyPagingItems<SearchListItem>,
+    remoteSongs: List<CloudCatalogSong>,
+    remoteFailures: Set<RemoteMusicProvider>,
+    remoteLoading: Boolean,
     keyword: String,
     playingMediaId: String?,
     onPlay: (Song) -> Unit,
     onMore: (Song) -> Unit,
+    onPlayRemote: (CloudCatalogSong) -> Unit,
+    onMoreRemote: (CloudCatalogSong) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val remoteSourceLabels =
+        mapOf(
+            CloudSongSource.NETEASE to stringResource(R.string.search_source_netease),
+            CloudSongSource.QQ_MUSIC to stringResource(R.string.search_source_qq_music),
+        )
+    val localHeader = stringResource(R.string.search_source_local_library)
+    val remoteErrorText = stringResource(R.string.search_remote_source_failed)
     LazyColumn(
         state = listState,
         modifier = modifier,
@@ -446,6 +497,56 @@ private fun SearchResultList(
         verticalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall),
         overscrollEffect = rememberIOSOverScrollEffect(orientation = Orientation.Vertical),
     ) {
+        listOf(CloudSongSource.NETEASE, CloudSongSource.QQ_MUSIC).forEach { source ->
+            val sourceSongs = remoteSongs.filter { it.source == source }
+            if (sourceSongs.isNotEmpty()) {
+                item(key = "remote_header_${source.name}", contentType = "source_header") {
+                    SearchSourceHeader(remoteSourceLabels.getValue(source))
+                }
+                items(
+                    count = sourceSongs.size,
+                    key = { index -> sourceSongs[index].stableId },
+                    contentType = { "remote_song" },
+                ) { index ->
+                    val song = sourceSongs[index]
+                    SearchRemoteSongItem(
+                        song = song,
+                        keyword = keyword,
+                        sourceLabel = remoteSourceLabels.getValue(source),
+                        isPlaying = playingMediaId == song.stableId,
+                        onPlay = { onPlayRemote(song) },
+                        onMore = { onMoreRemote(song) },
+                        modifier = Modifier.animateItem(),
+                    )
+                }
+            }
+        }
+        if (remoteFailures.isNotEmpty()) {
+            item(key = "remote_search_error", contentType = "remote_error") {
+                Text(
+                    text = remoteErrorText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.fillMaxWidth().padding(Spacing.Medium),
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+        if (remoteLoading && remoteSongs.isNotEmpty()) {
+            item(key = "remote_search_loading", contentType = "remote_loading") {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(Spacing.Medium),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                }
+            }
+        }
+        if (searchResult.itemCount > 0) {
+            item(key = "local_library_header", contentType = "source_header") {
+                SearchSourceHeader(localHeader)
+            }
+        }
         items(
             count = searchResult.itemCount,
             key = { index ->
@@ -502,6 +603,32 @@ private fun SearchResultList(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SearchSourceHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth().padding(top = Spacing.Medium, bottom = Spacing.ExtraSmall),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Box(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+        )
     }
 }
 
@@ -613,6 +740,86 @@ private fun SearchSongItem(
                     modifier = Modifier.weight(1f, fill = false),
                 )
             }
+        }
+        IconButton(onClick = onMore) {
+            Icon(
+                imageVector = Icons.Default.MoreVert,
+                contentDescription = stringResource(R.string.more),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** 在线搜索结果：保持与本地歌曲相同的卡片尺寸，并明确标注来源。 */
+@Composable
+private fun SearchRemoteSongItem(
+    song: CloudCatalogSong,
+    keyword: String,
+    sourceLabel: String,
+    isPlaying: Boolean,
+    onPlay: () -> Unit,
+    onMore: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(Shapes.ExtraLargeCornerBasedShape)
+                .background(
+                    if (isPlaying) {
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerLow
+                    },
+                ).combinedClickHighlight(onLongClick = onMore, onClick = onPlay)
+                .padding(Spacing.Small),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
+    ) {
+        AudioCover(
+            uri = song.artworkUri,
+            modifier =
+                Modifier
+                    .size(56.dp)
+                    .clip(Shapes.LargeCornerBasedShape),
+            placeHolder = { SearchCoverPlaceholder() },
+        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = highlightKeyword(song.title, keyword),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text =
+                    highlightKeyword(
+                        buildString {
+                            if (song.artist.isNotBlank()) append(song.artist)
+                            if (song.artist.isNotBlank() && song.album.isNotBlank()) append(" · ")
+                            if (song.album.isNotBlank()) append(song.album)
+                        },
+                        keyword,
+                    ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = "$sourceLabel · ${song.accountName}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         IconButton(onClick = onMore) {
             Icon(

@@ -867,24 +867,6 @@ class CloudMusicCatalogViewModel(
         }
     }
 
-    private fun RemoteMusicAccount.toCatalogSong(song: RemoteSong): CloudCatalogSong =
-        CloudCatalogSong(
-            stableId = "cloud:${provider.name.lowercase()}:$id:${song.id}",
-            source =
-                when (provider) {
-                    RemoteMusicProvider.SUBSONIC -> CloudSongSource.SUBSONIC
-                    RemoteMusicProvider.NETEASE -> CloudSongSource.NETEASE
-                    RemoteMusicProvider.QQ_MUSIC -> CloudSongSource.QQ_MUSIC
-                },
-            accountName = displayName,
-            title = song.title,
-            artist = song.artist,
-            album = song.album,
-            durationMs = song.durationMs,
-            artworkUri = song.artworkUrl?.let(Uri::parse),
-            payload = CloudCatalogPayload.Remote(this, song),
-        )
-
     private suspend fun CatalogQueueItem.toMediaItem(): MediaItem? =
         when (this) {
             is CatalogQueueItem.Local -> song.toLocalMediaItem()
@@ -1010,6 +992,24 @@ class CloudMusicCatalogViewModel(
         const val MAX_REFRESH_PAGES = 1_000
     }
 }
+
+internal fun RemoteMusicAccount.toCatalogSong(song: RemoteSong): CloudCatalogSong =
+    CloudCatalogSong(
+        stableId = "cloud:${provider.name.lowercase()}:$id:${song.id}",
+        source =
+            when (provider) {
+                RemoteMusicProvider.SUBSONIC -> CloudSongSource.SUBSONIC
+                RemoteMusicProvider.NETEASE -> CloudSongSource.NETEASE
+                RemoteMusicProvider.QQ_MUSIC -> CloudSongSource.QQ_MUSIC
+            },
+        accountName = displayName,
+        title = song.title,
+        artist = song.artist,
+        album = song.album,
+        durationMs = song.durationMs,
+        artworkUri = song.artworkUrl?.let(Uri::parse),
+        payload = CloudCatalogPayload.Remote(this, song),
+    )
 
 internal fun CloudCatalogSong.endpointKey(): String =
     when (val value = payload) {

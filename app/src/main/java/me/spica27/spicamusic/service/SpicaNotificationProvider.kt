@@ -88,30 +88,31 @@ internal class SpicaNotificationProvider(
             addNotificationActions(mediaSession, mediaButtons, builder, actionFactory)
         mediaStyle.setShowActionsInCompactView(*compactViewIndices)
 
+        var artworkMetadata: MediaMetadata? = null
         if (player.isCommandAvailable(Player.COMMAND_GET_METADATA)) {
             val metadata = player.mediaMetadata
-            val mediaItem = player.currentMediaItem
 
             builder
                 .setContentTitle(metadata.title)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentText(metadata.artist)
-
-            loadBitmapIntoNotification(
-                mediaSession = mediaSession,
-                metadata = metadata,
-                notificationId = notificationId,
-                builder = builder,
-                onNotificationChangedCallback = onNotificationChangedCallback,
-            )
+                .setLargeIcon(defaultNotificationArtwork())
+            artworkMetadata = metadata
         }
 
-        val playbackStartTimeMs = getPlaybackStartTimeEpochMs(player)
-        val displayElapsedTimeWithChronometer = playbackStartTimeMs != C.TIME_UNSET
         builder
-            .setWhen(if (displayElapsedTimeWithChronometer) playbackStartTimeMs else 0L)
-            .setShowWhen(displayElapsedTimeWithChronometer)
-            .setUsesChronometer(displayElapsedTimeWithChronometer)
+            // MIUI's light MediaStyle renders the seek track as white when the notification
+            // chronometer is enabled, making the entire progress bar disappear on a white card.
+            // PlaybackState already exposes a continuously updated position and duration, so
+            // let SystemUI render that progress directly, matching the platform media provider.
+            .setWhen(0L)
+            .setShowWhen(false)
+            .setUsesChronometer(false)
+            // HyperOS resolves a transparent/default accent to white for non-debuggable apps
+            // in light mode. Keep the card uncolorized but provide a neutral, contrast-safe
+            // accent so its system-rendered media progress stays visible in both themes.
+            .setColor(ContextCompat.getColor(context, R.color.notification_media_accent))
+            .setColorized(false)
 
         if (Build.VERSION.SDK_INT >= 31) {
             builder.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
@@ -131,6 +132,19 @@ internal class SpicaNotificationProvider(
                 .setOngoing(false)
                 .setGroup(GROUP_KEY)
                 .build()
+
+        // Start the asynchronous artwork request only after every MediaStyle field has been
+        // applied. Cached artwork may complete synchronously on fast/release builds; starting
+        // it earlier lets a partially configured notification race with the complete one and
+        // makes HyperOS intermittently lose its media seek bar.
+        artworkMetadata?.let { metadata ->
+            loadBitmapIntoNotification(
+                metadata = metadata,
+                notificationId = notificationId,
+                builder = builder,
+                onNotificationChangedCallback = onNotificationChangedCallback,
+            )
+        }
         return MediaNotification(notificationId, notification)
     }
 
@@ -295,7 +309,6 @@ internal class SpicaNotificationProvider(
     }
 
     private fun loadBitmapIntoNotification(
-        mediaSession: MediaSession,
         metadata: MediaMetadata,
         notificationId: Int,
         builder: NotificationCompat.Builder,
@@ -313,13 +326,7 @@ internal class SpicaNotificationProvider(
                 builder.setLargeIcon(imageBitmap)
                 // TODO--加通知栏图标
             } else {
-                builder.setLargeIcon(
-                    ContextCompat
-                        .getDrawable(
-                            context,
-                            R.drawable.default_cover,
-                        )?.toBitmap(64, 42),
-                )
+                builder.setLargeIcon(defaultNotificationArtwork())
             }
             onNotificationChangedCallback.onNotificationChanged(
                 MediaNotification(notificationId, builder.build()),
@@ -327,18 +334,10 @@ internal class SpicaNotificationProvider(
         }
     }
 
-    private fun createCommandButtonExtra() = Bundle().apply { putInt(COMMAND_KEY_COMPACT_VIEW_INDEX, C.INDEX_UNSET) }
+    private fun defaultNotificationArtwork() =
+        ContextCompat
+            .getDrawable(context, R.drawable.default_cover)
+            ?.toBitmap(100, 100)
 
-    private fun getPlaybackStartTimeEpochMs(player: Player): Long =
-        if ((
-                player.isPlaying &&
-                    !player.isPlayingAd &&
-                    !player.isCurrentMediaItemDynamic
-            ) &&
-            player.playbackParameters.speed == 1f
-        ) {
-            System.currentTimeMillis() - player.contentPosition
-        } else {
-            C.TIME_UNSET
-        }
+    private fun createCommandButtonExtra() = Bundle().apply { putInt(COMMAND_KEY_COMPACT_VIEW_INDEX, C.INDEX_UNSET) }
 }

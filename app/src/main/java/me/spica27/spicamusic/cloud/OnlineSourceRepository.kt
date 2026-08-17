@@ -97,72 +97,103 @@ class OnlineSourceStreamProxy(
                                 call.respond(HttpStatusCode.NotFound, "Online source item not found")
                                 return@get
                             }
-                            val upstreamUrl =
+                            val range = call.request.headers["Range"]
+                            if (range != null && !SAFE_RANGE.matches(range)) {
+                                call.respond(
+                                    HttpStatusCode(416, "Range Not Satisfiable"),
+                                    "Invalid byte range",
+                                )
+                                return@get
+                            }
+
+                            var resolutionError: Throwable? = null
+                            val onlineUrl =
                                 runCatching {
                                     this@OnlineSourceStreamProxy.engine.resolveUrl(
                                         entry.source,
                                         entry.songInfoJson,
                                     )
-                                }.getOrElse { resolutionError ->
-                                    entry.fallbackUrl
-                                        ?: run {
-                                            call.respond(
-                                                HttpStatusCode.BadGateway,
-                                                resolutionError.message ?: "Online source resolution failed",
-                                            )
-                                            return@get
-                                        }
-                                }
-                            val requestBuilder =
-                                Request
-                                    .Builder()
-                                    .url(upstreamUrl)
-                                    .header("Accept-Encoding", "identity")
-                                    .header("User-Agent", STREAM_USER_AGENT)
-                            refererFor(entry.source)?.let { requestBuilder.header("Referer", it) }
-                            call.request.headers["Range"]?.let { range ->
-                                if (!SAFE_RANGE.matches(range)) {
-                                    call.respond(
-                                        HttpStatusCode(416, "Range Not Satisfiable"),
-                                        "Invalid byte range",
-                                    )
-                                    return@get
-                                }
-                                requestBuilder.header("Range", range)
+                                }.onFailure { resolutionError = it }
+                                    .getOrNull()
+                            val candidates = listOfNotNull(onlineUrl, entry.fallbackUrl).distinct()
+                            if (candidates.isEmpty()) {
+                                call.respond(
+                                    HttpStatusCode.BadGateway,
+                                    resolutionError?.message ?: "Online source resolution failed",
+                                )
+                                return@get
                             }
-                            withContext(Dispatchers.IO) {
-                                upstreamClient.newCall(requestBuilder.build()).execute()
-                            }.use { response ->
-                                if (!response.isSuccessful && response.code != 206) {
-                                    call.respond(
-                                        HttpStatusCode.fromValue(response.code.coerceIn(400, 599)),
-                                        "Upstream stream failed",
-                                    )
-                                    return@get
+
+                            var lastStatus = HttpStatusCode.BadGateway
+                            var lastFailure = resolutionError?.message ?: "Unable to open cloud stream"
+                            for (upstreamUrl in candidates) {
+                                val requestBuilder =
+                                    Request
+                                        .Builder()
+                                        .url(upstreamUrl)
+                                        .header("Accept-Encoding", "identity")
+                                        .header("User-Agent", STREAM_USER_AGENT)
+                                refererFor(entry.source)?.let { requestBuilder.header("Referer", it) }
+                                range?.let { requestBuilder.header("Range", it) }
+
+                                val responseResult =
+                                    runCatching {
+                                        withContext(Dispatchers.IO) {
+                                            upstreamClient.newCall(requestBuilder.build()).execute()
+                                        }
+                                    }
+                                if (responseResult.isFailure) {
+                                    lastStatus = HttpStatusCode.BadGateway
+                                    lastFailure =
+                                        responseResult.exceptionOrNull()?.message
+                                            ?: "Cloud stream connection failed"
+                                    continue
                                 }
-                                response.header("Accept-Ranges")?.let {
-                                    call.response.header("Accept-Ranges", it)
+                                val response = responseResult.getOrThrow()
+                                val statusAccepted = response.isSuccessful || response.code == 206
+                                val contentTypeHeader = response.header("Content-Type")
+                                val contentRejected = isClearlyNonAudioContentType(contentTypeHeader)
+                                if (!statusAccepted || contentRejected) {
+                                    lastStatus =
+                                        HttpStatusCode.fromValue(
+                                            if (response.code in 400..599) response.code else 502,
+                                        )
+                                    lastFailure =
+                                        if (contentRejected) {
+                                            "Cloud source returned non-audio content"
+                                        } else {
+                                            "Upstream stream failed"
+                                        }
+                                    response.close()
+                                    continue
                                 }
-                                response.header("Content-Length")?.let {
-                                    call.response.header("Content-Length", it)
-                                }
-                                response.header("Content-Range")?.let {
-                                    call.response.header("Content-Range", it)
-                                }
-                                val contentType =
-                                    response
-                                        .header("Content-Type")
-                                        ?.let { runCatching { ContentType.parse(it) }.getOrNull() }
-                                        ?: ContentType.Audio.Any
-                                call.respondOutputStream(
-                                    contentType = contentType,
-                                    status = HttpStatusCode.fromValue(response.code),
-                                ) {
-                                    response.body.byteStream().use { input ->
-                                        input.copyTo(this, BUFFER_SIZE)
+
+                                response.use {
+                                    response.header("Accept-Ranges")?.let {
+                                        call.response.header("Accept-Ranges", it)
+                                    }
+                                    response.header("Content-Length")?.let {
+                                        call.response.header("Content-Length", it)
+                                    }
+                                    response.header("Content-Range")?.let {
+                                        call.response.header("Content-Range", it)
+                                    }
+                                    val contentType =
+                                        contentTypeHeader
+                                            ?.let { runCatching { ContentType.parse(it) }.getOrNull() }
+                                            ?: ContentType.Audio.Any
+                                    call.respondOutputStream(
+                                        contentType = contentType,
+                                        status = HttpStatusCode.fromValue(response.code),
+                                    ) {
+                                        response.body.byteStream().use { input ->
+                                            input.copyTo(this, BUFFER_SIZE)
+                                        }
                                     }
                                 }
+                                return@get
                             }
+                            call.respond(lastStatus, lastFailure)
                         }
                     }
                 }
@@ -198,4 +229,17 @@ class OnlineSourceStreamProxy(
         const val BUFFER_SIZE = 64 * 1024
         const val STREAM_USER_AGENT = "SPICaMusic/OnlineSource"
     }
+}
+
+internal fun isClearlyNonAudioContentType(value: String?): Boolean {
+    val normalized =
+        value
+            ?.substringBefore(';')
+            ?.trim()
+            ?.lowercase()
+            .orEmpty()
+    return normalized.startsWith("text/") ||
+        normalized == "application/json" ||
+        normalized == "application/xml" ||
+        normalized == "application/xhtml+xml"
 }

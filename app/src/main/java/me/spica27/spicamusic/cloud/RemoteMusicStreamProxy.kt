@@ -15,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.ServerSocket
@@ -91,6 +92,9 @@ class RemoteMusicStreamProxy(
                                     .Builder()
                                     .url(upstreamUrl)
                                     .header("Accept-Encoding", "identity")
+                            remoteStreamRequestHeaders(account, upstreamUrl).forEach { (name, value) ->
+                                requestBuilder.header(name, value)
+                            }
                             call.request.headers["Range"]?.let {
                                 if (!SAFE_RANGE.matches(it)) {
                                     call.respond(
@@ -151,3 +155,49 @@ class RemoteMusicStreamProxy(
         const val BUFFER_SIZE = 64 * 1024
     }
 }
+
+/**
+ * Adds account headers only for the matching provider's official domains. This lets paid streams
+ * use the authenticated session without leaking cookies to URLs returned by another source.
+ */
+internal fun remoteStreamRequestHeaders(
+    account: RemoteMusicAccount,
+    upstreamUrl: String,
+): Map<String, String> {
+    val host = upstreamUrl.toHttpUrlOrNull()?.host?.lowercase() ?: return emptyMap()
+    return when (account.provider) {
+        RemoteMusicProvider.NETEASE -> {
+            if (host == "music.163.com" || host.endsWith(".music.163.com")) {
+                mapOf(
+                    "Cookie" to account.secret,
+                    "Referer" to "https://music.163.com/",
+                    "User-Agent" to REMOTE_STREAM_BROWSER_USER_AGENT,
+                )
+            } else if (host == "music.126.net" || host.endsWith(".music.126.net")) {
+                mapOf(
+                    "Referer" to "https://music.163.com/",
+                    "User-Agent" to REMOTE_STREAM_BROWSER_USER_AGENT,
+                )
+            } else {
+                emptyMap()
+            }
+        }
+
+        RemoteMusicProvider.QQ_MUSIC -> {
+            if (host == "qqmusic.qq.com" || host.endsWith(".qqmusic.qq.com")) {
+                mapOf(
+                    "Cookie" to account.secret,
+                    "Referer" to "https://y.qq.com/",
+                    "User-Agent" to REMOTE_STREAM_BROWSER_USER_AGENT,
+                )
+            } else {
+                emptyMap()
+            }
+        }
+
+        RemoteMusicProvider.SUBSONIC -> emptyMap()
+    }
+}
+
+private const val REMOTE_STREAM_BROWSER_USER_AGENT =
+    "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36"

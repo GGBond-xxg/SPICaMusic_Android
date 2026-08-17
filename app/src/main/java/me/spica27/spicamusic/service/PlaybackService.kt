@@ -17,6 +17,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
@@ -702,14 +703,21 @@ class PlaybackService : MediaLibraryService() {
                 ?: getString(R.string.unknown_song)
         val nextIndex = exoPlayer.currentMediaItemIndex + 1
         val canSkip = nextIndex in 0 until exoPlayer.mediaItemCount
+        val responseCode =
+            generateSequence<Throwable>(error) { it.cause }
+                .filterIsInstance<HttpDataSource.InvalidResponseCodeException>()
+                .firstOrNull()
+                ?.responseCode
+        val restricted = isRestrictedCloudHttpStatus(responseCode)
         Toast
             .makeText(
                 this,
                 getString(
-                    if (canSkip) {
-                        R.string.cloud_playback_restricted_skipping
-                    } else {
-                        R.string.cloud_playback_restricted_stopped
+                    when {
+                        restricted && canSkip -> R.string.cloud_playback_restricted_skipping
+                        restricted -> R.string.cloud_playback_restricted_stopped
+                        canSkip -> R.string.cloud_playback_failed_skipping
+                        else -> R.string.cloud_playback_failed_stopped
                     },
                     failedTitle,
                 ),
@@ -717,7 +725,14 @@ class PlaybackService : MediaLibraryService() {
             ).show()
         Timber
             .tag("PlaybackService")
-            .w(error, "Cloud playback failed: mediaId=%s, skip=%s", failedMediaId, canSkip)
+            .w(
+                error,
+                "Cloud playback failed: mediaId=%s, http=%s, restricted=%s, skip=%s",
+                failedMediaId,
+                responseCode,
+                restricted,
+                canSkip,
+            )
         cloudErrorSkipJob?.cancel()
         cloudErrorSkipJob =
             playerScope.launch {
@@ -1026,3 +1041,10 @@ class PlaybackService : MediaLibraryService() {
         const val PROCESS_EXIT_DELAY_MS = 500L
     }
 }
+
+internal fun isRestrictedCloudHttpStatus(responseCode: Int?): Boolean =
+    responseCode == 401 ||
+        responseCode == 403 ||
+        responseCode == 404 ||
+        responseCode == 410 ||
+        responseCode == 451
