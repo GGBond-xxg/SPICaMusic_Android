@@ -30,6 +30,7 @@ class PlayerKVUtils(
       private const val KEY_HISTORY_IDS = "history_ids"
       private const val KEY_HISTORY_ITEMS = "history_items_v2"
       private const val KEY_HISTORY_POSITION = "history_position"
+      private const val KEY_HISTORY_PROGRESS_MS = "history_progress_ms"
       private const val KEY_CURRENT_MEDIA_ID = "current_media_id"
       private const val KEY_PLAY_MODE = "play_mode"
       private const val MAX_RESTORED_ITEMS = 10_000
@@ -178,6 +179,14 @@ class PlayerKVUtils(
      * 设置播放的到第几个的index到缓存
      */
     fun getHistoryPosition(): Int = sharedPreferences.getInt(KEY_HISTORY_POSITION, 0)
+
+    /** Saves the seek position used when the user explicitly closes and later reopens the app. */
+    fun setHistoryProgressMs(positionMs: Long) {
+        sharedPreferences.edit { putLong(KEY_HISTORY_PROGRESS_MS, positionMs.coerceAtLeast(0L)) }
+    }
+
+    fun getHistoryProgressMs(): Long =
+        sharedPreferences.getLong(KEY_HISTORY_PROGRESS_MS, 0L).coerceAtLeast(0L)
 
     /**
      * Persist the actual media id as well as its queue position. The id is the

@@ -43,6 +43,8 @@ class RemoteMusicViewModel(
     private val proxy: RemoteMusicStreamProxy,
     private val player: PlayerUseCases,
     private val playlistStore: CloudUserPlaylistStore,
+    private val playlistEntryStore: CloudPlaylistEntryStore,
+    private val recentStore: CloudRecentStore,
 ) : ViewModel() {
     private val _state = MutableStateFlow(RemoteMusicUiState())
     val state = _state.asStateFlow()
@@ -109,6 +111,8 @@ class RemoteMusicViewModel(
     fun removeSelectedAccount() {
         _state.value.selectedAccount?.let {
             clients.clearCache(it.id)
+            playlistEntryStore.removeAccount(it.id)
+            recentStore.removeAccount(it.id)
             accountStore.removeRemoteAccount(it.id)
         }
         refreshAccounts()

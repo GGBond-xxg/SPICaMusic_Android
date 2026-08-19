@@ -9,6 +9,7 @@ import me.spica27.spicamusic.cloud.CloudCatalogCountStore
 import me.spica27.spicamusic.cloud.CloudMusicCatalogViewModel
 import me.spica27.spicamusic.cloud.CloudPlaybackItemResolver
 import me.spica27.spicamusic.cloud.CloudPlaylistEntryStore
+import me.spica27.spicamusic.cloud.CloudRecentStore
 import me.spica27.spicamusic.cloud.CloudUserPlaylistStore
 import me.spica27.spicamusic.cloud.MediaServerClient
 import me.spica27.spicamusic.cloud.MediaServerType
@@ -92,6 +93,7 @@ object AppModule {
             single { NeteaseLibraryStore(androidContext()) }
             single { CloudUserPlaylistStore(androidContext()) }
             single { CloudPlaylistEntryStore(androidContext()) }
+            single { CloudRecentStore(androidContext(), get()) }
             single { LyriconProviderManager(androidContext()) }
             single { MusicLiveUpdateManager(androidContext()) }
             single { DesktopLyricsController(androidContext()) }
@@ -162,10 +164,16 @@ object AppModule {
                     accountStore = get(),
                     client = get(),
                     player = get(),
+                    playlistEntryStore = get(),
+                    recentStore = get(),
                 )
             }
             viewModel {
-                TelegramViewModel(repository = get())
+                TelegramViewModel(
+                    repository = get(),
+                    playlistEntryStore = get(),
+                    recentStore = get(),
+                )
             }
             viewModel {
                 CloudMusicCatalogViewModel(
@@ -180,6 +188,7 @@ object AppModule {
                     playlistRepository = get<PlaylistUseCases>(),
                     userPlaylistStore = get(),
                     playlistEntryStore = get(),
+                    recentStore = get(),
                 )
             }
             viewModel { parameters ->
@@ -190,6 +199,8 @@ object AppModule {
                     proxy = get(),
                     player = get(),
                     playlistStore = get(),
+                    playlistEntryStore = get(),
+                    recentStore = get(),
                 )
             }
             viewModel {

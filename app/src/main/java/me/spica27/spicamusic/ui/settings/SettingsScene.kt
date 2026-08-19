@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -75,6 +76,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.common.collect.ImmutableList
@@ -120,6 +122,38 @@ class SettingsScene : StackScene() {
         val coverTypeValue by viewModel.dynamicCoverType.collectAsStateWithLifecycle()
         val progressBarStyleValue by viewModel.progressBarStyle.collectAsStateWithLifecycle()
         val themeColorStyleValue by viewModel.themeColorStyle.collectAsStateWithLifecycle()
+        val spectrumTopGlowLabel = stringResource(R.string.dynamic_spectrum_top_glow)
+        val spectrumLiquidAuroraLabel = stringResource(R.string.dynamic_spectrum_liquid_aurora)
+        val spectrumFluidEffectLabel = stringResource(R.string.dynamic_spectrum_fluid_effect)
+        val spectrumFluidCoverLabel = stringResource(R.string.dynamic_spectrum_fluid_cover)
+        val spectrumBlurCoverLabel = stringResource(R.string.dynamic_spectrum_blur_cover)
+        val spectrumOffLabel = stringResource(R.string.dynamic_spectrum_off)
+        val spectrumLabels =
+            mapOf(
+                DynamicSpectrumBackground.TopGlow.value to spectrumTopGlowLabel,
+                DynamicSpectrumBackground.LiquidAurora.value to spectrumLiquidAuroraLabel,
+                DynamicSpectrumBackground.EffectShader.value to spectrumFluidEffectLabel,
+                DynamicSpectrumBackground.FluidWarp.value to spectrumFluidCoverLabel,
+                DynamicSpectrumBackground.BlurCover.value to spectrumBlurCoverLabel,
+                DynamicSpectrumBackground.OFF.value to spectrumOffLabel,
+            )
+        val spectrumName = spectrumLabels[spectrumValue] ?: spectrumOffLabel
+        val spectrumOptions =
+            ImmutableList.copyOf(
+                DynamicSpectrumBackground.presets.map { mode ->
+                    SelectOption(mode.value, spectrumLabels.getValue(mode.value))
+                },
+            )
+        val coverShiningStarsLabel = stringResource(R.string.dynamic_cover_shining_stars)
+        val coverAudioCityLabel = stringResource(R.string.dynamic_cover_audio_city)
+        val coverOffLabel = stringResource(R.string.dynamic_cover_off)
+        val coverLabels =
+            mapOf(
+                DynamicCoverType.ShiningStars.value to coverShiningStarsLabel,
+                DynamicCoverType.AudioCity.value to coverAudioCityLabel,
+                DynamicCoverType.OFF.value to coverOffLabel,
+            )
+        val coverName = coverLabels[coverTypeValue] ?: coverShiningStarsLabel
         val texturedLabel = stringResource(R.string.theme_color_style_textured)
         val flatLabel = stringResource(R.string.theme_color_style_flat)
         val themeColorStyleName =
@@ -280,8 +314,8 @@ class SettingsScene : StackScene() {
                     item {
                         SettingsHeroCard(
                             themeMode = themeMode,
-                            spectrumName = DynamicSpectrumBackground.fromString(spectrumValue).name,
-                            coverName = DynamicCoverType.fromString(coverTypeValue).name,
+                            spectrumName = spectrumName,
+                            coverName = coverName,
                         )
                     }
 
@@ -309,14 +343,9 @@ class SettingsScene : StackScene() {
                             SettingsItemDivider()
                             ModernSettingsSelectItem(
                                 title = stringResource(R.string.settings_dynamic_spectrum),
-                                subtitle = DynamicSpectrumBackground.fromString(spectrumValue).name,
+                                subtitle = spectrumName,
                                 icon = Icons.Default.LensBlur,
-                                options =
-                                    ImmutableList.copyOf(
-                                        DynamicSpectrumBackground.presets.map {
-                                            SelectOption(it.value, it.name)
-                                        },
-                                    ),
+                                options = spectrumOptions,
                                 currentValue = spectrumValue,
                                 onValueChange = viewModel::setDynamicSpectrumBackground,
                             )
@@ -597,7 +626,11 @@ private fun SettingsHeroCard(
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.Small)) {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
+                verticalArrangement = Arrangement.spacedBy(Spacing.Small),
+            ) {
                 SettingsPill(
                     label =
                         when (themeMode) {
@@ -622,6 +655,8 @@ private fun SettingsPill(label: String) {
     ) { targetLabel ->
         Text(
             text = targetLabel,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onPrimaryContainer,

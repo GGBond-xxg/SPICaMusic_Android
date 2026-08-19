@@ -358,6 +358,41 @@ class NeteaseClient(
         songId: String,
     ): String =
         withContext(Dispatchers.IO) {
+            var previewUrl: String? = null
+            for (level in STREAM_LEVEL_ORDER) {
+                val encodeType = if (level == "lossless" || level == "jyeffect") "flac" else "mp3"
+                val payload =
+                    JSONObject()
+                        .put("ids", "[$songId]")
+                        .put("level", level)
+                        .put("encodeType", encodeType)
+                val form =
+                    FormBody
+                        .Builder()
+                        .add(
+                            "params",
+                            NeteaseWebApiCrypto.encryptEapi(
+                                NETEASE_PLAYER_EAPI_PATH,
+                                payload,
+                            ),
+                        ).build()
+                val root =
+                    runCatching {
+                        executeJson(
+                            requestBuilder(STREAM_V1_URL, authenticatedCookieHeader(account.secret))
+                                .post(form)
+                                .build(),
+                        )
+                    }.getOrNull()
+                val item = root?.optJSONArray("data")?.optJSONObject(0)
+                val stream = item ?: continue
+                val url = stream.optString("url").takeIf(String::isNotBlank) ?: continue
+                val isPreview = !stream.isNull("freeTrialInfo")
+                if (!isPreview) return@withContext url
+                if (previewUrl == null) previewUrl = url
+            }
+
+            // Older endpoint remains useful for accounts/regions where EAPI v1 is unavailable.
             for (bitrate in STREAM_BITRATE_ORDER) {
                 val form =
                     FormBody
@@ -369,14 +404,14 @@ class NeteaseClient(
                     requestBuilder(STREAM_URL, account.secret)
                         .post(form)
                         .build()
-                executeJson(request)
-                    .optJSONArray("data")
-                    ?.optJSONObject(0)
-                    ?.optString("url")
-                    ?.takeIf(String::isNotBlank)
-                    ?.let { return@withContext it }
+                val item = executeJson(request).optJSONArray("data")?.optJSONObject(0)
+                val stream = item ?: continue
+                val url = stream.optString("url").takeIf(String::isNotBlank) ?: continue
+                val isPreview = !stream.isNull("freeTrialInfo")
+                if (!isPreview) return@withContext url
+                if (previewUrl == null) previewUrl = url
             }
-            "https://music.163.com/song/media/outer/url?id=$songId.mp3"
+            previewUrl ?: "https://music.163.com/song/media/outer/url?id=$songId.mp3"
         }
 
     suspend fun dailyRecommendations(
@@ -669,6 +704,19 @@ class NeteaseClient(
             .header("User-Agent", BROWSER_USER_AGENT)
             .header("Cookie", cookies)
 
+    private fun authenticatedCookieHeader(cookies: String): String {
+        val names =
+            cookies
+                .split(';')
+                .mapNotNull { value -> value.substringBefore('=', "").trim().takeIf(String::isNotBlank) }
+                .toSet()
+        return buildString {
+            append(cookies.trim().trimEnd(';'))
+            if ("os" !in names) append("; os=pc")
+            if ("appver" !in names) append("; appver=8.10.35")
+        }
+    }
+
     private fun executeJson(request: Request): JSONObject =
         client.newCall(request).execute().use { response ->
             check(response.isSuccessful) { "NetEase HTTP ${response.code}" }
@@ -681,6 +729,8 @@ class NeteaseClient(
         const val PLAYLIST_DETAIL_URL = "https://music.163.com/api/v6/playlist/detail"
         const val SEARCH_URL = "https://music.163.com/weapi/search/get"
         const val STREAM_URL = "https://music.163.com/api/song/enhance/player/url"
+        const val STREAM_V1_URL = "https://interface.music.163.com/eapi/song/enhance/player/url/v1"
+        const val NETEASE_PLAYER_EAPI_PATH = "/eapi/song/enhance/player/url/v1"
         const val SONG_DETAIL_URL = "https://music.163.com/api/v3/song/detail"
         const val DAILY_RECOMMENDATIONS_URL =
             "https://music.163.com/weapi/v3/discovery/recommend/songs"
@@ -688,6 +738,7 @@ class NeteaseClient(
         const val MAX_PLAYLIST_PAGES = 200
         const val SONG_DETAIL_BATCH_SIZE = 500
         val STREAM_BITRATE_ORDER = intArrayOf(999_000, 320_000, 128_000)
+        val STREAM_LEVEL_ORDER = arrayOf("lossless", "exhigh", "higher", "standard")
     }
 }
 

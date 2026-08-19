@@ -53,6 +53,7 @@ class OnlineSourceStreamProxy(
         val source: String,
         val songInfoJson: String,
         val fallbackUrl: String?,
+        val preferFallback: Boolean,
     )
 
     private val upstreamClient =
@@ -75,10 +76,11 @@ class OnlineSourceStreamProxy(
         source: String,
         songInfoJson: String,
         fallbackUrl: String? = null,
+        preferFallback: Boolean = false,
     ): String {
         ensureStarted()
-        val token = tokenFor(source, songInfoJson)
-        entries[token] = Entry(source, songInfoJson, fallbackUrl)
+        val token = tokenFor(source, songInfoJson, preferFallback)
+        entries[token] = Entry(source, songInfoJson, fallbackUrl, preferFallback)
         return "http://127.0.0.1:$port/online/$token"
     }
 
@@ -115,7 +117,12 @@ class OnlineSourceStreamProxy(
                                     )
                                 }.onFailure { resolutionError = it }
                                     .getOrNull()
-                            val candidates = listOfNotNull(onlineUrl, entry.fallbackUrl).distinct()
+                            val candidates =
+                                orderedStreamCandidates(
+                                    onlineUrl = onlineUrl,
+                                    fallbackUrl = entry.fallbackUrl,
+                                    preferFallback = entry.preferFallback,
+                                )
                             if (candidates.isEmpty()) {
                                 call.respond(
                                     HttpStatusCode.BadGateway,
@@ -206,10 +213,11 @@ class OnlineSourceStreamProxy(
     private fun tokenFor(
         source: String,
         songInfoJson: String,
+        preferFallback: Boolean,
     ): String =
         MessageDigest
             .getInstance("SHA-256")
-            .digest("$source\u0000$songInfoJson".toByteArray())
+            .digest("$source\u0000$preferFallback\u0000$songInfoJson".toByteArray())
             .take(18)
             .joinToString("") { "%02x".format(it) }
 
@@ -230,6 +238,17 @@ class OnlineSourceStreamProxy(
         const val STREAM_USER_AGENT = "SPICaMusic/OnlineSource"
     }
 }
+
+internal fun orderedStreamCandidates(
+    onlineUrl: String?,
+    fallbackUrl: String?,
+    preferFallback: Boolean,
+): List<String> =
+    if (preferFallback) {
+        listOfNotNull(fallbackUrl, onlineUrl).distinct()
+    } else {
+        listOfNotNull(onlineUrl, fallbackUrl).distinct()
+    }
 
 internal fun isClearlyNonAudioContentType(value: String?): Boolean {
     val normalized =

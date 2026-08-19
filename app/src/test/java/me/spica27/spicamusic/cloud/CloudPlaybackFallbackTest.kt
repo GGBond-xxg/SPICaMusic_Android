@@ -1,12 +1,69 @@
 package me.spica27.spicamusic.cloud
 
+import androidx.media3.common.Player
 import me.spica27.spicamusic.service.isRestrictedCloudHttpStatus
+import me.spica27.spicamusic.service.shouldHandleCloudAudioUnderrun
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CloudPlaybackFallbackTest {
+    @Test
+    fun `logged-in provider stream is tried before anonymous online source`() {
+        assertEquals(
+            listOf("http://account-stream", "http://online-source"),
+            orderedStreamCandidates(
+                onlineUrl = "http://online-source",
+                fallbackUrl = "http://account-stream",
+                preferFallback = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `plain online source keeps its resolved URL first`() {
+        assertEquals(
+            listOf("http://online-source", "http://fallback"),
+            orderedStreamCandidates(
+                onlineUrl = "http://online-source",
+                fallbackUrl = "http://fallback",
+                preferFallback = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `cloud preview underrun skips only when decoded audio is exhausted despite buffered data`() {
+        assertTrue(
+            shouldHandleCloudAudioUnderrun(
+                stillSameItem = true,
+                isPlaying = true,
+                playbackState = Player.STATE_READY,
+                totalBufferedDurationMs = 30_000L,
+                sinkHasPendingData = false,
+            ),
+        )
+        assertFalse(
+            shouldHandleCloudAudioUnderrun(
+                stillSameItem = true,
+                isPlaying = true,
+                playbackState = Player.STATE_BUFFERING,
+                totalBufferedDurationMs = 0L,
+                sinkHasPendingData = false,
+            ),
+        )
+        assertFalse(
+            shouldHandleCloudAudioUnderrun(
+                stillSameItem = true,
+                isPlaying = true,
+                playbackState = Player.STATE_READY,
+                totalBufferedDurationMs = 30_000L,
+                sinkHasPendingData = true,
+            ),
+        )
+    }
+
     @Test
     fun `rejects provider error pages but accepts audio and binary streams`() {
         assertTrue(isClearlyNonAudioContentType("text/html; charset=utf-8"))

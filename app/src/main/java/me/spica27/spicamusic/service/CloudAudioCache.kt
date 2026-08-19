@@ -93,7 +93,10 @@ class CloudAudioCache(
     }
 
     companion object {
-        const val CACHE_KEY_PREFIX = "spica-cloud:"
+        // v3 stops reusing preview spans cached before the account gained membership. Preview
+        // bytes and full-member bytes can share a provider song id, so a generation change is
+        // required when authenticated full-length resolution is introduced.
+        const val CACHE_KEY_PREFIX = "spica-cloud:v3:"
         const val DEFAULT_MAX_MIB = 1024
         private const val CACHE_DIRECTORY = "cloud_audio"
 

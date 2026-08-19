@@ -46,6 +46,8 @@
   <string name="cloud_playback_restricted_stopped">《%1$s》无法播放，可能需要会员或受版权限制</string>
   <string name="cloud_playback_failed_skipping">《%1$s》加载失败，请检查网络或重新登录云音乐，已自动播放下一首</string>
   <string name="cloud_playback_failed_stopped">《%1$s》加载失败，请检查网络或重新登录云音乐</string>
+  <string name="cloud_playback_preview_ended_skipping">《%1$s》试听已结束，正在播放下一首</string>
+  <string name="cloud_playback_preview_ended_stopped">《%1$s》试听已结束</string>
   <string name="search_songs_albums_artists">搜索本地和云端音乐</string>
   <string name="search_your_music_title">搜索本地与云端音乐</string>
   <string name="search_your_music_subtitle">同时搜索现有曲库以及网易云、QQ 音乐中未收藏的歌曲</string>

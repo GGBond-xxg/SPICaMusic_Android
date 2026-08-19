@@ -85,7 +85,9 @@ import kotlinx.coroutines.delay
 import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.spicamusic.App
 import me.spica27.spicamusic.R
+import me.spica27.spicamusic.cloud.CatalogQueueItem
 import me.spica27.spicamusic.cloud.CloudCatalogPlaylist
+import me.spica27.spicamusic.cloud.CloudCatalogSong
 import me.spica27.spicamusic.cloud.CloudMusicCatalogViewModel
 import me.spica27.spicamusic.cloud.CloudUserPlaylist
 import me.spica27.spicamusic.cloud.CloudUserPlaylistScene
@@ -132,6 +134,43 @@ private const val ENTRANCE_STAGGER_MILLIS = 55L
 /** 收藏预览最多展示的歌曲数 */
 private const val FavoritePreviewSongCount = 5
 
+private data class FrequentEntry(
+    val stableId: String,
+    val title: String,
+    val artist: String,
+    val durationMs: Long,
+    val artworkUri: Uri?,
+    val fallbackArtworkUri: Uri?,
+    val queueItem: CatalogQueueItem,
+)
+
+private fun Song.toFrequentEntry(): FrequentEntry =
+    FrequentEntry(
+        stableId = "local:$mediaStoreId",
+        title = displayName,
+        artist = artist,
+        durationMs = duration,
+        artworkUri = getCoverUri(),
+        fallbackArtworkUri = getAlbumCoverUri(),
+        queueItem = CatalogQueueItem.Local(this),
+    )
+
+private fun CloudCatalogSong.toFrequentEntry(): FrequentEntry =
+    FrequentEntry(
+        stableId = stableId,
+        title = title,
+        artist = artist,
+        durationMs = durationMs,
+        artworkUri = artworkUri,
+        fallbackArtworkUri = null,
+        queueItem = CatalogQueueItem.Cloud(this),
+    )
+
+private fun Long.asDurationLabel(): String {
+    val totalSeconds = (coerceAtLeast(0L) / 1_000L)
+    return "${totalSeconds / 60}:${(totalSeconds % 60).toString().padStart(2, '0')}"
+}
+
 /** 列表项增删的统一动画配方（同资料库页） */
 private val ItemPlacementSpec: FiniteAnimationSpec<IntOffset> =
     spring(
@@ -159,7 +198,15 @@ fun FinderPage(playEntrance: Boolean = true) {
     val cloudPlaylists = cloudCatalog.remotePlaylists
     val userCloudPlaylists = cloudCatalog.userPlaylists
     val totalPlaylistCount = playlists.size + cloudPlaylists.size + userCloudPlaylists.size
-    val frequentCardSongs = remember(frequentSongs) { ImmutableList.copyOf(frequentSongs) }
+    val frequentEntries =
+        remember(frequentSongs, cloudCatalog.recentCloudSongs) {
+            (
+                cloudCatalog.recentCloudSongs.map(CloudCatalogSong::toFrequentEntry) +
+                    frequentSongs.map(Song::toFrequentEntry)
+            ).distinctBy(FrequentEntry::stableId)
+                .take(10)
+        }
+    val frequentCardSongs = remember(frequentEntries) { ImmutableList.copyOf(frequentEntries) }
     val favoritePreviewSongs =
         remember(favoriteSongs) {
             ImmutableList.copyOf(favoriteSongs.take(FavoritePreviewSongCount))
@@ -199,7 +246,7 @@ fun FinderPage(playEntrance: Boolean = true) {
             item(key = "masthead", contentType = "masthead") {
                 val entrance = rememberEntrance(order = 0, play = playEntrance)
                 FinderMasthead(
-                    frequentCount = frequentSongs.size,
+                    frequentCount = frequentEntries.size,
                     favoriteCount = favoriteSongs.size,
                     playlistCount = totalPlaylistCount,
                     summaryReady = frequentSongsInitialized,
@@ -249,7 +296,7 @@ fun FinderPage(playEntrance: Boolean = true) {
                 item(key = "frequent_loading", contentType = "loading") {
                     FrequentHeroPlaceholder()
                 }
-            } else if (frequentSongs.isEmpty()) {
+            } else if (frequentEntries.isEmpty()) {
                 item(key = "frequent_empty", contentType = "empty") {
                     val entrance = rememberEntrance(order = 3, play = playEntrance)
                     FinderEmptyRow(
@@ -265,23 +312,23 @@ fun FinderPage(playEntrance: Boolean = true) {
                         songs = frequentCardSongs,
                         renderCachedContentImmediately = homeViewModel.frequentSongsRestoredFromCache,
                         onPlayAll = {
-                            playerViewModel.updatePlaylistWithSongs(
-                                songs = frequentSongs,
-                                startSong = frequentSongs.firstOrNull(),
-                                autoStart = true,
-                            )
+                            frequentEntries.firstOrNull()?.let { first ->
+                                cloudCatalogViewModel.play(
+                                    first.stableId,
+                                    frequentEntries.map(FrequentEntry::queueItem),
+                                )
+                            }
                         },
-                        onSongClick = { song ->
-                            playerViewModel.updatePlaylistWithSongs(
-                                songs = frequentSongs,
-                                startSong = song,
-                                autoStart = true,
+                        onSongClick = { entry ->
+                            cloudCatalogViewModel.play(
+                                entry.stableId,
+                                frequentEntries.map(FrequentEntry::queueItem),
                             )
                         },
                         onSaveAsPlaylist = {
-                            homeViewModel.createPlaylistFromSongs(
-                                songs = frequentSongs,
-                                playlistName = frequentPlaylistName,
+                            cloudCatalogViewModel.createLocalPlaylistFromQueue(
+                                name = frequentPlaylistName,
+                                items = frequentEntries.map(FrequentEntry::queueItem),
                             )
                         },
                         modifier = Modifier.entranceGraphics(entrance),
@@ -913,22 +960,22 @@ private fun ScanGuideCard(
  */
 @Composable
 private fun FrequentHeroCard(
-    songs: ImmutableList<Song>,
+    songs: ImmutableList<FrequentEntry>,
     renderCachedContentImmediately: Boolean,
     onPlayAll: () -> Unit,
-    onSongClick: (Song) -> Unit,
+    onSongClick: (FrequentEntry) -> Unit,
     onSaveAsPlaylist: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val previewSongs = songs.take(3)
     val resolvedArtwork =
-        remember(previewSongs.map(Song::mediaStoreId)) {
-            mutableStateMapOf<Long, Boolean>()
+        remember(previewSongs.map(FrequentEntry::stableId)) {
+            mutableStateMapOf<String, Boolean>()
         }
     val rowsReady =
         renderCachedContentImmediately ||
             previewSongs.all { song ->
-                resolvedArtwork[song.mediaStoreId] == true
+                resolvedArtwork[song.stableId] == true
             }
     val rowsReveal by animateFloatAsState(
         targetValue = if (rowsReady) 1f else 0f,
@@ -1014,21 +1061,21 @@ private fun FrequentHeroCard(
                         onClick = { onSongClick(song) },
                         retainedPainter =
                             if (renderCachedContentImmediately) {
-                                remember(song.mediaStoreId) {
-                                    ArtworkRenderCache.read(song.getCoverUri()?.toString())
+                                remember(song.stableId) {
+                                    ArtworkRenderCache.read(song.artworkUri?.toString())
                                 }
                             } else {
                                 null
                             },
                         onArtworkReady = {
                             ArtworkRenderCache.write(
-                                key = song.getCoverUri()?.toString(),
-                                fallbackKey = song.getAlbumCoverUri()?.toString(),
+                                key = song.artworkUri?.toString(),
+                                fallbackKey = song.fallbackArtworkUri?.toString(),
                             )
-                            resolvedArtwork[song.mediaStoreId] = true
+                            resolvedArtwork[song.stableId] = true
                         },
                         onArtworkFailed = {
-                            resolvedArtwork[song.mediaStoreId] = true
+                            resolvedArtwork[song.stableId] = true
                         },
                     )
                 }
@@ -1053,7 +1100,7 @@ private fun FrequentHeroCard(
 @Composable
 private fun HeroSongRow(
     index: Int,
-    song: Song,
+    song: FrequentEntry,
     onClick: () -> Unit,
     retainedPainter: Painter?,
     onArtworkReady: (Painter) -> Unit,
@@ -1084,8 +1131,8 @@ private fun HeroSongRow(
             textAlign = TextAlign.Center,
         )
         StableAudioCover(
-            uri = song.getCoverUri(),
-            fallbackUri = song.getAlbumCoverUri(),
+            uri = song.artworkUri,
+            fallbackUri = song.fallbackArtworkUri,
             retainedPainter = retainedPainter,
             modifier =
                 Modifier
@@ -1097,7 +1144,7 @@ private fun HeroSongRow(
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = song.displayName,
+                text = song.title,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -1113,7 +1160,7 @@ private fun HeroSongRow(
             )
         }
         Text(
-            text = song.getFormattedDuration(),
+            text = song.durationMs.asDurationLabel(),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(40.dp),

@@ -39,6 +39,8 @@ class MediaServerViewModel(
     private val accountStore: CloudAccountStore,
     private val client: MediaServerClient,
     private val player: PlayerUseCases,
+    private val playlistEntryStore: CloudPlaylistEntryStore,
+    private val recentStore: CloudRecentStore,
 ) : ViewModel() {
     private val _state = MutableStateFlow(MediaServerUiState())
     val state = _state.asStateFlow()
@@ -107,7 +109,11 @@ class MediaServerViewModel(
     }
 
     fun removeSelectedAccount() {
-        _state.value.selectedAccount?.let { accountStore.removeAccount(it.id) }
+        _state.value.selectedAccount?.let {
+            playlistEntryStore.removeAccount(it.id)
+            recentStore.removeAccount(it.id)
+            accountStore.removeAccount(it.id)
+        }
         refreshAccounts()
     }
 
@@ -189,6 +195,8 @@ data class TelegramUiState(
 
 class TelegramViewModel(
     private val repository: TelegramRepository,
+    private val playlistEntryStore: CloudPlaylistEntryStore,
+    private val recentStore: CloudRecentStore,
 ) : ViewModel() {
     val authorizationState: StateFlow<TdApi.AuthorizationState?> =
         repository.authorizationState.stateIn(
@@ -249,6 +257,8 @@ class TelegramViewModel(
         }
 
     fun removeChannel(chatId: Long) {
+        playlistEntryStore.removeTelegramChannel(chatId)
+        recentStore.removeTelegramChannel(chatId)
         repository.removeChannel(chatId)
         _state.update { it.copy(channels = repository.savedChannels()) }
     }

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
   <string name="app_name">柠檬音乐</string>
+  <string name="spica_app_label">柠檬音乐</string>
   <string name="action_settings">Settings</string>
   <string name="first_fragment_label">First Fragment</string>
   <string name="second_fragment_label">Second Fragment</string>
@@ -347,8 +348,17 @@
   <string name="live_update_playing">音樂播放中</string>
   <string name="live_update_paused">已暫停</string>
   <string name="settings_dynamic_spectrum">動態頻譜背景</string>
+  <string name="dynamic_spectrum_top_glow">頂部流光</string>
+  <string name="dynamic_spectrum_liquid_aurora">液態極光</string>
+  <string name="dynamic_spectrum_fluid_effect">流體效果</string>
+  <string name="dynamic_spectrum_fluid_cover">動態流體封面</string>
+  <string name="dynamic_spectrum_blur_cover">模糊封面</string>
+  <string name="dynamic_spectrum_off">關閉</string>
   <string name="settings_dynamic_cover">動態封面</string>
   <string name="settings_dynamic_cover_subtitle">播放器封面點擊翻轉後的背面效果</string>
+  <string name="dynamic_cover_shining_stars">閃耀星光</string>
+  <string name="dynamic_cover_audio_city">音訊城市</string>
+  <string name="dynamic_cover_off">關閉</string>
   <string name="settings_progress_bar_style">進度條樣式</string>
   <string name="progress_bar_style_dynamic_waveform">動態波形</string>
   <string name="progress_bar_style_time_domain_waveform">時域波形</string>
@@ -790,4 +800,6 @@
   <string name="cloud_playback_restricted_stopped">《%1$s》無法播放，可能需要會員或受版權限制</string>
   <string name="cloud_playback_failed_skipping">《%1$s》載入失敗，請檢查網路或重新登入雲端音樂，已自動播放下一首</string>
   <string name="cloud_playback_failed_stopped">《%1$s》載入失敗，請檢查網路或重新登入雲端音樂</string>
+  <string name="cloud_playback_preview_ended_skipping">《%1$s》試聽已結束，正在播放下一首</string>
+  <string name="cloud_playback_preview_ended_stopped">《%1$s》試聽已結束</string>
 </resources>

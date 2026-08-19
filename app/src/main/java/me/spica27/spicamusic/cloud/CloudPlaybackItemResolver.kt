@@ -104,6 +104,10 @@ class CloudPlaybackItemResolver(
                                         source = sourceKey,
                                         songInfoJson = onlineSongInfo(item, songId),
                                         fallbackUrl = fallbackUrl,
+                                        // Logged-in providers can return member/full-length audio.
+                                        // Anonymous online sources may legally return a successful
+                                        // but truncated preview, which then plays silently halfway.
+                                        preferFallback = true,
                                     )
                                 } else {
                                     fallbackUrl

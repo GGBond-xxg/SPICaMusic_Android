@@ -108,6 +108,40 @@ class CloudPlaylistEntryStore(
         if (file(playlistId).delete()) _revision.update(Long::inc)
     }
 
+    @Synchronized
+    fun removeAccount(accountId: String) {
+        var changed = false
+        readAll().forEach { (playlistId, songs) ->
+            val filtered = songs.filterNot { it.accountId == accountId }
+            if (filtered.size != songs.size) {
+                if (filtered.isEmpty()) {
+                    file(playlistId).delete()
+                } else {
+                    write(playlistId, filtered)
+                }
+                changed = true
+            }
+        }
+        if (changed) _revision.update(Long::inc)
+    }
+
+    @Synchronized
+    fun removeTelegramChannel(chatId: Long) {
+        var changed = false
+        readAll().forEach { (playlistId, songs) ->
+            val filtered = songs.filterNot { it.telegramChatId == chatId }
+            if (filtered.size != songs.size) {
+                if (filtered.isEmpty()) {
+                    file(playlistId).delete()
+                } else {
+                    write(playlistId, filtered)
+                }
+                changed = true
+            }
+        }
+        if (changed) _revision.update(Long::inc)
+    }
+
     private fun write(
         playlistId: Long,
         songs: List<StoredCloudPlaylistSong>,

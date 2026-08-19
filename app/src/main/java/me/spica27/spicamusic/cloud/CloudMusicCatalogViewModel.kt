@@ -103,6 +103,7 @@ data class CloudMusicCatalogState(
     val isLoadingDailyRecommendations: Boolean = false,
     val dailyRecommendationsError: String? = null,
     val localPlaylistCloudSongs: Map<Long, List<CloudCatalogSong>> = emptyMap(),
+    val recentCloudSongs: List<CloudCatalogSong> = emptyList(),
 )
 
 /**
@@ -121,6 +122,7 @@ class CloudMusicCatalogViewModel(
     private val playlistRepository: PlaylistUseCases,
     private val userPlaylistStore: CloudUserPlaylistStore,
     private val playlistEntryStore: CloudPlaylistEntryStore,
+    private val recentStore: CloudRecentStore,
 ) : ViewModel() {
     private val _state = MutableStateFlow(CloudMusicCatalogState())
     val state = _state.asStateFlow()
@@ -133,11 +135,15 @@ class CloudMusicCatalogViewModel(
     init {
         refreshSources()
         publishLocalPlaylistEntries()
+        publishRecentCloudSongs()
         viewModelScope.launch {
             userPlaylistStore.revision.drop(1).collect { refreshUserPlaylists() }
         }
         viewModelScope.launch {
             playlistEntryStore.revision.drop(1).collect { publishLocalPlaylistEntries() }
+        }
+        viewModelScope.launch {
+            recentStore.revision.drop(1).collect { publishRecentCloudSongs() }
         }
         viewModelScope.launch {
             telegramRepository.authorizationState.collect { authorization ->
@@ -180,6 +186,8 @@ class CloudMusicCatalogViewModel(
         refreshRemotePlaylists()
         refreshDailyRecommendations()
         refreshUserPlaylists()
+        publishLocalPlaylistEntries()
+        publishRecentCloudSongs()
     }
 
     fun refreshRemotePlaylists(forceRefresh: Boolean = false) {
@@ -291,6 +299,25 @@ class CloudMusicCatalogViewModel(
         }
     }
 
+    fun createLocalPlaylistFromQueue(
+        name: String,
+        items: List<CatalogQueueItem>,
+    ) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty() || items.isEmpty()) return
+        viewModelScope.launch {
+            val playlistId = playlistRepository.createPlaylist(trimmed)
+            val localIds =
+                items.filterIsInstance<CatalogQueueItem.Local>().map { it.song.mediaStoreId }
+            if (localIds.isNotEmpty()) {
+                playlistRepository.addSongsToPlaylist(playlistId, localIds)
+            }
+            items.filterIsInstance<CatalogQueueItem.Cloud>().forEach { item ->
+                playlistEntryStore.add(playlistId, item.song)
+            }
+        }
+    }
+
     fun removeLocalPlaylistEntries(playlistId: Long) {
         playlistEntryStore.removePlaylist(playlistId)
     }
@@ -309,6 +336,17 @@ class CloudMusicCatalogViewModel(
                 songs.mapNotNull(::resolveStoredPlaylistSong)
             }
         _state.update { it.copy(localPlaylistCloudSongs = resolved) }
+    }
+
+    private fun publishRecentCloudSongs() {
+        _state.update { current ->
+            current.copy(
+                recentCloudSongs =
+                    recentStore.read().mapNotNull { recent ->
+                        resolveStoredPlaylistSong(recent.song)
+                    },
+            )
+        }
     }
 
     private fun resolveStoredPlaylistSong(value: StoredCloudPlaylistSong): CloudCatalogSong? {
@@ -347,19 +385,23 @@ class CloudMusicCatalogViewModel(
                 }
 
                 "telegram" ->
-                    CloudCatalogPayload.Telegram(
-                        TelegramSong(
-                            value.telegramMessageId,
-                            value.telegramChatId,
-                            value.telegramFileId,
-                            value.telegramFileSize,
-                            value.title,
-                            value.artist,
-                            value.durationMs,
-                            value.mimeType,
-                            value.telegramCoverFileId,
-                        ),
-                    )
+                    if (telegramRepository.savedChannels().any { it.chatId == value.telegramChatId }) {
+                        CloudCatalogPayload.Telegram(
+                            TelegramSong(
+                                value.telegramMessageId,
+                                value.telegramChatId,
+                                value.telegramFileId,
+                                value.telegramFileSize,
+                                value.title,
+                                value.artist,
+                                value.durationMs,
+                                value.mimeType,
+                                value.telegramCoverFileId,
+                            ),
+                        )
+                    } else {
+                        return null
+                    }
 
                 else -> return null
             }

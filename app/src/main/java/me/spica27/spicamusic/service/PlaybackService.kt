@@ -49,10 +49,12 @@ import me.spica27.spicamusic.DesktopLyricsPermissionActivity
 import me.spica27.spicamusic.MainActivity
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.cloud.CloudPlaybackItemResolver
+import me.spica27.spicamusic.cloud.CloudRecentStore
 import me.spica27.spicamusic.feature.settings.domain.SettingsUseCases
 import me.spica27.spicamusic.player.api.IMusicPlayer
 import me.spica27.spicamusic.player.impl.SpicaPlayer
 import me.spica27.spicamusic.player.impl.utils.MediaLibrary
+import me.spica27.spicamusic.player.impl.utils.PlayerKVUtils
 import me.spica27.spicamusic.topdisplay.TopDisplayModeController
 import org.koin.android.ext.android.inject
 import timber.log.Timber
@@ -68,7 +70,9 @@ class PlaybackService : MediaLibraryService() {
     private val topDisplayModeController: TopDisplayModeController by inject()
     private val desktopLyricsController: DesktopLyricsController by inject()
     private val cloudPlaybackItemResolver: CloudPlaybackItemResolver by inject()
+    private val cloudRecentStore: CloudRecentStore by inject()
     private val settingsUseCases: SettingsUseCases by inject()
+    private val playerKVUtils: PlayerKVUtils by inject()
     private val cloudAudioCache by lazy { CloudAudioCache(this) }
 
     private var mediaSession: MediaLibrarySession? = null
@@ -109,6 +113,11 @@ class PlaybackService : MediaLibraryService() {
     private var fadeMonitorJob: Job? = null
     private var manualFadeJob: Job? = null
     private var cloudErrorSkipJob: Job? = null
+    private var cloudPreviewHandledMediaId: String? = null
+    private var cloudSinkEmptySinceMs = 0L
+    private var cloudRecentCandidateMediaId: String? = null
+    private var cloudRecentListeningSinceMs = 0L
+    private var cloudRecentRecorded = false
     private var manualFadeActive = false
     private var legacyNotificationButtons: List<CommandButton> = emptyList()
     private var legacyNotificationCommands: SessionCommands? = null
@@ -149,6 +158,11 @@ class PlaybackService : MediaLibraryService() {
                 reason: Int,
             ) {
                 cloudErrorSkipJob?.cancel()
+                cloudPreviewHandledMediaId = null
+                cloudSinkEmptySinceMs = 0L
+                cloudRecentCandidateMediaId = null
+                cloudRecentListeningSinceMs = 0L
+                cloudRecentRecorded = false
                 if (fadeEnabled && mediaItem != null) {
                     beginFadeIn()
                 } else {
@@ -750,12 +764,62 @@ class PlaybackService : MediaLibraryService() {
             }
     }
 
+    private fun handleCloudPreviewEnded(item: MediaItem) {
+        val mediaId = item.mediaId
+        if (cloudPreviewHandledMediaId == mediaId) return
+        cloudPreviewHandledMediaId = mediaId
+        val title =
+            item.mediaMetadata.title
+                ?.toString()
+                ?.takeIf(String::isNotBlank)
+                ?: getString(R.string.unknown_song)
+        val nextIndex = exoPlayer.currentMediaItemIndex + 1
+        val canSkip = nextIndex in 0 until exoPlayer.mediaItemCount
+        Toast
+            .makeText(
+                this,
+                getString(
+                    if (canSkip) {
+                        R.string.cloud_playback_preview_ended_skipping
+                    } else {
+                        R.string.cloud_playback_preview_ended_stopped
+                    },
+                    title,
+                ),
+                Toast.LENGTH_LONG,
+            ).show()
+        Timber
+            .tag("PlaybackService")
+            .w(
+                "Cloud stream stopped feeding decoded audio before its timeline ended: mediaId=%s, position=%d, buffered=%d, skip=%s",
+                mediaId,
+                exoPlayer.currentPosition,
+                exoPlayer.bufferedPosition,
+                canSkip,
+            )
+        if (canSkip) {
+            exoPlayer.seekToNextMediaItem()
+        } else {
+            exoPlayer.pause()
+            exoPlayer.stop()
+        }
+    }
+
     private fun closePlayerAndApp() {
         cloudErrorSkipJob?.cancel()
         desktopLyricsController.hide()
         exoPlayer.pause()
-        exoPlayer.stop()
-        exoPlayer.clearMediaItems()
+        val currentIndex = exoPlayer.currentMediaItemIndex
+        if (currentIndex >= 0 && exoPlayer.mediaItemCount > 0) {
+            playerKVUtils.setHistoryMediaItems(
+                List(exoPlayer.mediaItemCount) { exoPlayer.getMediaItemAt(it) },
+            )
+            playerKVUtils.setHistoryPosition(currentIndex)
+            playerKVUtils.setHistoryProgressMs(exoPlayer.currentPosition)
+            // This commit also makes the preceding SharedPreferences writes durable before the
+            // process exits, so reopening can restore the same queue and current song.
+            playerKVUtils.setCurrentMediaId(exoPlayer.currentMediaItem?.mediaId)
+        }
         stopForeground(STOP_FOREGROUND_REMOVE)
         sendBroadcast(Intent(MainActivity.ACTION_EXIT_APP).setPackage(packageName))
         stopSelf()
@@ -881,6 +945,7 @@ class PlaybackService : MediaLibraryService() {
         fadeMonitorJob =
             playerScope.launch {
                 while (isActive) {
+                    monitorCloudStreamHealth(SystemClock.elapsedRealtime())
                     if (manualFadeActive) {
                         delay(FADE_TICK_MS)
                         continue
@@ -910,6 +975,57 @@ class PlaybackService : MediaLibraryService() {
                     delay(FADE_TICK_MS)
                 }
             }
+    }
+
+    private fun monitorCloudStreamHealth(nowMs: Long) {
+        val item = exoPlayer.currentMediaItem
+        recordCloudRecentWhenEligible(item, nowMs)
+        val duration = exoPlayer.duration
+        val remaining = duration - exoPlayer.currentPosition
+        val sinkHasAudio = runCatching { audioSink?.hasPendingData() == true }.getOrDefault(true)
+        val stalled =
+            item != null &&
+                item.mediaId.startsWith(CLOUD_MEDIA_ID_PREFIX) &&
+                cloudPreviewHandledMediaId != item.mediaId &&
+                exoPlayer.isPlaying &&
+                exoPlayer.playbackState == Player.STATE_READY &&
+                exoPlayer.totalBufferedDuration >= CLOUD_UNDERRUN_MIN_BUFFERED_MS &&
+                (duration <= 0L || remaining > CLOUD_NATURAL_END_GUARD_MS) &&
+                !sinkHasAudio
+        if (!stalled) {
+            cloudSinkEmptySinceMs = 0L
+            return
+        }
+        if (cloudSinkEmptySinceMs == 0L) {
+            cloudSinkEmptySinceMs = nowMs
+            return
+        }
+        if (nowMs - cloudSinkEmptySinceMs >= CLOUD_UNDERRUN_CONFIRM_MS) {
+            cloudSinkEmptySinceMs = 0L
+            handleCloudPreviewEnded(item)
+        }
+    }
+
+    private fun recordCloudRecentWhenEligible(
+        item: MediaItem?,
+        nowMs: Long,
+    ) {
+        val mediaId = item?.mediaId
+        if (item == null || mediaId == null || !mediaId.startsWith(CLOUD_MEDIA_ID_PREFIX) || !exoPlayer.isPlaying) {
+            cloudRecentListeningSinceMs = 0L
+            return
+        }
+        if (cloudRecentCandidateMediaId != mediaId) {
+            cloudRecentCandidateMediaId = mediaId
+            cloudRecentListeningSinceMs = nowMs
+            cloudRecentRecorded = false
+            return
+        }
+        if (cloudRecentListeningSinceMs == 0L) cloudRecentListeningSinceMs = nowMs
+        if (!cloudRecentRecorded && nowMs - cloudRecentListeningSinceMs >= CLOUD_RECENT_MIN_LISTEN_MS) {
+            cloudRecentRecorded = true
+            serviceScope.launch { cloudRecentStore.record(item) }
+        }
     }
 
     private fun beginFadeIn() {
@@ -1038,6 +1154,10 @@ class PlaybackService : MediaLibraryService() {
         const val HEADSET_RESUME_WINDOW_MS = 10 * 60 * 1_000L
         const val CLOUD_MEDIA_ID_PREFIX = "cloud:"
         const val CLOUD_ERROR_SKIP_DELAY_MS = 600L
+        const val CLOUD_UNDERRUN_CONFIRM_MS = 3_000L
+        const val CLOUD_UNDERRUN_MIN_BUFFERED_MS = 8_000L
+        const val CLOUD_NATURAL_END_GUARD_MS = 5_000L
+        const val CLOUD_RECENT_MIN_LISTEN_MS = 10_000L
         const val PROCESS_EXIT_DELAY_MS = 500L
     }
 }
@@ -1048,3 +1168,16 @@ internal fun isRestrictedCloudHttpStatus(responseCode: Int?): Boolean =
         responseCode == 404 ||
         responseCode == 410 ||
         responseCode == 451
+
+internal fun shouldHandleCloudAudioUnderrun(
+    stillSameItem: Boolean,
+    isPlaying: Boolean,
+    playbackState: Int,
+    totalBufferedDurationMs: Long,
+    sinkHasPendingData: Boolean,
+): Boolean =
+    stillSameItem &&
+        isPlaying &&
+        playbackState == Player.STATE_READY &&
+        totalBufferedDurationMs >= PlaybackService.CLOUD_UNDERRUN_MIN_BUFFERED_MS &&
+        !sinkHasPendingData

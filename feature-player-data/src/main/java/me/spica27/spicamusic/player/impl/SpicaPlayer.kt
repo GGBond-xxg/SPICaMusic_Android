@@ -176,7 +176,7 @@ class SpicaPlayer(
                         .indexOfFirst { it.mediaId == savedMediaId }
                         .takeIf { it >= 0 }
                         ?: playerKVUtils.getHistoryPosition().coerceIn(items.indices)
-                browser.setMediaItems(items, savedIndex, 0L)
+                browser.setMediaItems(items, savedIndex, playerKVUtils.getHistoryProgressMs())
                 browser.prepare()
             } catch (e: Exception) {
                 Timber.tag(TAG).e(e, "Failed to initialize player")
@@ -528,6 +528,9 @@ class SpicaPlayer(
             playerKVUtils.setHistoryPosition(it)
         }
         playerKVUtils.setCurrentMediaId(mediaItem?.mediaId)
+        if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
+            playerKVUtils.setHistoryProgressMs(0L)
+        }
         // 切歌时立即重置 duration，避免旧时长污染新歌曲的进度计算
         _currentDuration.value = 0L
         // 尝试从 browser 实例获取新歌曲的时长（可能此时已就绪）
