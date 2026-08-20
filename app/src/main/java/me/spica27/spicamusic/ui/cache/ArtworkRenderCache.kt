@@ -7,6 +7,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
 import me.spica27.spicamusic.App
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
@@ -19,14 +21,20 @@ import java.util.concurrent.Executors
  */
 object ArtworkRenderCache {
     private val writer = Executors.newSingleThreadExecutor()
+    private val remoteClient = OkHttpClient()
 
     fun read(key: String?): Painter? {
         if (key.isNullOrBlank()) return null
         return runCatching {
-            BitmapFactory
-                .decodeFile(fileFor(key).absolutePath)
-                ?.asImageBitmap()
-                ?.let(::BitmapPainter)
+            val file = fileFor(key)
+            val bitmap = BitmapFactory.decodeFile(file.absolutePath)
+            if (bitmap == null) {
+                if (file.exists()) file.delete()
+                null
+            } else {
+                file.setLastModified(System.currentTimeMillis())
+                BitmapPainter(bitmap.asImageBitmap())
+            }
         }.getOrNull()
     }
 
@@ -35,8 +43,12 @@ object ArtworkRenderCache {
         fallbackKey: String? = null,
     ) {
         if (key.isNullOrBlank()) return
+        val cachedFile = fileFor(key)
+        if (cachedFile.isFile && cachedFile.length() > 0L) return
 
         writer.execute {
+            val destination = fileFor(key)
+            if (destination.isFile && destination.length() > 0L) return@execute
             runCatching {
                 val source =
                     sequenceOf(key, fallbackKey)
@@ -46,7 +58,6 @@ object ArtworkRenderCache {
                         ?: return@runCatching
                 val directory = cacheDirectory()
                 directory.mkdirs()
-                val destination = fileFor(key)
                 val temporary = File(directory, destination.name + ".tmp")
                 val thumbnail =
                     if (source.width > THUMBNAIL_SIZE || source.height > THUMBNAIL_SIZE) {
@@ -84,11 +95,24 @@ object ArtworkRenderCache {
 
     private fun decode(uriString: String): Bitmap? =
         runCatching {
-            App
-                .getInstance()
-                .contentResolver
-                .openInputStream(Uri.parse(uriString))
-                ?.use(BitmapFactory::decodeStream)
+            val uri = Uri.parse(uriString)
+            if (uri.scheme.equals("http", ignoreCase = true) ||
+                uri.scheme.equals("https", ignoreCase = true)
+            ) {
+                remoteClient
+                    .newCall(Request.Builder().url(uriString).build())
+                    .execute()
+                    .use { response ->
+                        if (!response.isSuccessful) return@use null
+                        response.body.byteStream().use(BitmapFactory::decodeStream)
+                    }
+            } else {
+                App
+                    .getInstance()
+                    .contentResolver
+                    .openInputStream(uri)
+                    ?.use(BitmapFactory::decodeStream)
+            }
         }.getOrNull()
 
     private fun prune(directory: File) {
