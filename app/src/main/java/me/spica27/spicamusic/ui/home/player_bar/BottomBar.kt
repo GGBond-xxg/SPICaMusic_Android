@@ -1105,38 +1105,50 @@ private fun HomePageSwitchItem(
             currentHomePage == bandHomePage
         }
 
-    Row(
-        modifier =
-            modifier
-                .clip(CircleShape)
-                .clickable {
-                    if (!isSelected) {
-                        homeViewModel.navigateToPage(bandHomePage)
-                    }
-                }.height(56.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        AnimatedVisibility(
-            isSelected,
-            enter = expandHorizontally(expandFrom = Alignment.Start) + fadeIn(),
-            exit = shrinkHorizontally(shrinkTowards = Alignment.Start) + fadeOut(),
+    BoxWithConstraints(modifier = modifier) {
+        // English labels such as "Discover" and "Library" need most of a compact tab's
+        // width by themselves. Hide the decorative selected icon when space is tight so the
+        // label stays readable instead of wrapping or spilling outside the indicator.
+        val showSelectedIcon = isSelected && maxWidth >= 96.dp
+
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(CircleShape)
+                    .clickable {
+                        if (!isSelected) {
+                            homeViewModel.navigateToPage(bandHomePage)
+                        }
+                    }.height(56.dp)
+                    .padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
         ) {
-            Row {
-                icon()
-                Spacer(modifier = Modifier.width(2.dp))
+            AnimatedVisibility(
+                showSelectedIcon,
+                enter = expandHorizontally(expandFrom = Alignment.Start) + fadeIn(),
+                exit = shrinkHorizontally(shrinkTowards = Alignment.Start) + fadeOut(),
+            ) {
+                Row {
+                    icon()
+                    Spacer(modifier = Modifier.width(2.dp))
+                }
             }
+            Text(
+                text = title,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.bodyMedium,
+                color =
+                    if (isSelected) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+            )
         }
-        Text(
-            text = title,
-            style = MaterialTheme.typography.bodyMedium,
-            color =
-                if (isSelected) {
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-        )
     }
 }
 

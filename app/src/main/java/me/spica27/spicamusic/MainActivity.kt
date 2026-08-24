@@ -45,6 +45,10 @@ class MainActivity :
             }
         }
 
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLocaleController.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 

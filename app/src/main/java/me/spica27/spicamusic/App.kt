@@ -1,6 +1,7 @@
 package me.spica27.spicamusic
 
 import android.app.Application
+import android.content.Context
 import androidx.annotation.OptIn
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -32,6 +33,10 @@ class App : Application() {
     private val musicScanService: MusicScanUseCases by inject()
 
     private val musicPlayer: IMusicPlayer by inject()
+
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(AppLocaleController.wrap(base))
+    }
 
     @OptIn(UnstableApi::class)
     override fun onCreate() {

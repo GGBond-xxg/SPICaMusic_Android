@@ -618,6 +618,11 @@
   <string name="settings_theme_mode_system">Follow</string>
   <string name="settings_theme_mode_light">Light</string>
   <string name="settings_theme_mode_dark">Dark</string>
+  <string name="settings_language_title">Language</string>
+  <string name="settings_language_system">Follow system</string>
+  <string name="settings_language_english">English</string>
+  <string name="settings_language_simplified_chinese">Simplified Chinese</string>
+  <string name="settings_language_traditional_chinese">Traditional Chinese</string>
   <string name="settings_dark_mode_title">Dark Mode</string>
   <string name="settings_dark_mode_toggle_subtitle">Toggle dark / light theme</string>
   <string name="settings_playback_subtitle">Make the listening experience smoother</string>
@@ -667,6 +672,16 @@
   <string name="about_reference_project">Reference project</string>
   <string name="about_reference_project_subtitle">r3n011/XiangsuPlayerHQ</string>
   <string name="about_cannot_open_link">Could not open the link</string>
+  <string name="about_check_updates">Version update</string>
+  <string name="about_current_version">Current version %1$s</string>
+  <string name="about_checking_updates">Checking for updates…</string>
+  <string name="about_update_available">New version available</string>
+  <string name="about_update_message">Current version: %1$s\nLatest version: %2$s</string>
+  <string name="about_update_ignore">Ignore</string>
+  <string name="about_update_upgrade">Upgrade</string>
+  <string name="about_update_latest">You’re using the latest version</string>
+  <string name="about_update_ignored">Version %1$s has been ignored</string>
+  <string name="about_update_failed">Couldn’t check for updates. Try again later.</string>
 
   <!-- Open-source licenses page -->
   <string name="licenses_title">Open-source licenses</string>

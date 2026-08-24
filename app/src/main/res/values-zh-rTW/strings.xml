@@ -616,6 +616,11 @@
   <string name="settings_theme_mode_system">跟隨系統</string>
   <string name="settings_theme_mode_light">淺色</string>
   <string name="settings_theme_mode_dark">深色</string>
+  <string name="settings_language_title">語言</string>
+  <string name="settings_language_system">跟隨系統</string>
+  <string name="settings_language_english">English</string>
+  <string name="settings_language_simplified_chinese">简体中文</string>
+  <string name="settings_language_traditional_chinese">繁體中文</string>
   <string name="settings_dark_mode_title">深色模式</string>
   <string name="settings_dark_mode_toggle_subtitle">切換深色 / 淺色主題</string>
   <string name="settings_playback_subtitle">讓聆聽體驗更順手</string>
@@ -665,6 +670,16 @@
   <string name="about_reference_project">參考專案</string>
   <string name="about_reference_project_subtitle">r3n011/XiangsuPlayerHQ</string>
   <string name="about_cannot_open_link">無法開啟連結</string>
+  <string name="about_check_updates">版本更新</string>
+  <string name="about_current_version">目前版本 %1$s</string>
+  <string name="about_checking_updates">正在檢查更新…</string>
+  <string name="about_update_available">發現新版本</string>
+  <string name="about_update_message">目前版本：%1$s\n最新版本：%2$s</string>
+  <string name="about_update_ignore">忽略</string>
+  <string name="about_update_upgrade">升級</string>
+  <string name="about_update_latest">目前已經是最新版本</string>
+  <string name="about_update_ignored">已忽略版本 %1$s</string>
+  <string name="about_update_failed">檢查更新失敗，請稍後重試</string>
 
   <!-- Open-source licenses page -->
   <string name="licenses_title">開源授權</string>

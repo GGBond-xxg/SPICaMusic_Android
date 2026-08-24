@@ -12,7 +12,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Arrangement
@@ -39,6 +38,7 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LensBlur
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Palette
@@ -74,6 +74,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -82,6 +83,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.common.collect.ImmutableList
 import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.navkit.scene.StackScene
+import me.spica27.spicamusic.AppLocaleController
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.common.entity.DynamicCoverType
 import me.spica27.spicamusic.common.entity.DynamicSpectrumBackground
@@ -94,8 +96,6 @@ import me.spica27.spicamusic.ui.audioeffects.EqualizerScene
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
-import me.spica27.spicamusic.ui.theme.rememberThemeRevealOriginState
-import me.spica27.spicamusic.ui.theme.themeRevealOrigin
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -104,6 +104,7 @@ class SettingsScene : StackScene() {
     @Composable
     override fun Content() {
         val path = LocalNavigationPath.current
+        val context = LocalContext.current
         val viewModel: SettingsViewModel = koinViewModel()
 
         val themeModeValue by viewModel.themeMode.collectAsStateWithLifecycle()
@@ -183,6 +184,41 @@ class SettingsScene : StackScene() {
                     ),
                 )
             }
+        val themeModeName =
+            themeModeOptions.firstOrNull { it.value == themeMode.value }?.label
+                ?: themeModeSystemLabel
+        val languageSystemLabel = stringResource(R.string.settings_language_system)
+        val languageEnglishLabel = stringResource(R.string.settings_language_english)
+        val languageSimplifiedChineseLabel =
+            stringResource(R.string.settings_language_simplified_chinese)
+        val languageTraditionalChineseLabel =
+            stringResource(R.string.settings_language_traditional_chinese)
+        val languageOptions =
+            remember(
+                languageSystemLabel,
+                languageEnglishLabel,
+                languageSimplifiedChineseLabel,
+                languageTraditionalChineseLabel,
+            ) {
+                ImmutableList.copyOf(
+                    listOf(
+                        SelectOption(AppLocaleController.LANGUAGE_SYSTEM, languageSystemLabel),
+                        SelectOption(AppLocaleController.LANGUAGE_ENGLISH, languageEnglishLabel),
+                        SelectOption(
+                            AppLocaleController.LANGUAGE_SIMPLIFIED_CHINESE,
+                            languageSimplifiedChineseLabel,
+                        ),
+                        SelectOption(
+                            AppLocaleController.LANGUAGE_TRADITIONAL_CHINESE,
+                            languageTraditionalChineseLabel,
+                        ),
+                    ),
+                )
+            }
+        val currentLanguage = AppLocaleController.currentLanguage(context)
+        val currentLanguageName =
+            languageOptions.firstOrNull { it.value == currentLanguage }?.label
+                ?: languageSystemLabel
         val dynamicWaveformLabel = stringResource(R.string.progress_bar_style_dynamic_waveform)
         val timeDomainWaveformLabel = stringResource(R.string.progress_bar_style_time_domain_waveform)
         val expressiveWavyLabel = stringResource(R.string.progress_bar_style_expressive_wavy)
@@ -324,12 +360,22 @@ class SettingsScene : StackScene() {
                             title = stringResource(R.string.settings_appearance),
                             subtitle = stringResource(R.string.settings_appearance_subtitle),
                         ) {
-                            InlineThemeModeSelector(
+                            ModernSettingsSelectItem(
                                 title = stringResource(R.string.settings_theme_mode_title),
+                                subtitle = themeModeName,
                                 icon = Icons.Default.Brightness6,
                                 options = themeModeOptions,
                                 currentValue = themeMode.value,
                                 onValueChange = viewModel::setThemeMode,
+                            )
+                            SettingsItemDivider()
+                            ModernSettingsSelectItem(
+                                title = stringResource(R.string.settings_language_title),
+                                subtitle = currentLanguageName,
+                                icon = Icons.Default.Language,
+                                options = languageOptions,
+                                currentValue = currentLanguage,
+                                onValueChange = { AppLocaleController.setLanguage(context, it) },
                             )
                             SettingsItemDivider()
                             ModernSettingsSelectItem(
@@ -702,111 +748,6 @@ private fun SettingsSectionCard(
         }
         Spacer(modifier = Modifier.height(Spacing.Small))
         content()
-    }
-}
-
-@Composable
-private fun InlineThemeModeSelector(
-    title: String,
-    icon: ImageVector,
-    options: ImmutableList<SelectOption>,
-    currentValue: String,
-    onValueChange: (String) -> Unit,
-) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Spacing.Large, vertical = Spacing.Medium),
-        verticalArrangement = Arrangement.spacedBy(Spacing.Medium),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(46.dp)
-                        .clip(Shapes.LargeCornerBasedShape)
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
-        ) {
-            options.forEach { option ->
-                val selected = option.value == currentValue
-                val revealOrigin = rememberThemeRevealOriginState()
-                val chipBackground by animateColorAsState(
-                    targetValue =
-                        if (selected) {
-                            MaterialTheme.colorScheme.primaryContainer
-                        } else {
-                            Color.Transparent
-                        },
-                    animationSpec = tween(durationMillis = 180),
-                    label = "theme_mode_chip_background",
-                )
-                val chipBorder by animateColorAsState(
-                    targetValue =
-                        if (selected) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.outline
-                        },
-                    animationSpec = tween(durationMillis = 180),
-                    label = "theme_mode_chip_border",
-                )
-                Box(
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .themeRevealOrigin(revealOrigin)
-                            .clip(Shapes.LargeCornerBasedShape)
-                            .background(chipBackground)
-                            .border(1.dp, chipBorder, Shapes.LargeCornerBasedShape)
-                            .clickable {
-                                if (!selected) {
-                                    revealOrigin.armFromCenter()
-                                    onValueChange(option.value)
-                                }
-                            }.padding(
-                                horizontal = Spacing.Small,
-                                vertical = Spacing.Medium,
-                            ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = option.label,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                        color =
-                            if (selected) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            },
-                        maxLines = 1,
-                    )
-                }
-            }
-        }
     }
 }
 

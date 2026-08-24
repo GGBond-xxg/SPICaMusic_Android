@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -17,10 +18,19 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.PrivacyTip
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,6 +42,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.skydoves.landscapist.image.LandscapistImage
+import kotlinx.coroutines.launch
 import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.navkit.scene.StackScene
 import me.spica27.spicamusic.BuildConfig
@@ -50,6 +61,9 @@ class AboutScene : StackScene() {
         val path = LocalNavigationPath.current
         val context = LocalContext.current
         val cannotOpenText = stringResource(R.string.about_cannot_open_link)
+        val scope = rememberCoroutineScope()
+        var isCheckingUpdate by remember { mutableStateOf(false) }
+        var availableRelease by remember { mutableStateOf<GitHubRelease?>(null) }
 
         fun openUrl(url: String) {
             try {
@@ -60,6 +74,46 @@ class AboutScene : StackScene() {
                 )
             } catch (_: ActivityNotFoundException) {
                 Toast.makeText(context, cannotOpenText, Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        fun checkForUpdate() {
+            if (isCheckingUpdate) return
+            isCheckingUpdate = true
+            scope.launch {
+                runCatching { GitHubReleaseChecker.fetchLatest() }
+                    .onSuccess { release ->
+                        when {
+                            !isVersionNewer(release.tagName, BuildConfig.VERSION_NAME) -> {
+                                Toast
+                                    .makeText(
+                                        context,
+                                        context.getString(R.string.about_update_latest),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                            }
+                            IgnoredUpdateStore.isIgnored(context, release.tagName) -> {
+                                Toast
+                                    .makeText(
+                                        context,
+                                        context.getString(
+                                            R.string.about_update_ignored,
+                                            release.tagName,
+                                        ),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                            }
+                            else -> availableRelease = release
+                        }
+                    }.onFailure {
+                        Toast
+                            .makeText(
+                                context,
+                                context.getString(R.string.about_update_failed),
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                    }
+                isCheckingUpdate = false
             }
         }
 
@@ -146,8 +200,78 @@ class AboutScene : StackScene() {
                             )
                         },
                     )
+                    AboutItemDivider()
+                    AboutRow(
+                        title = stringResource(R.string.about_check_updates),
+                        subtitle =
+                            if (isCheckingUpdate) {
+                                stringResource(R.string.about_checking_updates)
+                            } else {
+                                stringResource(
+                                    R.string.about_current_version,
+                                    BuildConfig.VERSION_NAME,
+                                )
+                            },
+                        icon = Icons.Default.SystemUpdate,
+                        onClick = ::checkForUpdate,
+                        trailingContent = {
+                            if (isCheckingUpdate) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(22.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                            } else {
+                                ChevronRightIcon()
+                            }
+                        },
+                    )
                 }
             }
+        }
+
+        availableRelease?.let { release ->
+            AlertDialog(
+                onDismissRequest = { availableRelease = null },
+                title = { Text(stringResource(R.string.about_update_available)) },
+                text = {
+                    Text(
+                        stringResource(
+                            R.string.about_update_message,
+                            BuildConfig.VERSION_NAME,
+                            release.tagName.removePrefix("v"),
+                        ),
+                    )
+                },
+                confirmButton = {
+                    Row {
+                        TextButton(onClick = { availableRelease = null }) {
+                            Text(stringResource(R.string.cancel))
+                        }
+                        TextButton(
+                            onClick = {
+                                IgnoredUpdateStore.ignore(context, release.tagName)
+                                availableRelease = null
+                            },
+                        ) {
+                            Text(stringResource(R.string.about_update_ignore))
+                        }
+                        TextButton(
+                            onClick = {
+                                val downloadUrl =
+                                    preferredDownloadUrl(
+                                        release = release,
+                                        withTelegramApi =
+                                            BuildConfig.TELEGRAM_API_ENCRYPTED.isNotBlank(),
+                                    )
+                                availableRelease = null
+                                openUrl(downloadUrl)
+                            },
+                        ) {
+                            Text(stringResource(R.string.about_update_upgrade))
+                        }
+                    }
+                },
+            )
         }
     }
 }
