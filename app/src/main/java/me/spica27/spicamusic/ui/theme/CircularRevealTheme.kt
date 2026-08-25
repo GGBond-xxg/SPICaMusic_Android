@@ -118,6 +118,7 @@ fun Modifier.themeRevealOrigin(state: ThemeRevealOriginState): Modifier = onGlob
 
 @Composable
 fun CircularRevealThemeHost(
+    enabled: Boolean = true,
     targetDarkTheme: Boolean,
     targetThemeColor: Color,
     content: @Composable (darkTheme: Boolean, themeColor: Color) -> Unit,
@@ -128,7 +129,7 @@ fun CircularRevealThemeHost(
     var displayedThemeColor by remember { mutableStateOf(targetThemeColor) }
     var hostOriginInWindow by remember { mutableStateOf(Offset.Zero) }
 
-    androidx.compose.runtime.LaunchedEffect(targetDarkTheme, targetThemeColor) {
+    androidx.compose.runtime.LaunchedEffect(enabled, targetDarkTheme, targetThemeColor) {
         val darkChanged = displayedDarkTheme != targetDarkTheme
         val colorChanged = displayedThemeColor != targetThemeColor
         if (!darkChanged && !colorChanged) return@LaunchedEffect
@@ -142,7 +143,7 @@ fun CircularRevealThemeHost(
         // tracks, which looks like a white flash. Keep circular reveal exclusively for an
         // actual light/dark theme change; cover-color updates are committed in place and the
         // player background handles their own transition.
-        val shouldReveal = darkChanged && armedOrigin != null
+        val shouldReveal = enabled && darkChanged && armedOrigin != null
         if (!shouldReveal || view.width <= 0 || view.height <= 0) {
             displayedDarkTheme = targetDarkTheme
             displayedThemeColor = targetThemeColor

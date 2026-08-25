@@ -617,6 +617,8 @@
   <string name="settings_appearance_subtitle">塑造播放器的视觉氛围</string>
   <string name="settings_theme_mode_title">主题模式</string>
   <string name="settings_theme_mode_subtitle">跟随系统、浅色或深色</string>
+  <string name="settings_circular_reveal_title">圆形揭示切换</string>
+  <string name="settings_circular_reveal_subtitle">切换浅色与深色主题时使用圆形扩散动画</string>
   <string name="settings_theme_mode_system">跟随系统</string>
   <string name="settings_theme_mode_light">浅色</string>
   <string name="settings_theme_mode_dark">深色</string>

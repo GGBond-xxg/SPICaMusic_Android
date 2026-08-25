@@ -8,6 +8,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -56,6 +57,19 @@ fun AppScaffold() {
         preferencesManager
             .getString(PreferencesManager.Keys.THEME_COLOR_STYLE, ThemeColorStyle.Textured.value)
             .collectAsStateWithLifecycle(ThemeColorStyle.Textured.value)
+    val initialCircularRevealEnabled =
+        remember(preferencesManager) {
+            preferencesManager.getCachedBoolean(
+                PreferencesManager.Keys.CIRCULAR_REVEAL_ENABLED,
+                true,
+            )
+        }
+    val circularRevealEnabled by
+        preferencesManager
+            .getBoolean(
+                PreferencesManager.Keys.CIRCULAR_REVEAL_ENABLED,
+                true,
+            ).collectAsStateWithLifecycle(initialCircularRevealEnabled)
 
     val playerViewModel: PlayerViewModel = koinActivityViewModel()
     val color by playerViewModel.playerThemeColor.collectAsStateWithLifecycle()
@@ -68,30 +82,44 @@ fun AppScaffold() {
     KeepScreenOnEffect(enabled = keepScreenOn && isPlaying)
 
     CircularRevealThemeHost(
+        enabled = circularRevealEnabled,
         targetDarkTheme = isDarkMode,
         targetThemeColor = color,
     ) { revealedDarkTheme, revealedThemeColor ->
-        val themedView = LocalView.current
-        LaunchedEffect(revealedDarkTheme) {
-            val window = (themedView.context as Activity).window
-            WindowCompat.getInsetsController(window, themedView).isAppearanceLightStatusBars =
-                !revealedDarkTheme
-        }
-        SPICaMusicTheme(
+        AppThemeContent(
             darkTheme = revealedDarkTheme,
             themeColor = revealedThemeColor,
             themeColorStyle = ThemeColorStyle.fromString(themeColorStyleValue),
-            animateColors = false,
-        ) {
-            CompositionLocalProvider(LocalPlayerViewModel provides playerViewModel) {
-                NavigationStack(
-                    initialScene = {
-                        HomeScene()
-                    },
-                    content = {
-                    },
-                )
-            }
+            animateColors = !circularRevealEnabled,
+            playerViewModel = playerViewModel,
+        )
+    }
+}
+
+@Composable
+private fun AppThemeContent(
+    darkTheme: Boolean,
+    themeColor: Color,
+    themeColorStyle: ThemeColorStyle,
+    animateColors: Boolean,
+    playerViewModel: PlayerViewModel,
+) {
+    val themedView = LocalView.current
+    LaunchedEffect(darkTheme) {
+        val window = (themedView.context as Activity).window
+        WindowCompat.getInsetsController(window, themedView).isAppearanceLightStatusBars = !darkTheme
+    }
+    SPICaMusicTheme(
+        darkTheme = darkTheme,
+        themeColor = themeColor,
+        themeColorStyle = themeColorStyle,
+        animateColors = animateColors,
+    ) {
+        CompositionLocalProvider(LocalPlayerViewModel provides playerViewModel) {
+            NavigationStack(
+                initialScene = { HomeScene() },
+                content = {},
+            )
         }
     }
 }

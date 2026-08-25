@@ -71,6 +71,18 @@ class SettingsViewModel(
         }
     }
 
+    // 圆形揭示主题切换；关闭时恢复原项目的 Material 色板平滑过渡。
+    val circularRevealEnabled =
+        settingsUseCases
+            .getBoolean(SettingsUseCases.Keys.CIRCULAR_REVEAL_ENABLED, true)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setCircularRevealEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsUseCases.setBoolean(SettingsUseCases.Keys.CIRCULAR_REVEAL_ENABLED, enabled)
+        }
+    }
+
     // 屏幕常亮
     val keepScreenOn =
         settingsUseCases

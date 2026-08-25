@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Animation
 import androidx.compose.material.icons.filled.ArrowBackIosNew
 import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.ChevronRight
@@ -123,6 +124,7 @@ class SettingsScene : StackScene() {
         val coverTypeValue by viewModel.dynamicCoverType.collectAsStateWithLifecycle()
         val progressBarStyleValue by viewModel.progressBarStyle.collectAsStateWithLifecycle()
         val themeColorStyleValue by viewModel.themeColorStyle.collectAsStateWithLifecycle()
+        val circularRevealEnabled by viewModel.circularRevealEnabled.collectAsStateWithLifecycle()
         val spectrumTopGlowLabel = stringResource(R.string.dynamic_spectrum_top_glow)
         val spectrumLiquidAuroraLabel = stringResource(R.string.dynamic_spectrum_liquid_aurora)
         val spectrumFluidEffectLabel = stringResource(R.string.dynamic_spectrum_fluid_effect)
@@ -403,6 +405,15 @@ class SettingsScene : StackScene() {
                                 options = progressBarStyleOptions,
                                 currentValue = progressBarStyleValue,
                                 onValueChange = viewModel::setProgressBarStyle,
+                            )
+                            SettingsItemDivider()
+                            ModernSettingsSwitchItem(
+                                title = stringResource(R.string.settings_circular_reveal_title),
+                                subtitle =
+                                    stringResource(R.string.settings_circular_reveal_subtitle),
+                                icon = Icons.Default.Animation,
+                                checked = circularRevealEnabled,
+                                onCheckedChange = viewModel::setCircularRevealEnabled,
                             )
                         }
                     }
