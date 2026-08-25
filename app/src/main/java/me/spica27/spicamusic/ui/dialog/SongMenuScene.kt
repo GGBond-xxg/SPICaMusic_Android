@@ -63,6 +63,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -480,7 +481,7 @@ private fun SongMenuContent(
                     iconTint = MaterialTheme.colorScheme.primary,
                 )
                 ControlButton(
-                    title = stringResource(R.string.add_to_queue),
+                    title = stringResource(R.string.add),
                     icon = Icons.Default.PlaylistPlay,
                     modifier = Modifier.weight(1f),
                     onClick = onAddToQueue,
@@ -597,9 +598,11 @@ private fun ControlButton(
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 title,
+                modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
+                textAlign = TextAlign.Center,
             )
         }
     }

@@ -133,7 +133,7 @@ fun LyricsPanel(
                     currentTime = currentTime + uiState.lyricsOffsetMs,
                     displayMode = displayMode,
                     onSeekToTime = { posMs ->
-                        viewModel.seekTo(posMs - uiState.lyricsOffsetMs)
+                        viewModel.seekTo((posMs - uiState.lyricsOffsetMs).coerceAtLeast(0L))
                     },
                     onUserScrollStateChanged = { isScrolling ->
                         isUserScrollingLyrics = isScrolling

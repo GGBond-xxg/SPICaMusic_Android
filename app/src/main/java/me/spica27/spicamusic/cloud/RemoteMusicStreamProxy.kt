@@ -18,6 +18,8 @@ import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.InputStream
+import java.io.OutputStream
 import java.net.ServerSocket
 
 /**
@@ -95,7 +97,8 @@ class RemoteMusicStreamProxy(
                             remoteStreamRequestHeaders(account, upstreamUrl).forEach { (name, value) ->
                                 requestBuilder.header(name, value)
                             }
-                            call.request.headers["Range"]?.let {
+                            val requestedRange = call.request.headers["Range"]
+                            requestedRange?.let {
                                 if (!SAFE_RANGE.matches(it)) {
                                     call.respond(
                                         HttpStatusCode(416, "Range Not Satisfiable"),
@@ -117,26 +120,37 @@ class RemoteMusicStreamProxy(
                                     )
                                     return@get
                                 }
-                                response.header("Accept-Ranges")?.let {
-                                    call.response.header("Accept-Ranges", it)
-                                }
-                                response.header("Content-Length")?.let {
-                                    call.response.header("Content-Length", it)
-                                }
-                                response.header("Content-Range")?.let {
-                                    call.response.header("Content-Range", it)
-                                }
+                                call.response.header("Accept-Ranges", "bytes")
                                 val type =
                                     response
                                         .header("Content-Type")
                                         ?.let { runCatching { ContentType.parse(it) }.getOrNull() }
                                         ?: ContentType.Audio.Any
-                                call.respondOutputStream(
-                                    contentType = type,
-                                    status = HttpStatusCode.fromValue(response.code),
-                                ) {
-                                    response.body.byteStream().use { input ->
-                                        input.copyTo(this, BUFFER_SIZE)
+                                val upstreamLength = response.body.contentLength().takeIf { it >= 0L }
+                                val fallbackRange =
+                                    if (requestedRange != null && response.code == 200 && upstreamLength != null) {
+                                        parseByteRange(requestedRange, upstreamLength)
+                                    } else {
+                                        null
+                                    }
+                                if (fallbackRange != null) {
+                                    val (start, end) = fallbackRange
+                                    call.response.header("Content-Range", "bytes $start-$end/$upstreamLength")
+                                    call.response.header("Content-Length", (end - start + 1L).toString())
+                                    call.respondOutputStream(type, HttpStatusCode.PartialContent) {
+                                        response.body.byteStream().use { input ->
+                                            if (!input.skipFully(start)) return@use
+                                            input.copyLimitedTo(this, end - start + 1L)
+                                        }
+                                    }
+                                } else {
+                                    response.header("Content-Length")?.let { call.response.header("Content-Length", it) }
+                                    response.header("Content-Range")?.let { call.response.header("Content-Range", it) }
+                                    call.respondOutputStream(
+                                        contentType = type,
+                                        status = HttpStatusCode.fromValue(response.code),
+                                    ) {
+                                        response.body.byteStream().use { input -> input.copyTo(this, BUFFER_SIZE) }
                                     }
                                 }
                             }
@@ -153,6 +167,46 @@ class RemoteMusicStreamProxy(
         val SAFE_ID = Regex("^[A-Za-z0-9_.:-]{1,160}$")
         val SAFE_RANGE = Regex("^bytes=\\d*-\\d*$")
         const val BUFFER_SIZE = 64 * 1024
+    }
+}
+
+private fun parseByteRange(
+    value: String,
+    totalLength: Long,
+): Pair<Long, Long>? {
+    val bounds = value.removePrefix("bytes=").split('-', limit = 2)
+    val start = bounds.getOrNull(0)?.toLongOrNull() ?: return null
+    if (start !in 0 until totalLength) return null
+    val requestedEnd = bounds.getOrNull(1)?.toLongOrNull() ?: (totalLength - 1L)
+    return start to requestedEnd.coerceIn(start, totalLength - 1L)
+}
+
+private fun InputStream.skipFully(byteCount: Long): Boolean {
+    var remaining = byteCount
+    while (remaining > 0L) {
+        val skipped = skip(remaining)
+        if (skipped > 0L) {
+            remaining -= skipped
+        } else if (read() >= 0) {
+            remaining -= 1L
+        } else {
+            return false
+        }
+    }
+    return true
+}
+
+private fun InputStream.copyLimitedTo(
+    output: OutputStream,
+    byteCount: Long,
+) {
+    val buffer = ByteArray(64 * 1024)
+    var remaining = byteCount
+    while (remaining > 0L) {
+        val count = read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
+        if (count < 0) break
+        output.write(buffer, 0, count)
+        remaining -= count
     }
 }
 

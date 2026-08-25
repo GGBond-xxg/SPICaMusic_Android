@@ -600,7 +600,9 @@
   <string name="search_songs_artists_albums">搜索歌曲、歌手或专辑</string>
   <string name="close_search_cd">关闭搜索</string>
   <string name="exit_multiselect_cd">退出多选</string>
-  <string name="selected_songs_count_format">已选 %d 首</string>
+    <string name="selected_songs_count_format">已选 %d 首</string>
+    <string name="cloud_music_picker_section">云端音乐</string>
+    <string name="local_music_picker_section">本地音乐</string>
   <string name="rename_playlist_dialog_title">重命名歌单</string>
   <string name="add_songs_from_library_hint">从音乐库中选择要加入歌单的歌曲</string>
   <string name="songs_count_to_add_format">已选择 %d 首歌曲</string>

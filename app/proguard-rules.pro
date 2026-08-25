@@ -21,6 +21,13 @@
 -dontwarn java.lang.management.ManagementFactory
 -dontwarn java.lang.management.RuntimeMXBean
 
+# The Android 16 crash report points to a release-only synthetic Compose callback cast, and R8
+# reports that SkipToLookaheadSizeElement fails type checking while compiling this screen. Keep
+# the playlist feature entry points and that animation helper stable; shrinking and optimisation
+# remain enabled for the rest of the application.
+-keep class me.spica27.spicamusic.ui.playlistdetail.** { *; }
+-keep class androidx.compose.animation.SkipToLookaheadSizeElement { *; }
+
 # PlaybackService synchronizes HyperOS' legacy media controls with Media3 through these
 # package-private members. Preserve their names so the reflective compatibility bridge keeps
 # SEEK_TO/rewind/fast-forward in PlaybackState after R8; HyperOS requires SEEK_TO to show its

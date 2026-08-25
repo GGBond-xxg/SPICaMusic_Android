@@ -188,7 +188,7 @@ private val COVER_COLLAPSED_START = 56.dp // 封面折叠后距屏幕左缘距�
 private val COLLAPSED_TITLE_START = COVER_COLLAPSED_START + COVER_COLLAPSED + Spacing.Medium
 
 private val BOTTOM_PLAYER_RESERVED = 200.dp // 悬浮迷你播放器底部预留（全项目惯例值）
-private val MULTI_SELECT_BAR_RESERVED = 72.dp // 多选底栏出现时的额外避让
+private val MULTI_SELECT_BAR_RESERVED = 120.dp // 两行多选底栏出现时的额外避让
 
 /** 固定顶栏的三种形态：浏览 / 搜索 / 排序 */
 private enum class TopBarState { Browse, Search, Sort }
@@ -240,6 +240,7 @@ fun PlaylistDetailScreen(playlist: Playlist) {
     val sortModeLimitExceeded by viewModel.sortModeLimitExceeded.collectAsStateWithLifecycle()
     val isMultiSelectMode by viewModel.isMultiSelectMode.collectAsStateWithLifecycle()
     val selectedSongs by viewModel.selectedSongs.collectAsStateWithLifecycle()
+    val selectedCloudSongs by viewModel.selectedCloudSongs.collectAsStateWithLifecycle()
     val showRenameDialog by viewModel.showRenameDialog.collectAsStateWithLifecycle()
     val showDeleteConfirmDialog by viewModel.showDeleteConfirmDialog.collectAsStateWithLifecycle()
     val showAddSongsSheet by viewModel.showAddSongsSheet.collectAsStateWithLifecycle()
@@ -533,7 +534,22 @@ fun PlaylistDetailScreen(playlist: Playlist) {
                         PlaylistCloudSongRow(
                             song = song,
                             isPlaying = playingMediaId == song.stableId,
-                            onClick = { cloudCatalogViewModel.play(song.stableId, combinedQueue) },
+                            isMultiSelectMode = isMultiSelectMode,
+                            isSelected = song.stableId in selectedCloudSongs,
+                            onClick = {
+                                if (isMultiSelectMode) {
+                                    viewModel.toggleCloudSongSelection(song.stableId)
+                                } else {
+                                    cloudCatalogViewModel.play(song.stableId, combinedQueue)
+                                }
+                            },
+                            onLongClick = {
+                                if (!isMultiSelectMode) {
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    viewModel.toggleMultiSelectMode()
+                                }
+                                viewModel.toggleCloudSongSelection(song.stableId)
+                            },
                             onMore = { path.push(CloudSongMenuScene(song)) },
                             modifier = Modifier.animateItem(),
                         )
@@ -697,9 +713,9 @@ fun PlaylistDetailScreen(playlist: Playlist) {
                     fadeOut(tween(120)),
         ) {
             MultiSelectBar(
-                selectedCount = selectedSongs.size,
+                selectedCount = selectedSongs.size + selectedCloudSongs.size,
                 onClose = viewModel::toggleMultiSelectMode,
-                onSelectAll = viewModel::selectAll,
+                onSelectAll = { viewModel.selectAll(cloudSongs.map(CloudCatalogSong::stableId)) },
                 onDeselectAll = viewModel::deselectAll,
                 onRemove = viewModel::removeSelectedSongs,
             )
@@ -729,6 +745,9 @@ fun PlaylistDetailScreen(playlist: Playlist) {
     if (showAddSongsSheet) {
         SongPickerBottomSheet(
             viewModel = viewModel,
+            cloudSongs = cloudCatalog.songs,
+            existingCloudSongIds = cloudSongs.mapTo(mutableSetOf(), CloudCatalogSong::stableId),
+            onAddCloudSong = { cloudCatalogViewModel.addToLocalPlaylist(playlistId, it) },
             onDismiss = viewModel::hideAddSongsSheet,
         )
     }
@@ -1296,19 +1315,34 @@ private fun FloatingHintIcon(
 private fun PlaylistCloudSongRow(
     song: CloudCatalogSong,
     isPlaying: Boolean,
+    isMultiSelectMode: Boolean,
+    isSelected: Boolean,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
     onMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val rowBackground =
+        when {
+            isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+            isPlaying -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.30f)
+            else -> Color.Transparent
+        }
     Row(
         modifier =
             modifier
                 .fillMaxWidth()
-                .combinedClickHighlight(onClick = onClick, onLongClick = onMore)
-                .padding(horizontal = LayoutTokens.MusicHeaderHorizontalPadding, vertical = 9.dp),
+                .padding(horizontal = Spacing.Medium)
+                .clip(Shapes.MediumCornerBasedShape)
+                .background(rowBackground)
+                .combinedClickHighlight(onClick = onClick, onLongClick = onLongClick)
+                .padding(horizontal = Spacing.Small, vertical = Spacing.Small),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        AnimatedVisibility(visible = isMultiSelectMode) {
+            Checkbox(checked = isSelected, onCheckedChange = { onClick() })
+        }
         AudioCover(
             uri = song.artworkUri,
             modifier = Modifier.size(48.dp).clip(RoundedCornerShape(13.dp)),
@@ -1337,8 +1371,10 @@ private fun PlaylistCloudSongRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        IconButton(onClick = onMore) {
-            Icon(Icons.Default.MoreVert, "更多")
+        if (!isMultiSelectMode) {
+            IconButton(onClick = onMore) {
+                Icon(Icons.Default.MoreVert, "更多")
+            }
         }
     }
 }
@@ -1898,42 +1934,46 @@ private fun MultiSelectBar(
         tonalElevation = 6.dp,
         shadowElevation = 6.dp,
     ) {
-        Row(
+        Column(
             Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
                 .padding(horizontal = Spacing.Small, vertical = Spacing.Small),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall),
         ) {
-            IconButton(onClick = onClose) {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = stringResource(R.string.exit_multiselect_cd),
-                )
-            }
-            Text(
-                text = stringResource(R.string.selected_songs_count_format, selectedCount),
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            TextButton(onClick = onSelectAll) { Text(stringResource(R.string.select_all)) }
-            TextButton(onClick = onDeselectAll) { Text(stringResource(R.string.cancel)) }
-            Button(
-                onClick = onRemove,
-                enabled = selectedCount > 0,
-                colors =
-                    ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error,
-                    ),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall),
             ) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
+                IconButton(onClick = onClose) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = stringResource(R.string.exit_multiselect_cd),
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.selected_songs_count_format, selectedCount),
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.width(Spacing.ExtraSmall))
-                Text(stringResource(R.string.remove))
+                Button(
+                    onClick = onRemove,
+                    enabled = selectedCount > 0,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(Spacing.ExtraSmall))
+                    Text(stringResource(R.string.remove), maxLines = 1)
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = onSelectAll) { Text(stringResource(R.string.select_all), maxLines = 1) }
+                TextButton(onClick = onDeselectAll) { Text(stringResource(R.string.deselect_all), maxLines = 1) }
             }
         }
     }
@@ -2012,9 +2052,13 @@ private fun DeleteConfirmDialog(
 @Composable
 private fun SongPickerBottomSheet(
     viewModel: PlaylistDetailViewModel,
+    cloudSongs: List<CloudCatalogSong>,
+    existingCloudSongIds: Set<String>,
+    onAddCloudSong: (CloudCatalogSong) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var selectedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var selectedCloudIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var pickerKeyword by remember { mutableStateOf("") }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -2023,6 +2067,22 @@ private fun SongPickerBottomSheet(
     }
 
     val pickerSongs = viewModel.pickerSongsPaging.collectAsLazyPagingItems()
+    val availableCloudSongs =
+        remember(cloudSongs, existingCloudSongIds, pickerKeyword) {
+            val keyword = pickerKeyword.trim()
+            cloudSongs
+                .asSequence()
+                .distinctBy(CloudCatalogSong::stableId)
+                .filterNot { it.stableId in existingCloudSongIds }
+                .filter { song ->
+                    keyword.isBlank() ||
+                        song.title.contains(keyword, ignoreCase = true) ||
+                        song.artist.contains(keyword, ignoreCase = true) ||
+                        song.album.contains(keyword, ignoreCase = true) ||
+                        song.accountName.contains(keyword, ignoreCase = true)
+                }.toList()
+        }
+    val totalSelected = selectedIds.size + selectedCloudIds.size
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -2052,10 +2112,10 @@ private fun SongPickerBottomSheet(
                     )
                     Text(
                         text =
-                            if (selectedIds.isEmpty()) {
+                            if (totalSelected == 0) {
                                 stringResource(R.string.add_songs_from_library_hint)
                             } else {
-                                stringResource(R.string.songs_count_to_add_format, selectedIds.size)
+                                stringResource(R.string.songs_count_to_add_format, totalSelected)
                             },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -2102,45 +2162,48 @@ private fun SongPickerBottomSheet(
                 shape = RoundedCornerShape(24.dp),
             )
 
-            AnimatedContent(selectedIds.isNotEmpty()) {
-                if (it) {
-                    Surface(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 12.dp),
-                        shape = RoundedCornerShape(18.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+            if (totalSelected > 0) {
+                Surface(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        Icon(
+                            Icons.Default.CheckBox,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Text(
+                            text =
+                                stringResource(
+                                    R.string.will_add_songs_format,
+                                    totalSelected,
+                                ),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(
+                            onClick = {
+                                selectedIds = emptySet()
+                                selectedCloudIds = emptySet()
+                            },
                         ) {
-                            Icon(
-                                Icons.Default.CheckBox,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Text(
-                                text =
-                                    stringResource(
-                                        R.string.will_add_songs_format,
-                                        selectedIds.size,
-                                    ),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.weight(1f),
-                            )
-                            TextButton(onClick = { selectedIds = emptySet() }) {
-                                Text(stringResource(R.string.deselect_all))
-                            }
+                            Text(stringResource(R.string.deselect_all))
                         }
                     }
-                } else {
-                    Spacer(modifier = Modifier.height(12.dp))
                 }
+            } else {
+                Spacer(modifier = Modifier.height(12.dp))
             }
 
             Box(
@@ -2151,6 +2214,39 @@ private fun SongPickerBottomSheet(
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 112.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    if (availableCloudSongs.isNotEmpty()) {
+                        item(key = "cloud_picker_header") {
+                            Text(
+                                text = stringResource(R.string.cloud_music_picker_section),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                            )
+                        }
+                        items(
+                            items = availableCloudSongs,
+                            key = CloudCatalogSong::stableId,
+                        ) { song ->
+                            val selected = song.stableId in selectedCloudIds
+                            PickerCloudSongRow(
+                                song = song,
+                                isSelected = selected,
+                                onToggle = {
+                                    selectedCloudIds =
+                                        if (selected) selectedCloudIds - song.stableId else selectedCloudIds + song.stableId
+                                },
+                                modifier = Modifier.animateItem(),
+                            )
+                        }
+                        item(key = "local_picker_header") {
+                            Text(
+                                text = stringResource(R.string.local_music_picker_section),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                            )
+                        }
+                    }
                     items(count = pickerSongs.itemCount, key = { index ->
                         pickerSongs[index]?.mediaStoreId ?: index
                     }) { index ->
@@ -2196,23 +2292,81 @@ private fun SongPickerBottomSheet(
                             Text(stringResource(R.string.cancel))
                         }
                         Button(
-                            onClick = { viewModel.addSongsToPlaylist(selectedIds.toList()) },
-                            enabled = selectedIds.isNotEmpty(),
+                            onClick = {
+                                cloudSongs
+                                    .distinctBy(CloudCatalogSong::stableId)
+                                    .filter { it.stableId in selectedCloudIds }
+                                    .forEach(onAddCloudSong)
+                                if (selectedIds.isNotEmpty()) {
+                                    viewModel.addSongsToPlaylist(selectedIds.toList())
+                                } else {
+                                    viewModel.hideAddSongsSheet()
+                                }
+                            },
+                            enabled = totalSelected > 0,
                             modifier = Modifier.weight(1.5f),
                         ) {
                             Text(
-                                if (selectedIds.isEmpty()) {
+                                if (totalSelected == 0) {
                                     stringResource(
                                         R.string.select_songs_button,
                                     )
                                 } else {
-                                    stringResource(R.string.add_n_songs_format, selectedIds.size)
+                                    stringResource(R.string.add_n_songs_format, totalSelected)
                                 },
                             )
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun PickerCloudSongRow(
+    song: CloudCatalogSong,
+    isSelected: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)),
+        shape = RoundedCornerShape(18.dp),
+        color =
+            if (isSelected) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerLow
+            },
+        tonalElevation = if (isSelected) 2.dp else 0.dp,
+    ) {
+        Row(
+            modifier = Modifier.clickHighlight(onClick = onToggle).padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            AudioCover(
+                uri = song.artworkUri,
+                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)),
+                placeHolder = {
+                    Box(
+                        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(Icons.Default.MusicNote, null) }
+                },
+            )
+            Column(Modifier.weight(1f)) {
+                Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
+                Text(
+                    "${song.artist} · ${song.accountName}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Checkbox(checked = isSelected, onCheckedChange = { onToggle() })
         }
     }
 }

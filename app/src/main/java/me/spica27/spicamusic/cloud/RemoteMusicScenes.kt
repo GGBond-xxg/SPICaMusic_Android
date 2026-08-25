@@ -685,9 +685,36 @@ class CloudUserPlaylistScene(
             koinViewModel(key = "remote_music_${playlist.provider.name}") {
                 parametersOf(playlist.provider)
             }
+        val state by viewModel.state.collectAsStateWithLifecycle()
+        val currentPlaylist = state.localPlaylists.firstOrNull { it.id == playlist.id } ?: playlist
+        var showDeleteDialog by rememberSaveable { mutableStateOf(false) }
+        if (showDeleteDialog) {
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = { Text("删除歌单？") },
+                text = { Text("将删除“${currentPlaylist.name}”。歌曲本身不会被删除。") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showDeleteDialog = false
+                            viewModel.deleteLocalPlaylist(currentPlaylist.accountId, currentPlaylist.id)
+                            path.popTop()
+                        },
+                    ) { Text("删除") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteDialog = false }) { Text("取消") }
+                },
+            )
+        }
         RemoteSceneScaffold(
-            title = playlist.name,
+            title = currentPlaylist.name,
             onBack = { path.popTop() },
+            actions = {
+                IconButton(onClick = { showDeleteDialog = true }) {
+                    Icon(Icons.Default.DeleteOutline, "删除歌单")
+                }
+            },
         ) { padding ->
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
@@ -700,25 +727,68 @@ class CloudUserPlaylistScene(
                     ),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                item(key = "local_hint", contentType = "hint") {
-                    Text(
-                        "本地歌单 · ${playlist.songs.size} 首 · 不同步到云端",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                item(key = "playlist_header", contentType = "header") {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        AudioCover(
+                            uri =
+                                currentPlaylist.songs
+                                    .firstOrNull()
+                                    ?.artworkUrl
+                                    ?.let(Uri::parse),
+                            modifier = Modifier.size(196.dp),
+                            placeHolder = {
+                                Box(
+                                    Modifier.fillMaxSize().background(
+                                        MaterialTheme.colorScheme.surfaceContainerHigh,
+                                        RoundedCornerShape(28.dp),
+                                    ),
+                                    contentAlignment = Alignment.Center,
+                                ) { Icon(Icons.Default.PlaylistPlay, null, modifier = Modifier.size(64.dp)) }
+                            },
+                        )
+                        Text(currentPlaylist.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                        Text(
+                            "本地歌单 · ${currentPlaylist.songs.size} 首 · 不同步到云端",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        FilledTonalButton(
+                            onClick = {
+                                currentPlaylist.songs.firstOrNull()?.let { first ->
+                                    viewModel.play(first, currentPlaylist.songs)
+                                }
+                            },
+                            enabled = currentPlaylist.songs.isNotEmpty(),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(Icons.Default.PlaylistPlay, null)
+                            Text("播放全部")
+                        }
+                    }
                 }
                 items(
-                    count = playlist.songs.size,
-                    key = { index -> playlist.songs[index].id },
+                    count = currentPlaylist.songs.size,
+                    key = { index -> currentPlaylist.songs[index].id },
                     contentType = { "local_playlist_song" },
                 ) { index ->
-                    val song = playlist.songs[index]
+                    val song = currentPlaylist.songs[index]
                     RemoteSongRow(
                         song = song,
-                        onClick = { viewModel.play(song, playlist.songs) },
+                        onClick = { viewModel.play(song, currentPlaylist.songs) },
+                        onRemoveFromPlaylist = {
+                            viewModel.removeSongFromLocalPlaylist(
+                                currentPlaylist.accountId,
+                                currentPlaylist.id,
+                                song.id,
+                            )
+                        },
                     )
                 }
-                if (playlist.songs.isEmpty()) {
+                if (currentPlaylist.songs.isEmpty()) {
                     item(key = "empty", contentType = "empty") {
                         Text(
                             "歌单还是空的，请从搜索结果右侧的 + 添加歌曲。",
@@ -1243,6 +1313,7 @@ private fun RemoteSongRow(
     song: RemoteSong,
     onClick: () -> Unit,
     onAddToPlaylist: (() -> Unit)? = null,
+    onRemoveFromPlaylist: (() -> Unit)? = null,
 ) {
     Row(
         modifier =
@@ -1294,6 +1365,11 @@ private fun RemoteSongRow(
         onAddToPlaylist?.let { add ->
             IconButton(onClick = add) {
                 Icon(Icons.Default.Add, "添加到歌单")
+            }
+        }
+        onRemoveFromPlaylist?.let { remove ->
+            IconButton(onClick = remove) {
+                Icon(Icons.Default.DeleteOutline, "从歌单移除")
             }
         }
     }

@@ -150,7 +150,7 @@
   <string name="lrc_setting_full_screen">Full Screen Lyrics</string>
   <string name="swipe_up_to_view_current_play_list">swipe up to view the now playing list</string>
   <string name="swipe_down_to_view_player_page">swipe down to view player page</string>
-  <string name="remove">remove</string>
+    <string name="remove">Remove</string>
   <string name="add_new_song_to_playlist">Add New Song To Current Playlist</string>
   <string name="play_all_songs">Play All</string>
   <string name="replace_current_playlist">Replace Current Playlist</string>
@@ -600,7 +600,9 @@
   <string name="search_songs_artists_albums">Search songs, artists, or albums</string>
   <string name="close_search_cd">Close search</string>
   <string name="exit_multiselect_cd">Exit multi-select</string>
-  <string name="selected_songs_count_format">%d songs selected</string>
+    <string name="selected_songs_count_format">Selected: %d</string>
+    <string name="cloud_music_picker_section">Cloud Music</string>
+    <string name="local_music_picker_section">Local Music</string>
   <string name="rename_playlist_dialog_title">Rename Playlist</string>
   <string name="add_songs_from_library_hint">Select songs from library to add to playlist</string>
   <string name="songs_count_to_add_format">%d songs selected</string>

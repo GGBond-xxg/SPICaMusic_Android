@@ -89,7 +89,7 @@ class CloudUserPlaylistStore(
                 songs = listOfNotNull(initialSong),
             )
         return (current + playlist).also {
-            write(it)
+            write(provider, accountId, it)
             _revision.update(Long::inc)
         }
     }
@@ -101,22 +101,70 @@ class CloudUserPlaylistStore(
         playlistId: String,
         song: RemoteSong,
     ): List<CloudUserPlaylist> {
+        val current = read(provider, accountId)
         val updated =
-            read(provider, accountId).map { playlist ->
+            current.map { playlist ->
                 if (playlist.id != playlistId || playlist.songs.any { it.id == song.id }) {
                     playlist
                 } else {
                     playlist.copy(songs = playlist.songs + song)
                 }
             }
-        write(updated)
-        _revision.update(Long::inc)
+        if (updated != current) {
+            write(provider, accountId, updated)
+            _revision.update(Long::inc)
+        }
         return updated
     }
 
-    private fun write(playlists: List<CloudUserPlaylist>) {
-        val first = playlists.firstOrNull() ?: return
-        val target = file(first.provider, first.accountId)
+    @Synchronized
+    fun removeSong(
+        provider: RemoteMusicProvider,
+        accountId: String,
+        playlistId: String,
+        songId: String,
+    ): List<CloudUserPlaylist> {
+        val current = read(provider, accountId)
+        val updated =
+            current.map { playlist ->
+                if (playlist.id == playlistId) {
+                    playlist.copy(songs = playlist.songs.filterNot { it.id == songId })
+                } else {
+                    playlist
+                }
+            }
+        if (updated != current) {
+            write(provider, accountId, updated)
+            _revision.update(Long::inc)
+        }
+        return updated
+    }
+
+    @Synchronized
+    fun delete(
+        provider: RemoteMusicProvider,
+        accountId: String,
+        playlistId: String,
+    ): List<CloudUserPlaylist> {
+        val current = read(provider, accountId)
+        val updated = current.filterNot { it.id == playlistId }
+        if (updated != current) {
+            write(provider, accountId, updated)
+            _revision.update(Long::inc)
+        }
+        return updated
+    }
+
+    private fun write(
+        provider: RemoteMusicProvider,
+        accountId: String,
+        playlists: List<CloudUserPlaylist>,
+    ) {
+        val target = file(provider, accountId)
+        if (playlists.isEmpty()) {
+            target.delete()
+            return
+        }
         val values =
             playlists.map { playlist ->
                 JSONObject()

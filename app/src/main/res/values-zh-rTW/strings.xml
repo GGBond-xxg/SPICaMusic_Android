@@ -598,7 +598,9 @@
   <string name="search_songs_artists_albums">搜尋歌曲、歌手或專輯</string>
   <string name="close_search_cd">關閉搜尋</string>
   <string name="exit_multiselect_cd">退出多選</string>
-  <string name="selected_songs_count_format">已選 %d 首</string>
+    <string name="selected_songs_count_format">已選 %d 首</string>
+    <string name="cloud_music_picker_section">雲端音樂</string>
+    <string name="local_music_picker_section">本機音樂</string>
   <string name="rename_playlist_dialog_title">重新命名歌單</string>
   <string name="add_songs_from_library_hint">從音樂庫中選擇要加入歌單的歌曲</string>
   <string name="songs_count_to_add_format">已選擇 %d 首歌曲</string>

@@ -140,7 +140,7 @@ object AppModule {
             single { MediaServerClient(get(named("cloudHttpClient"))) }
             single { SubsonicClient(get(named("cloudHttpClient"))) }
             single { NeteaseClient(get(named("cloudHttpClient")), get()) }
-            single { QqMusicClient(get(named("cloudHttpClient"))) }
+            single { QqMusicClient(get(named("cloudHttpClient")), get()) }
             single { RemoteMusicClientRegistry(get(), get(), get()) }
             single { OnlineSourceFileStore(androidContext(), get(named("cloudHttpClient"))) }
             single { OnlineSourceEngine(androidContext(), get(), get(named("cloudHttpClient"))) }

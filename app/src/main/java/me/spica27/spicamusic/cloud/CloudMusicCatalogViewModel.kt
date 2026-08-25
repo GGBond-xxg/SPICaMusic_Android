@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.drop
@@ -131,6 +132,7 @@ class CloudMusicCatalogViewModel(
     private val loadingEndpoints = mutableSetOf<String>()
     private var telegramReady = false
     private var catalogGeneration = 0
+    private var remotePlaylistRefreshJob: Job? = null
 
     init {
         refreshSources()
@@ -206,32 +208,51 @@ class CloudMusicCatalogViewModel(
             }
             return
         }
-        viewModelScope.launch {
-            val refreshed = mutableListOf<CloudCatalogPlaylist>()
-            accounts.values.forEach { account ->
-                runCatching { remoteClients.listPlaylists(account, forceRefresh) }
-                    .onSuccess { playlists ->
-                        playlists.forEach { playlist ->
-                            refreshed +=
-                                CloudCatalogPlaylist(
-                                    stableId = "${account.provider.name.lowercase()}:${account.id}:${playlist.id}",
-                                    account = account,
-                                    playlist = playlist,
-                                )
-                        }
-                    }
+        val cached =
+            accounts.values.flatMap { account ->
+                remoteClients.cachedPlaylists(account).map { playlist ->
+                    CloudCatalogPlaylist(
+                        stableId = "${account.provider.name.lowercase()}:${account.id}:${playlist.id}",
+                        account = account,
+                        playlist = playlist,
+                    )
+                }
             }
-            _state.update { current ->
-                current.copy(
-                    remotePlaylists =
-                        if (refreshed.isNotEmpty() || forceRefresh) {
-                            refreshed
-                        } else {
-                            current.remotePlaylists.filter { it.account.id in accounts }
-                        },
-                )
-            }
+        if (cached.isNotEmpty()) {
+            _state.update { current -> current.copy(remotePlaylists = cached) }
         }
+        if (remotePlaylistRefreshJob?.isActive == true) {
+            if (!forceRefresh) return
+            remotePlaylistRefreshJob?.cancel()
+        }
+        remotePlaylistRefreshJob =
+            viewModelScope.launch {
+                val refreshedByAccount = mutableMapOf<String, List<CloudCatalogPlaylist>>()
+                accounts.values.forEach { account ->
+                    // Cache has already been published above. Always check the server in the
+                    // background so newly added playlists appear without a blank cold-start state.
+                    runCatching { remoteClients.listPlaylists(account, forceRefresh = true) }
+                        .onSuccess { playlists ->
+                            refreshedByAccount[account.id] =
+                                playlists.map { playlist ->
+                                    CloudCatalogPlaylist(
+                                        stableId = "${account.provider.name.lowercase()}:${account.id}:${playlist.id}",
+                                        account = account,
+                                        playlist = playlist,
+                                    )
+                                }
+                        }
+                }
+                _state.update { current ->
+                    current.copy(
+                        remotePlaylists =
+                            accounts.values.flatMap { account ->
+                                refreshedByAccount[account.id]
+                                    ?: current.remotePlaylists.filter { it.account.id == account.id }
+                            },
+                    )
+                }
+            }
     }
 
     /** Compatibility entry point used by the NetEase account screen. */

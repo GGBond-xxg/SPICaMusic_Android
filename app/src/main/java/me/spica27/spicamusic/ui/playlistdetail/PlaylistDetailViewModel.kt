@@ -223,6 +223,9 @@ class PlaylistDetailViewModel(
     private val _selectedSongs = MutableStateFlow<Set<Long>>(emptySet())
     val selectedSongs = _selectedSongs.asStateFlow()
 
+    private val _selectedCloudSongs = MutableStateFlow<Set<String>>(emptySet())
+    val selectedCloudSongs = _selectedCloudSongs.asStateFlow()
+
     // 是否显示重命名对话框
     private val _showRenameDialog = MutableStateFlow(false)
     val showRenameDialog = _showRenameDialog.asStateFlow()
@@ -311,6 +314,7 @@ class PlaylistDetailViewModel(
         if (!_isMultiSelectMode.value) {
             // 退出多选模式时清空选择
             _selectedSongs.value = emptySet()
+            _selectedCloudSongs.value = emptySet()
         }
     }
 
@@ -328,17 +332,25 @@ class PlaylistDetailViewModel(
         _selectedSongs.value = current
     }
 
+    fun toggleCloudSongSelection(stableId: String) {
+        _selectedCloudSongs.value =
+            _selectedCloudSongs.value.toMutableSet().apply {
+                if (!add(stableId)) remove(stableId)
+            }
+    }
+
     /**
      * 全选
      */
-    fun selectAll() {
+    fun selectAll(cloudSongIds: Collection<String> = emptyList()) {
         viewModelScope.launch(Dispatchers.IO) {
             val ids = playlistRepository.getMediaIdsInPlaylist(playlistId)
-            if (ids.isEmpty()) {
+            if (ids.isEmpty() && cloudSongIds.isEmpty()) {
                 Timber.w("歌单中没有歌曲，无法全选")
                 return@launch
             }
             _selectedSongs.value = ids.toSet()
+            _selectedCloudSongs.value = cloudSongIds.toSet()
         }
     }
 
@@ -347,12 +359,14 @@ class PlaylistDetailViewModel(
      */
     fun deselectAll() {
         _selectedSongs.value = emptySet()
+        _selectedCloudSongs.value = emptySet()
     }
 
     fun enterSortMode() {
         exitSearchMode()
         _isMultiSelectMode.value = false
         _selectedSongs.value = emptySet()
+        _selectedCloudSongs.value = emptySet()
         _showMoreOptionsMenu.value = false
 
         viewModelScope.launch {
@@ -452,16 +466,23 @@ class PlaylistDetailViewModel(
      */
     fun removeSelectedSongs() {
         val selected = _selectedSongs.value
-        if (selected.isEmpty()) return
+        val selectedCloud = _selectedCloudSongs.value
+        if (selected.isEmpty() && selectedCloud.isEmpty()) return
 
         viewModelScope.launch {
             try {
                 // 单事务批量移除：只触发一次 Room 失效，列表只做一次退场动画
-                playlistRepository.removeSongsFromPlaylist(playlistId, selected.toList())
-                Timber.d("从歌单移除 ${selected.size} 首歌曲")
+                if (selected.isNotEmpty()) {
+                    playlistRepository.removeSongsFromPlaylist(playlistId, selected.toList())
+                }
+                if (selectedCloud.isNotEmpty()) {
+                    cloudPlaylistEntryStore.remove(playlistId, selectedCloud)
+                }
+                Timber.d("从歌单移除 ${selected.size + selectedCloud.size} 首歌曲")
                 // 退出多选模式
                 _isMultiSelectMode.value = false
                 _selectedSongs.value = emptySet()
+                _selectedCloudSongs.value = emptySet()
             } catch (e: Exception) {
                 Timber.e(e, "移除歌曲失败")
             }

@@ -99,7 +99,7 @@ class RemoteMusicViewModel(
             current.copy(
                 selectedAccount = account,
                 localPlaylists = account?.let { playlistStore.read(provider, it.id) }.orEmpty(),
-                remotePlaylists = emptyList(),
+                remotePlaylists = account?.let(clients::cachedPlaylists).orEmpty(),
                 remotePlaylistSongs = emptyMap(),
                 loadingRemotePlaylistIds = emptySet(),
                 remotePlaylistError = null,
@@ -125,6 +125,10 @@ class RemoteMusicViewModel(
     fun refreshRemotePlaylists(forceRefresh: Boolean = false) {
         if (provider != RemoteMusicProvider.QQ_MUSIC || _state.value.loadingRemotePlaylists) return
         val account = _state.value.selectedAccount ?: return
+        val cached = clients.cachedPlaylists(account)
+        if (cached.isNotEmpty()) {
+            _state.update { it.copy(remotePlaylists = cached) }
+        }
         _state.update { it.copy(loadingRemotePlaylists = true, remotePlaylistError = null) }
         viewModelScope.launch {
             runCatching { clients.listPlaylists(account, forceRefresh) }
@@ -204,6 +208,27 @@ class RemoteMusicViewModel(
         _state.update { it.copy(localPlaylists = updated) }
     }
 
+    fun removeSongFromLocalPlaylist(
+        accountId: String,
+        playlistId: String,
+        songId: String,
+    ) {
+        val updated = playlistStore.removeSong(provider, accountId, playlistId, songId)
+        _state.update { current ->
+            if (current.selectedAccount?.id == accountId) current.copy(localPlaylists = updated) else current
+        }
+    }
+
+    fun deleteLocalPlaylist(
+        accountId: String,
+        playlistId: String,
+    ) {
+        val updated = playlistStore.delete(provider, accountId, playlistId)
+        _state.update { current ->
+            if (current.selectedAccount?.id == accountId) current.copy(localPlaylists = updated) else current
+        }
+    }
+
     fun play(
         selectedSong: RemoteSong,
         visibleSnapshot: List<RemoteSong>,
@@ -279,6 +304,7 @@ class RemoteMusicViewModel(
                 accounts = accounts,
                 selectedAccount = selected,
                 localPlaylists = selected?.let { playlistStore.read(provider, it.id) }.orEmpty(),
+                remotePlaylists = selected?.let(clients::cachedPlaylists).orEmpty(),
             )
     }
 }

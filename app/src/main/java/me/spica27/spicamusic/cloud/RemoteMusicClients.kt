@@ -67,6 +67,13 @@ class RemoteMusicClientRegistry(
             else -> emptyList()
         }
 
+    fun cachedPlaylists(account: RemoteMusicAccount): List<RemotePlaylist> =
+        when (account.provider) {
+            RemoteMusicProvider.NETEASE -> netease.cachedPlaylists(account.id)
+            RemoteMusicProvider.QQ_MUSIC -> qqMusic.cachedPlaylists(account.id)
+            else -> emptyList()
+        }
+
     suspend fun listPlaylistSongs(
         account: RemoteMusicAccount,
         playlistId: String,
@@ -460,6 +467,12 @@ class NeteaseClient(
         libraryStore.clear(accountId)
     }
 
+    fun cachedPlaylists(accountId: String): List<RemotePlaylist> =
+        playlistCache[accountId]
+            ?: libraryStore.readPlaylists(accountId).also { cached ->
+                if (cached.isNotEmpty()) playlistCache[accountId] = cached
+            }
+
     suspend fun listPlaylists(
         account: RemoteMusicAccount,
         forceRefresh: Boolean = false,
@@ -744,6 +757,7 @@ class NeteaseClient(
 
 class QqMusicClient(
     baseClient: OkHttpClient,
+    private val libraryStore: NeteaseLibraryStore,
 ) {
     private val client =
         baseClient
@@ -863,9 +877,17 @@ class QqMusicClient(
         withContext(Dispatchers.IO) {
             playlistLocks.getOrPut(account.id) { Mutex() }.withLock {
                 if (!forceRefresh) {
-                    playlistCache[account.id]?.let { return@withLock it }
+                    playlistCache[account.id]?.takeIf { it.isNotEmpty() }?.let { return@withLock it }
                 }
-                loadPlaylistsFromNetwork(account).also { playlistCache[account.id] = it }
+                val cached = libraryStore.readPlaylists(account.id)
+                val refreshed =
+                    runCatching { loadPlaylistsFromNetwork(account) }.getOrElse { error ->
+                        if (cached.isNotEmpty()) return@withLock cached.also { playlistCache[account.id] = it }
+                        throw error
+                    }
+                playlistCache[account.id] = refreshed
+                libraryStore.writePlaylists(account.id, refreshed)
+                refreshed
             }
         }
 
@@ -878,13 +900,25 @@ class QqMusicClient(
             val key = "${account.id}:$playlistId"
             playlistSongLocks.getOrPut(key) { Mutex() }.withLock {
                 if (!forceRefresh) {
-                    playlistSongCache[key]?.let { return@withLock it }
+                    playlistSongCache[key]?.takeIf { it.isNotEmpty() }?.let { return@withLock it }
                 }
-                loadPlaylistSongsFromNetwork(account, playlistId).also {
-                    playlistSongCache[key] = it
-                }
+                val cached = libraryStore.readSongs(account.id, playlistId)
+                val refreshed =
+                    runCatching { loadPlaylistSongsFromNetwork(account, playlistId) }.getOrElse { error ->
+                        if (cached.isNotEmpty()) return@withLock cached.also { playlistSongCache[key] = it }
+                        throw error
+                    }
+                playlistSongCache[key] = refreshed
+                libraryStore.writeSongs(account.id, playlistId, refreshed)
+                refreshed
             }
         }
+
+    fun cachedPlaylists(accountId: String): List<RemotePlaylist> =
+        playlistCache[accountId]
+            ?: libraryStore.readPlaylists(accountId).also { cached ->
+                if (cached.isNotEmpty()) playlistCache[accountId] = cached
+            }
 
     fun clearCache(accountId: String) {
         libraryCache.remove(accountId)
@@ -892,6 +926,7 @@ class QqMusicClient(
         playlistSongCache.keys.removeAll { it.startsWith("$accountId:") }
         playlistLocks.remove(accountId)
         playlistSongLocks.keys.removeAll { it.startsWith("$accountId:") }
+        libraryStore.clear(accountId)
     }
 
     private fun search(

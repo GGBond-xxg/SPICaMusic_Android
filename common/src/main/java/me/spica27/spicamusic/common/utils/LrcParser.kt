@@ -9,12 +9,12 @@ object LrcParser {
   /**
    * 匹配[00:00.00]格式时间标签的正则表达式
    */
-  private val REGEX_TIME = Regex("\\[(\\d\\d):(\\d\\d)\\.(\\d{1,5})]")
+  private val REGEX_TIME = Regex("\\[(\\d{1,3}):(\\d{2})(?:\\.(\\d{1,6}))?]")
 
   /**
    * 匹配<00:00.00>格式时间标签的正则表达式
    */
-  private val REGEX_TIME_EX = Regex("<(\\d\\d):(\\d\\d)\\.(\\d{1,5})>")
+  private val REGEX_TIME_EX = Regex("<(\\d{1,3}):(\\d{2})(?:\\.(\\d{1,6}))?>")
 
   /**
    * 逐字时间戳相对[..]行时间标签允许的最大偏差（毫秒），
@@ -245,16 +245,16 @@ object LrcParser {
 
     val min = timeMatcher.getOrNull(1)!!.toLong()
     val sec = timeMatcher.getOrNull(2)!!.toLong()
-    val milString = timeMatcher.getOrNull(3)!!
+    val milString = timeMatcher.getOrNull(3).orEmpty()
 
-    var mil = milString.toLong()
-    // 如果毫秒是两位数，需要乘以 10，when 新增支持 1 - 6 位毫秒，很多获取的歌词存在不同的毫秒位数
-    when (milString.length) {
-      1 -> mil *= 100
-      2 -> mil *= 10
-      4 -> mil /= 10
-      5 -> mil /= 100
-      6 -> mil /= 1000
+    val mil = when (milString.length) {
+      0 -> 0L
+      1 -> milString.toLong() * 100
+      2 -> milString.toLong() * 10
+      3 -> milString.toLong()
+      4 -> milString.toLong() / 10
+      5 -> milString.toLong() / 100
+      else -> milString.toLong() / 1000
     }
 
     return min * 60 * 1000 + sec * 1000 + mil

@@ -104,6 +104,25 @@ class CloudPlaylistEntryStore(
     }
 
     @Synchronized
+    fun remove(
+        playlistId: Long,
+        stableIds: Collection<String>,
+    ): List<StoredCloudPlaylistSong> {
+        if (stableIds.isEmpty()) return read(playlistId)
+        val current = read(playlistId)
+        val updated = current.filterNot { it.stableId in stableIds }
+        if (updated != current) {
+            if (updated.isEmpty()) {
+                file(playlistId).delete()
+            } else {
+                write(playlistId, updated)
+            }
+            _revision.update(Long::inc)
+        }
+        return updated
+    }
+
+    @Synchronized
     fun removePlaylist(playlistId: Long) {
         if (file(playlistId).delete()) _revision.update(Long::inc)
     }
