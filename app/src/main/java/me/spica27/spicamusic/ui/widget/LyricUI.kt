@@ -65,6 +65,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
@@ -132,6 +133,36 @@ enum class LyricsDisplayMode {
     Compact,
 }
 
+/** 用户选择的歌词横向排版方式。 */
+enum class LyricsTextAlignment(
+    val value: String,
+) {
+    Start("start"),
+    Center("center"),
+    End("end"),
+    ;
+
+    val textAlign: TextAlign
+        get() =
+            when (this) {
+                Start -> TextAlign.Start
+                Center -> TextAlign.Center
+                End -> TextAlign.End
+            }
+
+    val horizontalArrangement: Arrangement.Horizontal
+        get() =
+            when (this) {
+                Start -> Arrangement.Start
+                Center -> Arrangement.Center
+                End -> Arrangement.End
+            }
+
+    companion object {
+        fun fromValue(value: String): LyricsTextAlignment = entries.firstOrNull { it.value == value } ?: Start
+    }
+}
+
 /**
  * 随展示形态变化的排版参数
  */
@@ -148,16 +179,27 @@ private data class LyricsUIStyle(
 )
 
 @Composable
-private fun rememberLyricsUIStyle(displayMode: LyricsDisplayMode): LyricsUIStyle {
+private fun rememberLyricsUIStyle(
+    displayMode: LyricsDisplayMode,
+    textScale: Float,
+    fontFamily: FontFamily?,
+): LyricsUIStyle {
     val typography = MaterialTheme.typography
-    return remember(typography, displayMode) {
+    return remember(typography, displayMode, textScale, fontFamily) {
+        fun TextStyle.forLyrics(): TextStyle =
+            copy(
+                fontSize = fontSize * textScale,
+                lineHeight = lineHeight * textScale,
+                fontFamily = fontFamily ?: this.fontFamily,
+            )
+
         when (displayMode) {
             LyricsDisplayMode.Fullscreen ->
                 LyricsUIStyle(
-                    mainTextStyle = typography.headlineMedium,
-                    translationTextStyle = typography.titleMedium,
-                    wordsTextStyle = typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold),
-                    wordsTranslationTextStyle = typography.bodySmall,
+                    mainTextStyle = typography.headlineMedium.forLyrics(),
+                    translationTextStyle = typography.titleMedium.forLyrics(),
+                    wordsTextStyle = typography.headlineSmall.forLyrics().copy(fontWeight = FontWeight.ExtraBold),
+                    wordsTranslationTextStyle = typography.bodySmall.forLyrics(),
                     activeScale = 1.12f,
                     itemSpacing = 12.dp,
                     horizontalPadding = 24.dp,
@@ -166,10 +208,10 @@ private fun rememberLyricsUIStyle(displayMode: LyricsDisplayMode): LyricsUIStyle
 
             LyricsDisplayMode.Compact ->
                 LyricsUIStyle(
-                    mainTextStyle = typography.titleLarge,
-                    translationTextStyle = typography.bodyMedium,
-                    wordsTextStyle = typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
-                    wordsTranslationTextStyle = typography.bodySmall,
+                    mainTextStyle = typography.titleLarge.forLyrics(),
+                    translationTextStyle = typography.bodyMedium.forLyrics(),
+                    wordsTextStyle = typography.titleLarge.forLyrics().copy(fontWeight = FontWeight.ExtraBold),
+                    wordsTranslationTextStyle = typography.bodySmall.forLyrics(),
                     activeScale = 1.06f,
                     itemSpacing = 6.dp,
                     horizontalPadding = 16.dp,
@@ -191,6 +233,9 @@ fun LyricsUI(
     lyric: ImmutableList<LyricItem>,
     currentTime: Long,
     displayMode: LyricsDisplayMode = LyricsDisplayMode.Fullscreen,
+    textAlignment: LyricsTextAlignment = LyricsTextAlignment.Start,
+    textScale: Float = 1f,
+    fontFamily: FontFamily? = null,
     onSeekToTime: (Long) -> Unit = {},
     onUserScrollStateChanged: (Boolean) -> Unit = {},
 ) {
@@ -201,7 +246,7 @@ fun LyricsUI(
         return
     }
 
-    val style = rememberLyricsUIStyle(displayMode)
+    val style = rememberLyricsUIStyle(displayMode, textScale.coerceIn(0.75f, 1.4f), fontFamily)
     val lazyListState = rememberLazyListState()
     var isAutoScrolling by remember { mutableStateOf(false) }
     var isUserScrolling by remember { mutableStateOf(false) }
@@ -399,6 +444,7 @@ fun LyricsUI(
                                 scale = scale,
                                 blurRadius = blurRadius,
                                 style = style,
+                                textAlignment = textAlignment,
                             )
 
                         is LyricItem.WordsLyric -> {
@@ -416,6 +462,7 @@ fun LyricsUI(
                                 scale = scale,
                                 blurRadius = blurRadius,
                                 style = style,
+                                textAlignment = textAlignment,
                                 measureCache = wordsMeasureCache,
                             )
                         }
@@ -523,6 +570,7 @@ private fun LyricLine(
     scale: Float,
     blurRadius: Dp,
     style: LyricsUIStyle,
+    textAlignment: LyricsTextAlignment,
 ) {
     val inactiveTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
     val activeTextColor = MaterialTheme.colorScheme.onSurface
@@ -547,8 +595,9 @@ private fun LyricLine(
             style = style.mainTextStyle,
             fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Medium,
             color = if (isActive) activeTextColor else inactiveTextColor,
-            textAlign = TextAlign.Start,
+            textAlign = textAlignment.textAlign,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
         )
 
         if (!lyric.translation.isNullOrBlank()) {
@@ -562,8 +611,9 @@ private fun LyricLine(
                     } else {
                         inactiveTextColor.copy(alpha = LyricUIConstants.INACTIVE_TRANSLATION_ALPHA)
                     },
-                textAlign = TextAlign.Start,
+                textAlign = textAlignment.textAlign,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
@@ -652,6 +702,7 @@ private fun WordsLyricLine(
     scale: Float,
     blurRadius: Dp,
     style: LyricsUIStyle,
+    textAlignment: LyricsTextAlignment,
     measureCache: MutableMap<String, List<MeasuredWord>>,
 ) {
     val activeTextColor = MaterialTheme.colorScheme.onSurface
@@ -731,6 +782,7 @@ private fun WordsLyricLine(
             highlightStrength = highlightStrength,
             cacheKey = lyric.key,
             measureCache = measureCache,
+            textAlignment = textAlignment,
         )
 
         val translation = lyric.translation.firstOrNull { it.content.isNotBlank() }?.content
@@ -740,8 +792,9 @@ private fun WordsLyricLine(
                 text = translation,
                 style = style.wordsTranslationTextStyle,
                 color = translationColor,
-                textAlign = TextAlign.Start,
+                textAlign = textAlignment.textAlign,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
@@ -769,6 +822,7 @@ private fun ProgressiveWordsText(
     measureCache: MutableMap<String, List<MeasuredWord>>,
     modifier: Modifier = Modifier,
     highlightStrength: Float = 1f,
+    textAlignment: LyricsTextAlignment = LyricsTextAlignment.Start,
 ) {
     if (wordRanges.isEmpty()) {
         Text(
@@ -776,6 +830,7 @@ private fun ProgressiveWordsText(
             style = textStyle,
             color = baseColor,
             modifier = modifier,
+            textAlign = textAlignment.textAlign,
         )
         return
     }
@@ -806,12 +861,19 @@ private fun ProgressiveWordsText(
     val words = measuredWords
     if (words == null || words.size != wordRanges.size) {
         // 测量完成前显示无样式占位文本，避免空白闪烁
-        Text(text = text, style = textStyle, color = baseColor, modifier = modifier)
+        Text(
+            text = text,
+            style = textStyle,
+            color = baseColor,
+            modifier = modifier,
+            textAlign = textAlignment.textAlign,
+        )
         return
     }
 
     FlowRow(
         modifier = modifier,
+        horizontalArrangement = textAlignment.horizontalArrangement,
     ) {
         words.forEachIndexed { index, measured ->
             val range = wordRanges[index]

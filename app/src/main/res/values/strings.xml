@@ -331,6 +331,23 @@
 
   <!-- Lyrics toolbar -->
   <string name="lyrics_tool">Lyrics Tool</string>
+  <string name="lyrics_editor">Edit lyrics</string>
+  <string name="lyrics_editor_description">Adjust layout, size, font, timing, and lyric source</string>
+  <string name="lyrics_alignment">Lyrics alignment</string>
+  <string name="lyrics_timing">Timing offset</string>
+  <string name="lyrics_text_size">Text size</string>
+  <string name="lyrics_font_style">Font style</string>
+  <string name="default_font">Default font</string>
+  <string name="add_more_fonts">Add more</string>
+  <string name="delete_font">Delete font</string>
+  <string name="name_font">Name font</string>
+  <string name="font_name">Font name</string>
+  <string name="font_import_failed">Could not import font: %1$s</string>
+  <string name="percentage_format">%1$d%%</string>
+  <string name="save">Save</string>
+  <string name="align_left">Left</string>
+  <string name="align_center">Center</string>
+  <string name="align_right">Right</string>
   <string name="advance_half_second">Advance 0.5s</string>
   <string name="delay_half_second">Delay 0.5s</string>
 

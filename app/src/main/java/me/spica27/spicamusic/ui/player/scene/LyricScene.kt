@@ -243,6 +243,8 @@ fun LyricsPlayerPage(
     transitionProgressProvider: () -> Float,
     artworkModifier: Modifier = Modifier,
     showNavigationButton: Boolean = true,
+    showLyricsEditor: Boolean = false,
+    onLyricsEditorDismiss: () -> Unit = {},
     onBack: () -> Unit,
 ) {
     val playerViewModel = LocalPlayerViewModel.current
@@ -328,6 +330,8 @@ fun LyricsPlayerPage(
                         Modifier
                             .fillMaxWidth()
                             .weight(1f),
+                    showEditor = showLyricsEditor,
+                    onEditorDismiss = onLyricsEditorDismiss,
                 )
             }
         }

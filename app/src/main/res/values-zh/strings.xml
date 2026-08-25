@@ -332,6 +332,23 @@
 
   <!-- Lyrics toolbar -->
   <string name="lyrics_tool">歌词工具</string>
+  <string name="lyrics_editor">编辑歌词</string>
+  <string name="lyrics_editor_description">调整排版、字号、字体、时间和歌词来源</string>
+  <string name="lyrics_alignment">歌词对齐</string>
+  <string name="lyrics_timing">时间偏移</string>
+  <string name="lyrics_text_size">文字大小</string>
+  <string name="lyrics_font_style">字体样式</string>
+  <string name="default_font">默认字体</string>
+  <string name="add_more_fonts">添加更多</string>
+  <string name="delete_font">删除字体</string>
+  <string name="name_font">字体命名</string>
+  <string name="font_name">字体名称</string>
+  <string name="font_import_failed">字体导入失败：%1$s</string>
+  <string name="percentage_format">%1$d%%</string>
+  <string name="save">保存</string>
+  <string name="align_left">居左</string>
+  <string name="align_center">居中</string>
+  <string name="align_right">居右</string>
   <string name="advance_half_second">提前 0.5 秒</string>
   <string name="delay_half_second">延迟 0.5 秒</string>
 

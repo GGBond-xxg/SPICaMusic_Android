@@ -63,7 +63,13 @@ class BottomBarV2State internal constructor(
     /** 当前胶囊到全屏的形变进度（0f..1f）。 */
     val progress: Float get() = fraction.value
 
-    /** 全屏播放器重内容是否已经完成过首次组合；首次打开后保留，避免关闭尾帧销毁造成闪现。 */
+    /**
+     * 全屏播放器内容常驻组合树，收起时仅暂停动态效果。
+     *
+     * 若等到上滑越过触摸阈值后才创建内容，首个拖动帧会先露出纯色容器；点击路径则必须
+     * 额外等待预组合。常驻后两种入口都能立即复用同一帧内容，模糊背景在 progress=0 时
+     * 仍由下方绘制层完全隐藏，不会重新出现胶囊外沿光晕。
+     */
     val contentPrepared: Boolean = true
 
     /** 播放器内容是否处于可交互状态。 */
@@ -99,9 +105,6 @@ class BottomBarV2State internal constructor(
                 contentActive = false
                 dynamicEffectsActive = false
 
-                if (isPlaying && fraction.value <= 0.001f) {
-                    delay(220)
-                }
                 if (fraction.value < 0.999f) {
                     fraction.animateTo(1f, expandMorphSpec())
                 }
@@ -427,10 +430,21 @@ fun BottomBarV2(
                     // player subtree. Media3 can leave that subtree without a committed frame
                     // during an adjacent-item hand-off; retaining the last decoded backdrop here
                     // prevents the plain light/dark container from becoming visible.
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        persistentExpandedBackdrop()
-                    }
                     if (state.contentPrepared) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer {
+                                        // The retained artwork is only needed once the player sheet
+                                        // starts expanding. Leaving it visible at progress 0 would let the
+                                        // blurred cover peek around the shared mini-player surface
+                                        // while scrolling switches between the two bottom-bar layouts.
+                                        alpha = (fractionProvider() / 0.12f).coerceIn(0f, 1f)
+                                    },
+                        ) {
+                            persistentExpandedBackdrop()
+                        }
                         Box(
                             modifier =
                                 Modifier

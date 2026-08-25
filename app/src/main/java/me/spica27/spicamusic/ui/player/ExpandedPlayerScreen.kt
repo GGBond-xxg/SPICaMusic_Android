@@ -36,6 +36,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -197,6 +198,7 @@ fun ExpandedPlayerScreen(
     val songLikeState by viewModel.currentSongIsLike.collectAsStateWithLifecycle()
     val sleepTimerRemainingMs by viewModel.sleepTimerRemainingMs.collectAsStateWithLifecycle()
     var lyricsArtworkPainter by remember { mutableStateOf<Painter?>(null) }
+    var showLyricsEditor by remember { mutableStateOf(false) }
 
     LaunchedEffect(songLikeState) {
         Timber.tag("ExpandedPlayerScreen").d("当前歌曲收藏状态: $songLikeState")
@@ -399,19 +401,6 @@ fun ExpandedPlayerScreen(
                                     onCollapse = onCollapse,
                                     progressProvider = { 1f },
                                     showNavigationButton = false,
-                                    horizontalTransitionProgressProvider = lyricsTransitionProgressProvider,
-                                    onPlaylistBtnClick = {
-                                        coroutineScope.launch {
-                                            pagerState.animateScrollToPage(
-                                                1,
-                                                animationSpec =
-                                                    tween(
-                                                        durationMillis = 300,
-                                                        easing = EaseOutCubic,
-                                                    ),
-                                            )
-                                        }
-                                    },
                                 )
 
                                 // 水平 Pager 内容区域
@@ -507,6 +496,8 @@ fun ExpandedPlayerScreen(
                                                 }
                                         },
                                 showNavigationButton = false,
+                                showLyricsEditor = showLyricsEditor,
+                                onLyricsEditorDismiss = { showLyricsEditor = false },
                                 onBack = {
                                     coroutineScope.launch {
                                         lyricsPagerState.animateScrollToPage(
@@ -629,6 +620,23 @@ fun ExpandedPlayerScreen(
                                     },
                         )
                     }
+                    MorphingPlayerTopAction(
+                        transitionProgressProvider = lyricsTransitionProgressProvider,
+                        onPlaylistClick = {
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(
+                                    1,
+                                    animationSpec = tween(durationMillis = 300, easing = EaseOutCubic),
+                                )
+                            }
+                        },
+                        onLyricsEditorClick = { showLyricsEditor = true },
+                        modifier =
+                            Modifier
+                                .align(Alignment.TopEnd)
+                                .statusBarsPadding()
+                                .padding(end = Spacing.Large, top = 12.dp),
+                    )
                 }
             } else {
                 // 播放列表
@@ -705,8 +713,6 @@ private fun TopBar(
     progressProvider: () -> Float,
     modifier: Modifier,
     showNavigationButton: Boolean = true,
-    horizontalTransitionProgressProvider: () -> Float = { 0f },
-    onPlaylistBtnClick: () -> Unit = {},
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -749,39 +755,69 @@ private fun TopBar(
                 )
             }
             Spacer(modifier = Modifier.weight(1f))
-            Row(
-                modifier =
-                    Modifier
-                        .graphicsLayer {
-                            alpha =
-                                (
-                                    1f -
-                                        horizontalTransitionProgressProvider() / 0.42f
-                                ).coerceIn(0f, 1f)
-                        }.clip(CircleShape)
-                        .background(
-                            MaterialTheme.colorScheme.surfaceContainer,
-                            shape = CircleShape,
-                        ).clickable {
-                            onPlaylistBtnClick.invoke()
-                        }.padding(horizontal = 12.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Default.PlaylistPlay,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(24.dp),
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = stringResource(R.string.queue),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
         }
+    }
+}
+
+/** 播放列表胶囊随横向 Pager 连续收束为歌词编辑圆形按钮。 */
+@Composable
+private fun MorphingPlayerTopAction(
+    transitionProgressProvider: () -> Float,
+    onPlaylistClick: () -> Unit,
+    onLyricsEditorClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val progress = smoothStepProgress(transitionProgressProvider().coerceIn(0f, 1f))
+    val width = floatLerp(108f, 48f, progress).dp
+    Box(
+        modifier =
+            modifier
+                .width(width)
+                .height(48.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .clickable {
+                    if (progress >= 0.5f) onLyricsEditorClick() else onPlaylistClick()
+                },
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            modifier =
+                Modifier.graphicsLayer {
+                    alpha = (1f - progress * 1.8f).coerceIn(0f, 1f)
+                    translationX = -progress * 10.dp.toPx()
+                },
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Default.PlaylistPlay,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = stringResource(R.string.queue),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+        Icon(
+            imageVector = Icons.Rounded.EditNote,
+            contentDescription = stringResource(R.string.lyrics_editor),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier =
+                Modifier
+                    .size(24.dp)
+                    .graphicsLayer {
+                        alpha = ((progress - 0.42f) / 0.58f).coerceIn(0f, 1f)
+                        rotationZ = (1f - progress) * -24f
+                        scaleX = 0.72f + progress * 0.28f
+                        scaleY = 0.72f + progress * 0.28f
+                    },
+        )
     }
 }
 
