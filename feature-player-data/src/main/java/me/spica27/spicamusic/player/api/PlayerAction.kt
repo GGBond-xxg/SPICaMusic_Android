@@ -42,6 +42,14 @@ sealed class PlayerAction {
     data class SeekTo(val positionMs: Long) : PlayerAction()
 
     /**
+     * 跳转到指定位置并立即开始播放。
+     *
+     * 歌词行点击需要把跳转和播放作为同一次播放器操作提交，避免播放器暂停时
+     * 只更新位置、以及服务重连时两个异步操作发生竞争。
+     */
+    data class SeekToAndPlay(val positionMs: Long) : PlayerAction()
+
+    /**
      * 播放完成后暂停
      */
     data class PauseWhenCompletion(val cancel: Boolean = false) : PlayerAction()

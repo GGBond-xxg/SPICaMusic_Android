@@ -529,6 +529,14 @@ class PlaybackService : MediaLibraryService() {
     private fun notificationPlayerCommands(session: MediaSession): Player.Commands =
         session.player.availableCommands
             .buildUpon()
+            // Cloud streams are served through our range-capable loopback proxies. Media3 can
+            // temporarily classify a freshly opened progressive stream as unseekable before its
+            // range response has been observed, which removes this command from controllers and
+            // makes an otherwise valid seek a silent no-op. Keep current-item seeking available;
+            // the proxy and ExoPlayer will resolve the requested byte range when it is submitted.
+            .add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
+            .add(Player.COMMAND_SEEK_BACK)
+            .add(Player.COMMAND_SEEK_FORWARD)
             .add(Player.COMMAND_SEEK_TO_PREVIOUS)
             .add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
             .add(Player.COMMAND_SEEK_TO_NEXT)

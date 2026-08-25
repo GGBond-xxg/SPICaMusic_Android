@@ -44,7 +44,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -111,7 +111,7 @@ import me.spica27.spicamusic.ui.player.playerArtworkMorphHost
 import me.spica27.spicamusic.ui.player.playerArtworkMorphSource
 import me.spica27.spicamusic.ui.player.rememberPlayerArtworkMorphState
 import me.spica27.spicamusic.ui.player.sourceArtworkAlpha
-import me.spica27.spicamusic.ui.playlist.PlaylistCreatorScene
+import me.spica27.spicamusic.ui.search.SearchScene
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.widget.MusicCoverPlaceholder
 import me.spica27.spicamusic.ui.widget.StableAudioCover
@@ -381,7 +381,7 @@ fun BottomMediaBar(bottomBarScrollConnection: BottomBarScrollConnection = LocalB
                                     modifier =
                                         Modifier
                                             .sharedElement(
-                                                sharedContentState = rememberSharedContentState("plus_icon"),
+                                                sharedContentState = rememberSharedContentState("search_icon"),
                                                 animatedVisibilityScope = this@AnimatedContent,
                                             ).size(56.dp)
                                             .clip(CircleShape)
@@ -390,15 +390,13 @@ fun BottomMediaBar(bottomBarScrollConnection: BottomBarScrollConnection = LocalB
                                                     alpha = BOTTOM_FLOATING_CONTAINER_ALPHA,
                                                 ),
                                             ).clickable {
-                                                navigationPath.push(
-                                                    PlaylistCreatorScene(),
-                                                )
+                                                navigationPath.push(SearchScene())
                                             },
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Icon(
-                                        Icons.Default.Add,
-                                        contentDescription = "Add",
+                                        Icons.Default.Search,
+                                        contentDescription = stringResource(R.string.search),
                                         tint = MaterialTheme.colorScheme.onTertiary,
                                     )
                                 }
@@ -510,14 +508,12 @@ fun BottomMediaBar(bottomBarScrollConnection: BottomBarScrollConnection = LocalB
                         }
                         IconButton(
                             onClick = {
-                                navigationPath.push(
-                                    PlaylistCreatorScene(),
-                                )
+                                navigationPath.push(SearchScene())
                             },
                             modifier =
                                 Modifier
                                     .sharedElement(
-                                        sharedContentState = rememberSharedContentState("plus_icon"),
+                                        sharedContentState = rememberSharedContentState("search_icon"),
                                         animatedVisibilityScope = this@AnimatedContent,
                                     ).size(56.dp)
                                     .clip(CircleShape)
@@ -528,8 +524,8 @@ fun BottomMediaBar(bottomBarScrollConnection: BottomBarScrollConnection = LocalB
                                     ),
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = null,
+                                imageVector = Icons.Default.Search,
+                                contentDescription = stringResource(R.string.search),
                                 tint = MaterialTheme.colorScheme.onTertiary,
                             )
                         }
@@ -636,7 +632,7 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                                 modifier =
                                     Modifier
                                         .sharedElement(
-                                            sharedContentState = rememberSharedContentState("plus_icon"),
+                                            sharedContentState = rememberSharedContentState("search_icon"),
                                             animatedVisibilityScope = this@AnimatedContent,
                                         ).size(56.dp)
                                         .clip(CircleShape)
@@ -645,13 +641,13 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                                                 alpha = BOTTOM_FLOATING_CONTAINER_ALPHA,
                                             ),
                                         ).clickable {
-                                            navigationPath.push(PlaylistCreatorScene())
+                                            navigationPath.push(SearchScene())
                                         },
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Icon(
-                                    Icons.Default.Add,
-                                    contentDescription = "Add",
+                                    Icons.Default.Search,
+                                    contentDescription = stringResource(R.string.search),
                                     tint = MaterialTheme.colorScheme.onTertiary,
                                 )
                             }
@@ -947,12 +943,12 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                     }
                     IconButton(
                         onClick = {
-                            navigationPath.push(PlaylistCreatorScene())
+                            navigationPath.push(SearchScene())
                         },
                         modifier =
                             Modifier
                                 .sharedElement(
-                                    sharedContentState = rememberSharedContentState("plus_icon"),
+                                    sharedContentState = rememberSharedContentState("search_icon"),
                                     animatedVisibilityScope = this@AnimatedContent,
                                 ).size(56.dp)
                                 .clip(CircleShape)
@@ -963,8 +959,8 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                                 ),
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = null,
+                            imageVector = Icons.Default.Search,
+                            contentDescription = stringResource(R.string.search),
                             tint = MaterialTheme.colorScheme.onTertiary,
                         )
                     }

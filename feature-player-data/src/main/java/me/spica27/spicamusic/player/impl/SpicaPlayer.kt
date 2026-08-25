@@ -291,6 +291,14 @@ class SpicaPlayer(
                         browser.seekTo(action.positionMs)
                     }
 
+                    is PlayerAction.SeekToAndPlay -> {
+                        browser.seekTo(action.positionMs)
+                        if (browser.playbackState == Player.STATE_IDLE || browser.playerError != null) {
+                            browser.prepare()
+                        }
+                        browser.play()
+                    }
+
                     is PlayerAction.PauseWhenCompletion -> {
                         _pauseWhenCompletion.value = !action.cancel
                     }

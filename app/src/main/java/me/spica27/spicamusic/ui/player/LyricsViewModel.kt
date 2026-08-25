@@ -307,9 +307,9 @@ class LyricsViewModel(
         }
     }
 
-    /** 跳转到指定播放位置 */
-    fun seekTo(posMs: Long) {
-        player.doAction(PlayerAction.SeekTo(posMs))
+    /** 从指定歌词时间开始播放。 */
+    fun seekToAndPlay(posMs: Long) {
+        player.doAction(PlayerAction.SeekToAndPlay(posMs))
     }
 
     /** 获取当前播放位置（毫秒） */

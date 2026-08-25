@@ -16,6 +16,8 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -52,12 +54,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -93,52 +97,59 @@ fun PlayerProgressSection(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
-        when (progressBarStyle) {
-            ProgressBarStyle.ExpressiveWavy ->
-                ExpressiveWavySlider(
-                    progress = progress.coerceIn(0f, 1f),
-                    onProgressChange = onProgressChange,
-                    onProgressChangeFinished = onProgressChangeFinished,
-                    isPlaying = isPlaying,
-                    activeColor = MaterialTheme.colorScheme.onSurface,
-                    inactiveColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height(PlayerProgressTrackHeight),
-                )
-
-            ProgressBarStyle.DynamicWaveform -> {
-                if (fftDrawData != null) {
-                    val drawData by fftDrawData.collectAsStateWithLifecycle()
-                    AudioDynamicWaveSlider(
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(PlayerProgressTrackHeight),
+        ) {
+            // 三种进度条只负责绘制；最上层统一处理点按和拖动，避免不同 Slider
+            // 实现与播放器页的嵌套 Pager 争抢手势，造成某些样式无法拖动。
+            when (progressBarStyle) {
+                ProgressBarStyle.ExpressiveWavy ->
+                    ExpressiveWavySlider(
                         progress = progress.coerceIn(0f, 1f),
-                        fftAmplitudes = drawData,
-                        onProgressChange = onProgressChange,
-                        onProgressChangeFinished = onProgressChangeFinished,
+                        onProgressChange = {},
+                        onProgressChangeFinished = {},
+                        isPlaying = isPlaying,
+                        activeColor = MaterialTheme.colorScheme.onSurface,
+                        inactiveColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+
+                ProgressBarStyle.DynamicWaveform -> {
+                    if (fftDrawData != null) {
+                        val drawData by fftDrawData.collectAsStateWithLifecycle()
+                        AudioDynamicWaveSlider(
+                            progress = progress.coerceIn(0f, 1f),
+                            fftAmplitudes = drawData,
+                            onProgressChange = {},
+                            onProgressChangeFinished = {},
+                            waveformBrush = SolidColor(MaterialTheme.colorScheme.surfaceContainerHighest),
+                            progressBrush = SolidColor(MaterialTheme.colorScheme.onSurface),
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+
+                ProgressBarStyle.TimeDomainWaveform ->
+                    AudioWaveSlider(
+                        progress = progress.coerceIn(0f, 1f),
+                        amplitudes = amplitudes,
+                        onProgressChange = {},
+                        onProgressChangeFinished = {},
                         waveformBrush = SolidColor(MaterialTheme.colorScheme.surfaceContainerHighest),
                         progressBrush = SolidColor(MaterialTheme.colorScheme.onSurface),
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .height(PlayerProgressTrackHeight),
+                        modifier = Modifier.fillMaxSize(),
                     )
-                }
             }
 
-            ProgressBarStyle.TimeDomainWaveform ->
-                AudioWaveSlider(
-                    progress = progress.coerceIn(0f, 1f),
-                    amplitudes = amplitudes,
-                    onProgressChange = onProgressChange,
-                    onProgressChangeFinished = onProgressChangeFinished,
-                    waveformBrush = SolidColor(MaterialTheme.colorScheme.surfaceContainerHighest),
-                    progressBrush = SolidColor(MaterialTheme.colorScheme.onSurface),
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height(PlayerProgressTrackHeight),
-                )
+            ProgressSeekGestureOverlay(
+                enabled = duration > 0L,
+                onProgressChange = onProgressChange,
+                onProgressChangeFinished = onProgressChangeFinished,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
         Spacer(modifier = Modifier.height(Spacing.Small))
         val timeStyle =
@@ -185,6 +196,56 @@ fun PlayerProgressSection(
             )
         }
     }
+}
+
+/** 统一的进度点按/拖动层；松手或手势被父容器取消时都会提交最后位置。 */
+@Composable
+private fun ProgressSeekGestureOverlay(
+    enabled: Boolean,
+    onProgressChange: (Float) -> Unit,
+    onProgressChangeFinished: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val latestOnProgressChange by rememberUpdatedState(onProgressChange)
+    val latestOnProgressChangeFinished by rememberUpdatedState(onProgressChangeFinished)
+
+    Box(
+        modifier =
+            modifier.pointerInput(enabled) {
+                if (!enabled) return@pointerInput
+
+                fun updateProgress(x: Float) {
+                    latestOnProgressChange((x / size.width.coerceAtLeast(1)).coerceIn(0f, 1f))
+                }
+
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    down.consume()
+                    updateProgress(down.position.x)
+                    try {
+                        var pointerId = down.id
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change =
+                                event.changes.firstOrNull { it.id == pointerId }
+                                    ?: event.changes.firstOrNull { it.pressed }
+                                    ?: break
+                            pointerId = change.id
+                            if (!change.pressed) {
+                                change.consume()
+                                break
+                            }
+                            if (change.position != change.previousPosition) {
+                                change.consume()
+                                updateProgress(change.position.x)
+                            }
+                        }
+                    } finally {
+                        latestOnProgressChangeFinished()
+                    }
+                }
+            },
+    )
 }
 
 /** 兼容仅需要流动波浪的调用点。 */

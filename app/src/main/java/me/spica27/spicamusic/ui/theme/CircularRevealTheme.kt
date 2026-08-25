@@ -137,7 +137,12 @@ fun CircularRevealThemeHost(
         // Preference restoration and cold-start player metadata can update the target shortly
         // after the first frame. Only a real user gesture is allowed to start a reveal; otherwise
         // a fixed app theme on a differently themed system would animate from the fallback corner.
-        val shouldReveal = armedOrigin != null
+        // Album-art palette updates are ordinary playback state changes. Revealing the entire
+        // app for those updates briefly exposes the light window background while switching
+        // tracks, which looks like a white flash. Keep circular reveal exclusively for an
+        // actual light/dark theme change; cover-color updates are committed in place and the
+        // player background handles their own transition.
+        val shouldReveal = darkChanged && armedOrigin != null
         if (!shouldReveal || view.width <= 0 || view.height <= 0) {
             displayedDarkTheme = targetDarkTheme
             displayedThemeColor = targetThemeColor
