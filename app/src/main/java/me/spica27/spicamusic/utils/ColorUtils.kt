@@ -136,6 +136,38 @@ fun rememberDominantColorFromUri(
     return dominantColor
 }
 
+/**
+ * Retains the previous artwork color while the next URI is decoded.
+ *
+ * Unlike [rememberDominantColorFromUri], changing [uri] does not reset the state to a fallback
+ * color. This is intended for continuously visible player backgrounds where that reset would be
+ * observable as a light/dark flash between tracks.
+ */
+@Composable
+fun rememberRetainedDominantColorFromUri(
+    uri: Uri?,
+    fallbackColor: Color = Color(0xFF2196F3),
+): Color {
+    val context = LocalContext.current
+    var dominantColor by
+        remember {
+            mutableStateOf(getCachedDominantColorFromUri(uri) ?: fallbackColor)
+        }
+
+    LaunchedEffect(uri) {
+        if (uri == null) return@LaunchedEffect
+        dominantColor =
+            getCachedDominantColorFromUri(uri)
+                ?: extractDominantColorFromUri(
+                    context = context,
+                    uri = uri,
+                    fallbackColor = dominantColor,
+                )
+    }
+
+    return dominantColor
+}
+
 /** 计算合适的 inSampleSize，使解码后尺寸不超过 [reqWidth]×[reqHeight] */
 private fun calculateInSampleSize(
     options: BitmapFactory.Options,

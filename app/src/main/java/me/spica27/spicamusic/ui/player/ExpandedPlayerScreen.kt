@@ -6,6 +6,7 @@ import android.text.TextUtils
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.tween
@@ -103,8 +104,8 @@ import me.spica27.spicamusic.ui.widget.clickHighlight
 import me.spica27.spicamusic.ui.widget.materialSharedAxisYIn
 import me.spica27.spicamusic.ui.widget.materialSharedAxisYOut
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
-import me.spica27.spicamusic.ui.widget.resolvePlayerBackdropColor
 import me.spica27.spicamusic.utils.albumCoverFallbackUri
+import me.spica27.spicamusic.utils.rememberRetainedDominantColorFromUri
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinActivityViewModel
 import timber.log.Timber
@@ -283,18 +284,34 @@ fun ExpandedPlayerScreen(
             }
     }
 
-    // 与应用动态主题共用同一份封面主色缓存，避免播放器页面再次解码封面。
-    val coverColor by viewModel.playerThemeColor.collectAsStateWithLifecycle()
-    val surfaceColor = MaterialTheme.colorScheme.surface
-    val staticBackdropColor =
-        remember(coverColor, surfaceColor) {
-            resolvePlayerBackdropColor(coverColor, surfaceColor)
-        }
+    // Follow upstream's player-local artwork color. ColorUtils shares an in-memory cache with
+    // the app theme, while this state remains keyed to the artwork actually rendered here.
+    val playerArtworkUri =
+        currentMediaItem?.mediaMetadata?.artworkUri
+            ?: currentMediaItem?.mediaMetadata?.albumCoverFallbackUri()
+    val preparedCoverColor =
+        rememberRetainedDominantColorFromUri(
+            uri = playerArtworkUri,
+            fallbackColor = MaterialTheme.colorScheme.primary,
+        )
+    val coverColor by
+        animateColorAsState(
+            targetValue = preparedCoverColor,
+            animationSpec =
+                tween(
+                    durationMillis = 420,
+                    easing = EaseOutCubic,
+                ),
+            label = "PreparedPlayerBackdropColor",
+        )
 
     Box(
         modifier =
             modifier
-                .background(staticBackdropColor)
+                // Keep the same stable base layer as upstream. FluidMusicBackground owns the
+                // artwork/color transition; a second cover-colored layer here changes earlier
+                // than the artwork and is visible as a white/solid-color flash between songs.
+                .background(MaterialTheme.colorScheme.surface)
                 .fillMaxSize()
                 .then(
                     if (artworkMorphState != null) {
@@ -311,7 +328,7 @@ fun ExpandedPlayerScreen(
                     .fillMaxSize(),
             coverColor = coverColor,
             isDarkMode = MaterialTheme.colorScheme.surface.luminance() < 0.5f,
-            coverUri = { currentMediaItem?.mediaMetadata?.artworkUri },
+            coverUri = { playerArtworkUri },
             active = dynamicEffectsActive && isAppInForeground,
             visibilityProgressProvider = {
                 val morph = morphProgressProvider()

@@ -937,6 +937,11 @@ class PlaybackService : MediaLibraryService() {
                     player.setReverb(level, room)
                 }
         }
+        serviceScope.launch {
+            settingsUseCases
+                .getBoolean(SettingsUseCases.Keys.LOUDNESS_NORMALIZATION_ENABLED, false)
+                .collect(player::setLoudnessNormalizationEnabled)
+        }
     }
 
     private fun startCacheTrimMonitor() {

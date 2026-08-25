@@ -84,13 +84,16 @@ fun AppScaffold() {
     CircularRevealThemeHost(
         enabled = circularRevealEnabled,
         targetDarkTheme = isDarkMode,
-        targetThemeColor = color,
-    ) { revealedDarkTheme, revealedThemeColor ->
+        // Artwork palette updates must not pass through the reveal host's asynchronous
+        // displayed-state hand-off. Doing so briefly leaves the navigation content without a
+        // rendered frame while Media3 advances. The host only owns light/dark changes; album
+        // colors flow directly into Material Kolor just as they do in the upstream project.
+        targetThemeColor = Color.Unspecified,
+    ) { revealedDarkTheme, _ ->
         AppThemeContent(
             darkTheme = revealedDarkTheme,
-            themeColor = revealedThemeColor,
+            themeColor = color,
             themeColorStyle = ThemeColorStyle.fromString(themeColorStyleValue),
-            animateColors = !circularRevealEnabled,
             playerViewModel = playerViewModel,
         )
     }
@@ -101,7 +104,6 @@ private fun AppThemeContent(
     darkTheme: Boolean,
     themeColor: Color,
     themeColorStyle: ThemeColorStyle,
-    animateColors: Boolean,
     playerViewModel: PlayerViewModel,
 ) {
     val themedView = LocalView.current
@@ -113,7 +115,10 @@ private fun AppThemeContent(
         darkTheme = darkTheme,
         themeColor = themeColor,
         themeColorStyle = themeColorStyle,
-        animateColors = animateColors,
+        // Album artwork changes are animated by the player's retained backdrop. Animating the
+        // entire Material color scheme at the same time invalidates the full navigation subtree
+        // and can expose the sheet's plain surface for one frame during Media3 hand-off.
+        animateColors = false,
     ) {
         CompositionLocalProvider(LocalPlayerViewModel provides playerViewModel) {
             NavigationStack(

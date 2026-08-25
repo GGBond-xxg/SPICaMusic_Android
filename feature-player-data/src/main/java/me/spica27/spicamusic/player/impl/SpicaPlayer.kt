@@ -33,6 +33,7 @@ import me.spica27.spicamusic.player.impl.dsp.EqualizerAudioProcessor
 import me.spica27.spicamusic.player.impl.dsp.FFTAudioProcessor
 import me.spica27.spicamusic.player.impl.dsp.FFTAudioProcessorWrapper
 import me.spica27.spicamusic.player.impl.dsp.ReverbAudioProcessor
+import me.spica27.spicamusic.player.impl.dsp.LoudnessNormalizationAudioProcessor
 import me.spica27.spicamusic.player.impl.utils.MediaLibrary
 import me.spica27.spicamusic.player.impl.utils.PlayerKVUtils
 import me.spica27.spicamusic.player.impl.utils.toMediaItem
@@ -79,6 +80,7 @@ class SpicaPlayer(
     // 音效处理器
     private val _equalizerProcessor = EqualizerAudioProcessor()
     private val _reverbProcessor = ReverbAudioProcessor()
+    private val _loudnessProcessor = LoudnessNormalizationAudioProcessor()
 
     private val _initializing = AtomicBoolean(false)
 
@@ -683,6 +685,10 @@ class SpicaPlayer(
         _reverbProcessor.setReverb(level, roomSize)
     }
 
+    override fun setLoudnessNormalizationEnabled(enabled: Boolean) {
+        _loudnessProcessor.setEnabled(enabled)
+    }
+
     /**
      * 获取音效处理器数组
      * 用于在 PlaybackService 中配置 ExoPlayer
@@ -692,6 +698,8 @@ class SpicaPlayer(
             _fftAudioProcessorWrapper,
             _equalizerProcessor,
             _reverbProcessor,
+            // 放在链路末端，在 EQ 与混响改变电平后统一响度。
+            _loudnessProcessor,
         )
     }
 

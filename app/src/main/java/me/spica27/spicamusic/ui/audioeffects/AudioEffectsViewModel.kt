@@ -61,6 +61,11 @@ class AudioEffectsViewModel(
             .getFloat(SettingsUseCases.Keys.REVERB_ROOM_SIZE, 0.5f)
             .stateIn(viewModelScope, SharingStarted.Eagerly, 0.5f)
 
+    val loudnessNormalizationEnabled: StateFlow<Boolean> =
+        settingsUseCases
+            .getBoolean(SettingsUseCases.Keys.LOUDNESS_NORMALIZATION_ENABLED, false)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     // 加载状态
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -187,6 +192,15 @@ class AudioEffectsViewModel(
         }
     }
 
+    fun setLoudnessNormalizationEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsUseCases.setBoolean(
+                SettingsUseCases.Keys.LOUDNESS_NORMALIZATION_ENABLED,
+                enabled,
+            )
+        }
+    }
+
     /**
      * 重置所有音效到默认值
      */
@@ -202,6 +216,8 @@ class AudioEffectsViewModel(
             setReverbEnabled(false)
             settingsUseCases.setFloat(SettingsUseCases.Keys.REVERB_LEVEL, 0.3f)
             settingsUseCases.setFloat(SettingsUseCases.Keys.REVERB_ROOM_SIZE, 0.5f)
+
+            setLoudnessNormalizationEnabled(false)
 
             _isLoading.value = false
         }

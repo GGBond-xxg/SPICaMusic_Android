@@ -53,6 +53,7 @@ class PreferencesManager(
         val REVERB_ENABLED = booleanPreferencesKey("reverb_enabled")
         val REVERB_LEVEL = stringPreferencesKey("reverb_level")
         val REVERB_ROOM_SIZE = stringPreferencesKey("reverb_room_size")
+        val LOUDNESS_NORMALIZATION_ENABLED = booleanPreferencesKey("loudness_normalization_enabled")
         val SCAN_MIN_DURATION_SEC = stringPreferencesKey("scan_min_duration_sec")
         val SCAN_MAX_DURATION_SEC = stringPreferencesKey("scan_max_duration_sec")
         val SCAN_MIN_FILE_SIZE_KB = stringPreferencesKey("scan_min_file_size_kb")

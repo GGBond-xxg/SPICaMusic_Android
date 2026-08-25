@@ -8,9 +8,11 @@ import android.graphics.Shader
 import android.graphics.SurfaceTexture
 import android.net.Uri
 import android.view.TextureView
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.MaterialTheme
@@ -19,6 +21,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -27,14 +30,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.skydoves.landscapist.components.rememberImageComponent
-import com.skydoves.landscapist.crossfade.CrossfadePlugin
 import com.skydoves.landscapist.image.LandscapistImage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
@@ -145,21 +150,18 @@ fun FluidMusicBackground(
             }
 
             DynamicSpectrumBackground.BlurCover -> {
-                // 仅模糊封面，无动态效果；图片插件自身执行交叉淡化。
+                // Keep the previous decoded backdrop until the next one is fully prepared. The
+                // image loader's own crossfade clears its old request first, exposing surface for
+                // one or more frames (white in light mode and black in dark mode).
                 Box(
                     modifier =
                         Modifier
                             .matchParentSize()
                             .background(surfaceColor),
                 )
-                LandscapistImage(
+                StableBlurredBackdrop(
                     modifier = Modifier.matchParentSize(),
-                    imageModel = { coverUri.invoke() },
-                    component =
-                        rememberImageComponent {
-                            +CrossfadePlugin(duration = 320)
-                            +BlurHashTransformationPlugin()
-                        },
+                    uri = coverUri.invoke(),
                 )
                 Box(
                     modifier =
@@ -238,6 +240,89 @@ fun FluidMusicBackground(
         }
     }
 }
+
+/**
+ * Two-phase artwork switch for the full-screen blurred backdrop.
+ *
+ * Loading and blur-hash conversion happen invisibly. Only after the transformed painter is ready
+ * is it faded over the retained painter; rapid consecutive skips therefore keep the last complete
+ * frame instead of exposing the theme surface.
+ */
+@Composable
+private fun StableBlurredBackdrop(
+    uri: Uri?,
+    modifier: Modifier = Modifier,
+) {
+    var retainedPainter by remember { mutableStateOf<Painter?>(null) }
+    val previousPainter = remember(uri) { retainedPainter }
+    var incomingPainter by remember(uri) { mutableStateOf<Painter?>(null) }
+    val incomingAlpha = remember(uri) { Animatable(0f) }
+
+    LaunchedEffect(uri, incomingPainter) {
+        val painter = incomingPainter ?: return@LaunchedEffect
+        if (retainedPainter == null) {
+            incomingAlpha.snapTo(1f)
+        } else {
+            incomingAlpha.snapTo(0f)
+            incomingAlpha.animateTo(
+                targetValue = 1f,
+                animationSpec =
+                    tween(
+                        durationMillis = BACKDROP_CROSSFADE_DURATION_MS,
+                        easing = FastOutSlowInEasing,
+                    ),
+            )
+        }
+        retainedPainter = painter
+    }
+
+    Box(modifier = modifier) {
+        val basePainter = previousPainter ?: retainedPainter
+        basePainter?.let { painter ->
+            Image(
+                painter = painter,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize(),
+            )
+        }
+
+        incomingPainter?.let { painter ->
+            Image(
+                painter = painter,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier =
+                    Modifier
+                        .matchParentSize()
+                        .graphicsLayer { alpha = incomingAlpha.value },
+            )
+        }
+
+        if (uri != null) {
+            key(uri) {
+                LandscapistImage(
+                    modifier =
+                        Modifier
+                            .matchParentSize()
+                            .graphicsLayer { alpha = 0f },
+                    imageModel = { uri },
+                    component =
+                        rememberImageComponent {
+                            +BlurHashTransformationPlugin()
+                        },
+                    success = { _, painter ->
+                        LaunchedEffect(painter) {
+                            incomingPainter = painter
+                        }
+                    },
+                )
+            }
+        }
+    }
+}
+
+private const val BACKDROP_CROSSFADE_DURATION_MS = 420
 
 /**
  * 播放器形变容器和全屏播放器共用的静态底色。

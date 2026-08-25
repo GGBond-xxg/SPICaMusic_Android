@@ -17,6 +17,7 @@ import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
@@ -64,6 +65,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
@@ -75,6 +77,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -731,6 +734,35 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                                     sheetState.expand(isPlaying)
                                 },
                                 onNext = playerViewModel::skipToNext,
+                            )
+                        }
+                    },
+                    persistentExpandedBackdrop = {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.surface),
+                        ) {
+                            stableCoverPainter?.let { painter ->
+                                Image(
+                                    painter = painter,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier =
+                                        Modifier
+                                            .fillMaxSize()
+                                            .graphicsLayer {
+                                                scaleX = 1.16f
+                                                scaleY = 1.16f
+                                            }.blur(56.dp),
+                                )
+                            }
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .matchParentSize()
+                                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)),
                             )
                         }
                     },

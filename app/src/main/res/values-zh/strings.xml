@@ -219,6 +219,15 @@
   <string name="preset_rock">摇滚</string>
   <string name="preset_classical">古典</string>
   <string name="preset_jazz">爵士</string>
+  <string name="audio_effects_subtitle">按喜好调节均衡器</string>
+  <string name="audio_effects_section_equalizer">均衡器</string>
+  <string name="audio_effects_eq_enable">启用均衡器</string>
+  <string name="audio_effects_eq_enable_desc">调节 10 个频段的增益</string>
+  <string name="audio_effects_section_reverb">混响</string>
+  <string name="audio_effects_reverb_enable">启用混响</string>
+  <string name="audio_effects_section_loudness">响度</string>
+  <string name="audio_effects_loudness_title">响度归一化</string>
+  <string name="audio_effects_loudness_desc">拉平不同歌曲之间的音量差异，切歌时听感更平稳</string>
   <string name="toggle_lyrics">切换歌词</string>
   <string name="no_albums_found">没有找到相关专辑</string>
   <string name="choose_lyrics">选择歌词</string>
@@ -331,9 +340,15 @@
 
   <!-- Settings screen sections -->
   <string name="settings_appearance">外观</string>
+  <string name="settings_player_page">播放页</string>
+  <string name="settings_player_page_subtitle">播放页面的背景与进度控制</string>
+  <string name="settings_other">其他</string>
+  <string name="settings_other_subtitle">语言与通知偏好</string>
+  <string name="settings_masthead_subtitle">主题、播放页视觉与播放行为</string>
   <string name="settings_dark_mode_subtitle">启用深色主题</string>
   <string name="settings_playback">播放</string>
-  <string name="settings_sound_effects_subtitle">均衡器、混响等音效设置</string>
+  <string name="settings_sound_effects">音效</string>
+  <string name="settings_sound_effects_subtitle">均衡器、淡入淡出、Hi-Fi 与 USB DAC</string>
   <string name="settings_keep_screen_on">屏幕常亮</string>
   <string name="settings_keep_screen_on_subtitle">播放时保持屏幕常亮</string>
   <string name="settings_lyricon_title">状态栏歌词</string>
@@ -349,7 +364,7 @@
   <string name="live_update_channel_description">由系统在支持时提升显示的可选播放状态</string>
   <string name="live_update_playing">音乐播放中</string>
   <string name="live_update_paused">已暂停</string>
-  <string name="settings_dynamic_spectrum">动态频谱背景</string>
+  <string name="settings_dynamic_spectrum">播放页背景</string>
   <string name="dynamic_spectrum_top_glow">顶部流光</string>
   <string name="dynamic_spectrum_liquid_aurora">液态极光</string>
   <string name="dynamic_spectrum_fluid_effect">流体效果</string>
@@ -365,7 +380,7 @@
   <string name="progress_bar_style_dynamic_waveform">动态波形</string>
   <string name="progress_bar_style_time_domain_waveform">时域波形</string>
   <string name="progress_bar_style_expressive_wavy">流动波浪</string>
-  <string name="settings_theme_color_style">主题色风格</string>
+  <string name="settings_theme_color_style">配色方案</string>
   <string name="theme_color_style_textured">质感化</string>
   <string name="theme_color_style_flat">扁平化</string>
   <string name="settings_media_library">媒体库</string>
@@ -617,7 +632,7 @@
   <string name="settings_appearance_subtitle">塑造播放器的视觉氛围</string>
   <string name="settings_theme_mode_title">主题模式</string>
   <string name="settings_theme_mode_subtitle">跟随系统、浅色或深色</string>
-  <string name="settings_circular_reveal_title">圆形揭示切换</string>
+  <string name="settings_circular_reveal_title">圆形揭示</string>
   <string name="settings_circular_reveal_subtitle">切换浅色与深色主题时使用圆形扩散动画</string>
   <string name="settings_theme_mode_system">跟随系统</string>
   <string name="settings_theme_mode_light">浅色</string>

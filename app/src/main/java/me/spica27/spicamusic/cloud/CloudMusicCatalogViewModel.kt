@@ -133,6 +133,7 @@ class CloudMusicCatalogViewModel(
     private var telegramReady = false
     private var catalogGeneration = 0
     private var remotePlaylistRefreshJob: Job? = null
+    private var playbackQueueCompletionJob: Job? = null
 
     init {
         refreshSources()
@@ -580,38 +581,63 @@ class CloudMusicCatalogViewModel(
         selectedStableId: String,
         visibleQueue: List<CatalogQueueItem>,
     ) {
-        viewModelScope.launch {
-            val visibleCloudSongs =
-                visibleQueue
-                    .filterIsInstance<CatalogQueueItem.Cloud>()
-                    .map(CatalogQueueItem.Cloud::song)
-            val endpointKeys = visibleCloudSongs.mapTo(linkedSetOf(), CloudCatalogSong::endpointKey)
-            val completedSongs = completeEndpointsForPlayback(endpointKeys)
-            val visibleIds = visibleQueue.mapTo(hashSetOf(), CatalogQueueItem::stableId)
-            val queue =
-                (
-                    visibleQueue +
-                        completedSongs
-                            .asSequence()
-                            .filter { it.endpointKey() in endpointKeys }
-                            .filterNot { it.stableId in visibleIds }
-                            .map(CatalogQueueItem::Cloud)
-                            .toList()
-                ).distinctBy(CatalogQueueItem::stableId)
-                    .ifEmpty {
-                        _state.value.songs
-                            .firstOrNull { it.stableId == selectedStableId }
-                            ?.let { listOf(CatalogQueueItem.Cloud(it)) }
-                            .orEmpty()
+        playbackQueueCompletionJob?.cancel()
+        playbackQueueCompletionJob =
+            viewModelScope.launch {
+                // Start from the already-rendered queue immediately. Completing every paged
+                // cloud endpoint before handing anything to Media3 made a cloud row feel much
+                // slower than a local row, even though the selected item was already available.
+                val immediateQueue =
+                    visibleQueue
+                        .distinctBy(CatalogQueueItem::stableId)
+                        .ifEmpty {
+                            _state.value.songs
+                                .firstOrNull { it.stableId == selectedStableId }
+                                ?.let { listOf(CatalogQueueItem.Cloud(it)) }
+                                .orEmpty()
+                        }
+                // Keep the catalog item beside its converted MediaItem. Local catalog IDs use
+                // the "local:" prefix while MediaStore media IDs do not, so looking up the
+                // selected row through MediaItem.mediaId can incorrectly fall back to index 0.
+                val immediateEntries =
+                    immediateQueue.mapNotNull { queueItem ->
+                        queueItem.toMediaItem()?.let { mediaItem -> queueItem to mediaItem }
                     }
-            val mediaItems = queue.mapNotNull { it.toMediaItem() }
-            if (mediaItems.isEmpty()) return@launch
-            val startIndex =
-                queue
-                    .indexOfFirst { it.stableId == selectedStableId }
-                    .coerceIn(mediaItems.indices)
-            player.doAction(PlayerAction.PlayMediaItems(mediaItems, startIndex))
-        }
+                val immediateItems = immediateEntries.map { it.second }
+                if (immediateItems.isEmpty()) return@launch
+                val startIndex =
+                    immediateEntries
+                        .indexOfFirst { (queueItem, _) -> queueItem.stableId == selectedStableId }
+                        .coerceAtLeast(0)
+                        .coerceIn(immediateItems.indices)
+                val selectedMediaId = immediateItems[startIndex].mediaId
+                player.doAction(PlayerAction.PlayMediaItems(immediateItems, startIndex))
+
+                // Preserve the previous whole-library queue behaviour, but fill the remaining
+                // pages after playback has started. A later tap cancels this job so an obsolete
+                // catalog cannot be appended to the user's new queue.
+                val visibleCloudSongs =
+                    immediateQueue
+                        .filterIsInstance<CatalogQueueItem.Cloud>()
+                        .map(CatalogQueueItem.Cloud::song)
+                val endpointKeys =
+                    visibleCloudSongs.mapTo(linkedSetOf(), CloudCatalogSong::endpointKey)
+                if (endpointKeys.isEmpty()) return@launch
+                val completedSongs = completeEndpointsForPlayback(endpointKeys)
+                val currentQueueIds = player.currentTimelineItems.value.mapTo(hashSetOf()) { it.mediaId }
+                if (selectedMediaId !in currentQueueIds) return@launch
+                val missingItems =
+                    completedSongs
+                        .asSequence()
+                        .filter { it.endpointKey() in endpointKeys }
+                        .filterNot { it.stableId in currentQueueIds }
+                        .map(CatalogQueueItem::Cloud)
+                        .toList()
+                        .mapNotNull { it.toMediaItem() }
+                if (missingItems.isNotEmpty()) {
+                    player.doAction(PlayerAction.AddMediaItemsToQueue(missingItems))
+                }
+            }
     }
 
     fun addToNext(song: CloudCatalogSong) {

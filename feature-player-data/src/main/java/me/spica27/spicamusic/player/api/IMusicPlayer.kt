@@ -125,4 +125,7 @@ interface IMusicPlayer {
      * @param roomSize 房间大小 (0.0 - 1.0)
      */
     fun setReverb(level: Float, roomSize: Float)
+
+    /** 开启或关闭实时响度归一化。 */
+    fun setLoudnessNormalizationEnabled(enabled: Boolean)
 }

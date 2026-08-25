@@ -233,6 +233,7 @@ fun BottomBarV2(
     onCollapsed: () -> Unit = {},
     navigationBar: @Composable () -> Unit,
     playBar: @Composable () -> Unit,
+    persistentExpandedBackdrop: @Composable () -> Unit = {},
     fullScreenPlayer: @Composable (
         morphProgressProvider: () -> Float,
         morphInFlightProvider: () -> Boolean,
@@ -422,6 +423,13 @@ fun BottomBarV2(
                                 }
                             },
                 ) {
+                    // This layer belongs to the sheet container rather than the media-item-driven
+                    // player subtree. Media3 can leave that subtree without a committed frame
+                    // during an adjacent-item hand-off; retaining the last decoded backdrop here
+                    // prevents the plain light/dark container from becoming visible.
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        persistentExpandedBackdrop()
+                    }
                     if (state.contentPrepared) {
                         Box(
                             modifier =

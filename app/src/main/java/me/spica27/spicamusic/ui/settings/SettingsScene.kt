@@ -1,6 +1,7 @@
 package me.spica27.spicamusic.ui.settings
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -8,8 +9,11 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,59 +26,69 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.Animation
 import androidx.compose.material.icons.filled.ArrowBackIosNew
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.Brightness6
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Headphones
-import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LensBlur
+import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material.icons.filled.PlayCircle
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.SwapCalls
-import androidx.compose.material.icons.filled.Usb
+import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.Waves
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -93,10 +107,12 @@ import me.spica27.spicamusic.common.entity.ThemeColorStyle
 import me.spica27.spicamusic.common.entity.ThemeMode
 import me.spica27.spicamusic.topdisplay.TopDisplayMode
 import me.spica27.spicamusic.ui.about.AboutScene
-import me.spica27.spicamusic.ui.audioeffects.EqualizerScene
+import me.spica27.spicamusic.ui.audioeffects.AudioEffectsScene
+import me.spica27.spicamusic.ui.theme.EaseOutEmphasized
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
+import me.spica27.spicamusic.ui.widget.clickHighlight
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -289,276 +305,299 @@ class SettingsScene : StackScene() {
                         stringResource(R.string.top_display_mode_live_update_subtitle)
                     }
             }
-        val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
-        Scaffold(
-            containerColor = Color.Transparent,
-            topBar = {
-                TopAppBar(
-                    scrollBehavior = scrollBehavior,
-                    navigationIcon = {
-                        IconButton(onClick = { path.popTop() }) {
-                            Icon(
-                                imageVector = Icons.Default.ArrowBackIosNew,
-                                contentDescription = stringResource(R.string.back),
-                                tint = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                    },
-                    title = {
-                        Text(
-                            text = stringResource(R.string.finder_settings_title),
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    },
-                    colors =
-                        TopAppBarDefaults.topAppBarColors(
-                            containerColor = Color.Transparent,
-                            scrolledContainerColor = Color.Transparent,
-                        ),
-                )
-            },
-        ) { paddingValues ->
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.surface,
-                                    MaterialTheme.colorScheme.surfaceContainerLow,
-                                    MaterialTheme.colorScheme.surface,
-                                ),
-                            ),
-                        ),
+        // 与原项目一致：同一时间只在卡片内展开一组选项。
+        var expandedRowKey by rememberSaveable { mutableStateOf<String?>(null) }
+        val listState = rememberLazyListState()
+        val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val mastheadGone by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
+
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background),
+        ) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding =
+                    PaddingValues(
+                        start = LayoutTokens.MusicHeaderHorizontalPadding,
+                        end = LayoutTokens.MusicHeaderHorizontalPadding,
+                        top = statusBarTop + 56.dp,
+                        bottom = 96.dp,
+                    ),
+                verticalArrangement = Arrangement.spacedBy(Spacing.Large),
+                overscrollEffect = rememberIOSOverScrollEffect(orientation = Orientation.Vertical),
             ) {
-                SettingsAmbientBackground()
-
-                LazyColumn(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .nestedScroll(scrollBehavior.nestedScrollConnection),
-                    contentPadding =
-                        PaddingValues(
-                            start = LayoutTokens.MusicHeaderHorizontalPadding,
-                            end = LayoutTokens.MusicHeaderHorizontalPadding,
-                            top = Spacing.Small + paddingValues.calculateTopPadding(),
-                            bottom = Spacing.Huge + paddingValues.calculateBottomPadding(),
-                        ),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.Large),
-                    overscrollEffect = rememberIOSOverScrollEffect(orientation = Orientation.Vertical),
-                ) {
-                    item {
-                        SettingsHeroCard(
-                            themeMode = themeMode,
-                            spectrumName = spectrumName,
-                            coverName = coverName,
+                item(key = "settings_masthead") {
+                    SettingsMasthead(
+                        modifier =
+                            Modifier
+                                .padding(top = Spacing.Large),
+                    )
+                }
+                item {
+                    SettingsSectionCard(
+                        title = stringResource(R.string.settings_appearance),
+                        subtitle = stringResource(R.string.settings_appearance_subtitle),
+                    ) {
+                        ModernSettingsSelectItem(
+                            rowKey = "color_style",
+                            title = stringResource(R.string.settings_theme_color_style),
+                            subtitle = themeColorStyleName,
+                            icon = Icons.Default.Palette,
+                            options = themeColorStyleOptions,
+                            currentValue = themeColorStyleValue,
+                            expandedKey = expandedRowKey,
+                            onExpandChange = { expandedRowKey = it },
+                            onValueChange = viewModel::setThemeColorStyle,
+                        )
+                        SettingsItemDivider()
+                        ModernSettingsSelectItem(
+                            rowKey = "theme_mode",
+                            title = stringResource(R.string.settings_theme_mode_title),
+                            subtitle = themeModeName,
+                            icon = Icons.Default.Brightness6,
+                            options = themeModeOptions,
+                            currentValue = themeMode.value,
+                            expandedKey = expandedRowKey,
+                            onExpandChange = { expandedRowKey = it },
+                            onValueChange = viewModel::setThemeMode,
+                        )
+                        SettingsItemDivider()
+                        ModernSettingsSwitchItem(
+                            title = stringResource(R.string.settings_circular_reveal_title),
+                            subtitle =
+                                stringResource(R.string.settings_circular_reveal_subtitle),
+                            icon = Icons.Default.Animation,
+                            checked = circularRevealEnabled,
+                            onCheckedChange = viewModel::setCircularRevealEnabled,
                         )
                     }
+                }
 
-                    item {
-                        SettingsSectionCard(
-                            title = stringResource(R.string.settings_appearance),
-                            subtitle = stringResource(R.string.settings_appearance_subtitle),
-                        ) {
-                            ModernSettingsSelectItem(
-                                title = stringResource(R.string.settings_theme_mode_title),
-                                subtitle = themeModeName,
-                                icon = Icons.Default.Brightness6,
-                                options = themeModeOptions,
-                                currentValue = themeMode.value,
-                                onValueChange = viewModel::setThemeMode,
-                            )
-                            SettingsItemDivider()
-                            ModernSettingsSelectItem(
-                                title = stringResource(R.string.settings_language_title),
-                                subtitle = currentLanguageName,
-                                icon = Icons.Default.Language,
-                                options = languageOptions,
-                                currentValue = currentLanguage,
-                                onValueChange = { AppLocaleController.setLanguage(context, it) },
-                            )
-                            SettingsItemDivider()
-                            ModernSettingsSelectItem(
-                                title = stringResource(R.string.settings_theme_color_style),
-                                subtitle = themeColorStyleName,
-                                icon = Icons.Default.Palette,
-                                options = themeColorStyleOptions,
-                                currentValue = themeColorStyleValue,
-                                onValueChange = viewModel::setThemeColorStyle,
-                            )
-                            SettingsItemDivider()
-                            ModernSettingsSelectItem(
-                                title = stringResource(R.string.settings_dynamic_spectrum),
-                                subtitle = spectrumName,
-                                icon = Icons.Default.LensBlur,
-                                options = spectrumOptions,
-                                currentValue = spectrumValue,
-                                onValueChange = viewModel::setDynamicSpectrumBackground,
-                            )
-                            SettingsItemDivider()
-                            ModernSettingsSelectItem(
-                                title = stringResource(R.string.settings_progress_bar_style),
-                                subtitle = progressBarStyleName,
-                                icon = Icons.Default.Percent,
-                                options = progressBarStyleOptions,
-                                currentValue = progressBarStyleValue,
-                                onValueChange = viewModel::setProgressBarStyle,
-                            )
-                            SettingsItemDivider()
-                            ModernSettingsSwitchItem(
-                                title = stringResource(R.string.settings_circular_reveal_title),
-                                subtitle =
-                                    stringResource(R.string.settings_circular_reveal_subtitle),
-                                icon = Icons.Default.Animation,
-                                checked = circularRevealEnabled,
-                                onCheckedChange = viewModel::setCircularRevealEnabled,
-                            )
-                        }
+                item {
+                    SettingsSectionCard(
+                        title = stringResource(R.string.settings_player_page),
+                        subtitle = stringResource(R.string.settings_player_page_subtitle),
+                    ) {
+                        ModernSettingsSelectItem(
+                            rowKey = "player_background",
+                            title = stringResource(R.string.settings_dynamic_spectrum),
+                            subtitle = spectrumName,
+                            icon = Icons.Default.LensBlur,
+                            options = spectrumOptions,
+                            currentValue = spectrumValue,
+                            expandedKey = expandedRowKey,
+                            onExpandChange = { expandedRowKey = it },
+                            onValueChange = viewModel::setDynamicSpectrumBackground,
+                        )
+                        SettingsItemDivider()
+                        ModernSettingsSelectItem(
+                            rowKey = "progress_bar_style",
+                            title = stringResource(R.string.settings_progress_bar_style),
+                            subtitle = progressBarStyleName,
+                            icon = Icons.Default.Percent,
+                            options = progressBarStyleOptions,
+                            currentValue = progressBarStyleValue,
+                            expandedKey = expandedRowKey,
+                            onExpandChange = { expandedRowKey = it },
+                            onValueChange = viewModel::setProgressBarStyle,
+                        )
                     }
+                }
 
-                    item {
-                        SettingsSectionCard(
-                            title = stringResource(R.string.settings_playback),
-                            subtitle = stringResource(R.string.settings_playback_subtitle),
-                        ) {
-                            ModernSettingsSwitchItem(
-                                title = stringResource(R.string.settings_background_playback),
-                                subtitle = stringResource(R.string.settings_background_playback_subtitle),
-                                icon = Icons.Default.PlayCircle,
-                                checked = backgroundPlayback,
-                                onCheckedChange = viewModel::setBackgroundPlayback,
-                            )
-                            SettingsItemDivider()
-                            ModernSettingsSwitchItem(
-                                title = stringResource(R.string.settings_headset_resume),
-                                subtitle = stringResource(R.string.settings_headset_resume_subtitle),
-                                icon = Icons.Default.Headphones,
-                                checked = resumeOnHeadset,
-                                onCheckedChange = viewModel::setResumeOnHeadset,
-                            )
-                            SettingsItemDivider()
-                            ModernSettingsSwitchItem(
-                                title = stringResource(R.string.settings_fade),
-                                subtitle = stringResource(R.string.settings_fade_subtitle),
-                                icon = Icons.Default.SwapCalls,
-                                checked = fadeEnabled,
-                                onCheckedChange = viewModel::setFadeEnabled,
-                            )
-                            if (fadeEnabled) {
-                                SettingsItemDivider()
-                                ModernSettingsSelectItem(
-                                    title = stringResource(R.string.settings_fade_duration),
-                                    subtitle = "${(fadeDurationMs / 1_000f).toInt()} s",
-                                    icon = Icons.Default.SwapCalls,
-                                    options = fadeDurationOptions,
-                                    currentValue = fadeDurationMs.toInt().toString(),
-                                    onValueChange = viewModel::setFadeDuration,
+                item {
+                    SettingsSectionCard(
+                        title = stringResource(R.string.settings_playback),
+                        subtitle = stringResource(R.string.settings_playback_subtitle),
+                    ) {
+                        SettingsRow(
+                            title = stringResource(R.string.settings_sound_effects),
+                            subtitle = stringResource(R.string.settings_sound_effects_subtitle),
+                            icon = Icons.Default.GraphicEq,
+                            selected = false,
+                            onClick = { path.push(AudioEffectsScene()) },
+                            trailingContent = {
+                                Icon(
+                                    imageVector = Icons.Default.ChevronRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                            }
-                            SettingsItemDivider()
-                            ModernSettingsSelectItem(
-                                title = stringResource(R.string.settings_cloud_audio_cache),
-                                subtitle =
-                                    stringResource(
-                                        R.string.settings_cloud_audio_cache_subtitle,
-                                        cloudCacheOptions
-                                            .firstOrNull { it.value == cloudAudioCacheMib }
-                                            ?.label
-                                            ?: "$cloudAudioCacheMib MB",
-                                    ),
-                                icon = Icons.Default.Storage,
-                                options = cloudCacheOptions,
-                                currentValue = cloudAudioCacheMib,
-                                onValueChange = viewModel::setCloudAudioCacheMib,
-                            )
-                            SettingsItemDivider()
-                            ModernSettingsSwitchItem(
-                                title = stringResource(R.string.settings_hifi),
-                                subtitle =
-                                    stringResource(
-                                        if (viewModel.hiFiSupported) {
-                                            R.string.settings_hifi_subtitle
-                                        } else {
-                                            R.string.settings_hifi_unsupported
-                                        },
-                                    ),
-                                icon = Icons.Default.HighQuality,
-                                checked = hiFiMode,
-                                enabled = viewModel.hiFiSupported,
-                                onCheckedChange = viewModel::setHiFiMode,
-                            )
-                            SettingsItemDivider()
-                            ModernSettingsSwitchItem(
-                                title = stringResource(R.string.settings_usb_dac),
-                                subtitle =
-                                    usbDeviceName?.let {
-                                        stringResource(R.string.settings_usb_dac_connected, it)
-                                    } ?: stringResource(R.string.settings_usb_dac_disconnected),
-                                icon = Icons.Default.Usb,
-                                checked = usbDacOutput,
-                                enabled = usbDeviceName != null,
-                                onCheckedChange = viewModel::setUsbDacOutput,
-                            )
-                            SettingsItemDivider()
-                            SettingsRow(
-                                title = stringResource(R.string.equalizer_10_band),
-                                subtitle = stringResource(R.string.settings_equalizer_subtitle),
-                                icon = Icons.Default.GraphicEq,
-                                selected = false,
-                                onClick = { path.push(EqualizerScene()) },
-                                trailingContent = {
-                                    Icon(
-                                        imageVector = Icons.Default.ChevronRight,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                },
-                            )
-                            SettingsItemDivider()
-                            ModernSettingsSwitchItem(
-                                title = stringResource(R.string.settings_keep_screen_on),
-                                subtitle = stringResource(R.string.settings_keep_screen_on_subtitle),
-                                icon = Icons.Default.Visibility,
-                                checked = keepScreenOn,
-                                onCheckedChange = viewModel::setKeepScreenOn,
-                            )
-                            SettingsItemDivider()
-                            ModernSettingsSelectItem(
-                                title = stringResource(R.string.top_display_mode_title),
-                                subtitle = topDisplaySubtitle,
-                                icon = Icons.Default.NotificationsActive,
-                                options = topDisplayModeOptions,
-                                currentValue = topDisplayMode.value,
-                                onValueChange = viewModel::setTopDisplayMode,
-                            )
-                        }
+                            },
+                        )
+                        SettingsItemDivider()
+                        ModernSettingsSwitchItem(
+                            title = stringResource(R.string.settings_background_playback),
+                            subtitle = stringResource(R.string.settings_background_playback_subtitle),
+                            icon = Icons.Default.PlayCircle,
+                            checked = backgroundPlayback,
+                            onCheckedChange = viewModel::setBackgroundPlayback,
+                        )
+                        SettingsItemDivider()
+                        ModernSettingsSwitchItem(
+                            title = stringResource(R.string.settings_headset_resume),
+                            subtitle = stringResource(R.string.settings_headset_resume_subtitle),
+                            icon = Icons.Default.Headphones,
+                            checked = resumeOnHeadset,
+                            onCheckedChange = viewModel::setResumeOnHeadset,
+                        )
+                        SettingsItemDivider()
+                        ModernSettingsSwitchItem(
+                            title = stringResource(R.string.settings_keep_screen_on),
+                            subtitle = stringResource(R.string.settings_keep_screen_on_subtitle),
+                            icon = Icons.Default.Visibility,
+                            checked = keepScreenOn,
+                            onCheckedChange = viewModel::setKeepScreenOn,
+                        )
                     }
+                }
 
-                    item {
-                        SettingsSectionCard(
+                item {
+                    SettingsSectionCard(
+                        title = stringResource(R.string.settings_other),
+                        subtitle = stringResource(R.string.settings_other_subtitle),
+                    ) {
+                        ModernSettingsSelectItem(
+                            rowKey = "language",
+                            title = stringResource(R.string.settings_language_title),
+                            subtitle = currentLanguageName,
+                            icon = Icons.Default.Language,
+                            options = languageOptions,
+                            currentValue = currentLanguage,
+                            expandedKey = expandedRowKey,
+                            onExpandChange = { expandedRowKey = it },
+                            onValueChange = { AppLocaleController.setLanguage(context, it) },
+                        )
+                        SettingsItemDivider()
+                        ModernSettingsSelectItem(
+                            rowKey = "notification_mode",
+                            title = stringResource(R.string.top_display_mode_title),
+                            subtitle = topDisplaySubtitle,
+                            icon = Icons.Default.NotificationsActive,
+                            options = topDisplayModeOptions,
+                            currentValue = topDisplayMode.value,
+                            expandedKey = expandedRowKey,
+                            onExpandChange = { expandedRowKey = it },
+                            onValueChange = viewModel::setTopDisplayMode,
+                        )
+                    }
+                }
+
+                item {
+                    SettingsSectionCard(
+                        title = stringResource(R.string.settings_about),
+                        subtitle = stringResource(R.string.settings_about_subtitle),
+                    ) {
+                        SettingsRow(
                             title = stringResource(R.string.settings_about),
                             subtitle = stringResource(R.string.settings_about_subtitle),
-                        ) {
-                            SettingsRow(
-                                title = stringResource(R.string.settings_about),
-                                subtitle = stringResource(R.string.settings_about_subtitle),
-                                icon = Icons.Default.Info,
-                                selected = false,
-                                onClick = { path.push(AboutScene()) },
-                                trailingContent = {
-                                    Icon(
-                                        imageVector = Icons.Default.ChevronRight,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                },
-                            )
-                        }
+                            icon = Icons.Default.Info,
+                            selected = false,
+                            onClick = { path.push(AboutScene()) },
+                            trailingContent = {
+                                Icon(
+                                    imageVector = Icons.Default.ChevronRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            },
+                        )
                     }
                 }
             }
+
+            SettingsTopBar(
+                title = stringResource(R.string.finder_settings_title),
+                listState = listState,
+                solid = mastheadGone,
+                onBack = { path.popTop() },
+                modifier = Modifier.align(Alignment.TopStart),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsMasthead(modifier: Modifier = Modifier) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(R.string.finder_settings_title),
+            style = MaterialTheme.typography.displaySmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = stringResource(R.string.settings_masthead_subtitle),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun SettingsTopBar(
+    title: String,
+    listState: LazyListState,
+    solid: Boolean,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val backgroundColor = MaterialTheme.colorScheme.background
+    val collapse by
+        remember(listState) {
+            derivedStateOf {
+                if (listState.firstVisibleItemIndex > 0) {
+                    1f
+                } else {
+                    (listState.firstVisibleItemScrollOffset / 96f).coerceIn(0f, 1f)
+                }
+            }
+        }
+
+    Box(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .height(statusBarTop + 56.dp)
+                .drawBehind { drawRect(color = backgroundColor.copy(alpha = collapse)) },
+    ) {
+        if (solid) {
+            HorizontalDivider(
+                modifier = Modifier.align(Alignment.BottomStart),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.14f),
+            )
+        }
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(top = statusBarTop)
+                    .padding(horizontal = Spacing.Small),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.Default.ArrowBackIosNew,
+                    contentDescription = stringResource(R.string.back),
+                )
+            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .graphicsLayer { alpha = collapse },
+            )
         }
     }
 }
@@ -797,41 +836,72 @@ private fun ModernSettingsSwitchItem(
 
 @Composable
 private fun ModernSettingsSelectItem(
+    rowKey: String,
     title: String,
     subtitle: String,
     icon: ImageVector,
     options: ImmutableList<SelectOption>,
     currentValue: String,
+    expandedKey: String?,
+    onExpandChange: (String?) -> Unit,
     onValueChange: (String) -> Unit,
 ) {
-    var showDialog by remember { mutableStateOf(false) }
-
-    SettingsRow(
-        title = title,
-        subtitle = subtitle,
-        icon = icon,
-        selected = false,
-        onClick = { showDialog = true },
-        trailingContent = {
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        },
+    val expanded = expandedKey == rowKey
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = tween(durationMillis = 220, easing = EaseOutEmphasized),
+        label = "settings_inline_chevron",
     )
 
-    if (showDialog) {
-        SettingsSelectDialog(
+    Column(modifier = Modifier.fillMaxWidth()) {
+        SettingsRow(
             title = title,
-            options = options,
-            currentValue = currentValue,
-            onDismiss = { showDialog = false },
-            onValueChange = {
-                onValueChange(it)
-                showDialog = false
+            subtitle = subtitle,
+            icon = icon,
+            selected = expanded,
+            onClick = { onExpandChange(if (expanded) null else rowKey) },
+            trailingContent = {
+                Icon(
+                    imageVector = Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.graphicsLayer { rotationZ = chevronRotation },
+                )
             },
         )
+
+        AnimatedVisibility(
+            visible = expanded,
+            enter =
+                expandVertically(
+                    animationSpec = tween(durationMillis = 220, easing = EaseOutEmphasized),
+                ) + fadeIn(tween(durationMillis = 180)),
+            exit =
+                shrinkVertically(
+                    animationSpec = tween(durationMillis = 180, easing = EaseOutEmphasized),
+                ) + fadeOut(tween(durationMillis = 140)),
+        ) {
+            Column(
+                modifier =
+                    Modifier.padding(
+                        start = 78.dp,
+                        end = Spacing.Large,
+                        top = Spacing.ExtraSmall,
+                        bottom = Spacing.Small,
+                    ),
+                verticalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall),
+            ) {
+                options.forEach { option ->
+                    InlineOptionCard(
+                        rowKey = rowKey,
+                        option = option,
+                        icon = icon,
+                        selected = option.value == currentValue,
+                        onClick = { onValueChange(option.value) },
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -924,59 +994,129 @@ private fun SettingsItemDivider() {
 }
 
 @Composable
-private fun SettingsSelectDialog(
-    title: String,
-    options: ImmutableList<SelectOption>,
-    currentValue: String,
-    onDismiss: () -> Unit,
-    onValueChange: (String) -> Unit,
+private fun InlineOptionCard(
+    rowKey: String,
+    option: SelectOption,
+    icon: ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.Small)) {
-                options.forEach { option ->
-                    val selected = currentValue == option.value
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .clip(Shapes.LargeCornerBasedShape)
-                                .background(
-                                    if (selected) {
-                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
-                                    } else {
-                                        MaterialTheme.colorScheme.surfaceContainerHigh
-                                    },
-                                ).clickable { onValueChange(option.value) }
-                                .padding(horizontal = Spacing.Small, vertical = Spacing.ExtraSmall),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
-                    ) {
-                        RadioButton(
-                            selected = selected,
-                            onClick = { onValueChange(option.value) },
-                        )
-                        Text(
-                            text = option.label,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                            color =
-                                if (selected) {
-                                    MaterialTheme.colorScheme.onPrimaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface
-                                },
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.close))
-            }
-        },
+    val background by animateColorAsState(
+        targetValue =
+            if (selected) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.55f)
+            },
+        animationSpec = tween(durationMillis = 200, easing = EaseOutEmphasized),
+        label = "settings_inline_option_background",
     )
+    val contentColor =
+        if (selected) {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        }
+
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(Shapes.MediumCornerBasedShape)
+                .background(background)
+                .clickHighlight(onClick = onClick)
+                .padding(horizontal = Spacing.Medium, vertical = Spacing.Medium),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
+    ) {
+        Icon(
+            imageVector = optionIcon(rowKey, option.value, icon),
+            contentDescription = null,
+            tint = contentColor,
+            modifier = Modifier.size(20.dp),
+        )
+        Text(
+            text = option.label,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            color = contentColor,
+            modifier = Modifier.weight(1f),
+        )
+        AnimatedVisibility(
+            visible = selected,
+            enter =
+                fadeIn(tween(durationMillis = 180)) +
+                    scaleIn(
+                        animationSpec = tween(durationMillis = 220, easing = EaseOutEmphasized),
+                        initialScale = 0.82f,
+                    ),
+            exit = fadeOut(tween(durationMillis = 120)),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(22.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+        }
+    }
 }
+
+/** 为每个展开选项提供独立图标，避免所有选项重复使用设置行图标。 */
+private fun optionIcon(
+    rowKey: String,
+    value: String,
+    fallback: ImageVector,
+): ImageVector =
+    when (rowKey) {
+        "color_style" ->
+            when (ThemeColorStyle.fromString(value)) {
+                ThemeColorStyle.Textured -> Icons.Default.AutoAwesome
+                ThemeColorStyle.Flat -> Icons.Default.Layers
+            }
+        "theme_mode" ->
+            when (ThemeMode.fromString(value)) {
+                ThemeMode.SYSTEM -> Icons.Default.Brightness6
+                ThemeMode.LIGHT -> Icons.Default.WbSunny
+                ThemeMode.DARK -> Icons.Default.DarkMode
+            }
+        "player_background" ->
+            when (DynamicSpectrumBackground.fromString(value)) {
+                DynamicSpectrumBackground.TopGlow -> Icons.Default.WbSunny
+                DynamicSpectrumBackground.LiquidAurora -> Icons.Default.Waves
+                DynamicSpectrumBackground.EffectShader -> Icons.Default.BlurOn
+                DynamicSpectrumBackground.FluidWarp -> Icons.Default.LensBlur
+                DynamicSpectrumBackground.BlurCover -> Icons.Default.Layers
+                DynamicSpectrumBackground.OFF -> Icons.Default.PowerSettingsNew
+            }
+        "progress_bar_style" ->
+            when (ProgressBarStyle.fromString(value)) {
+                ProgressBarStyle.ExpressiveWavy -> Icons.Default.Waves
+                ProgressBarStyle.DynamicWaveform -> Icons.Default.GraphicEq
+                ProgressBarStyle.TimeDomainWaveform -> Icons.AutoMirrored.Filled.ShowChart
+            }
+        "language" ->
+            when (value) {
+                AppLocaleController.LANGUAGE_SYSTEM -> Icons.Default.Language
+                AppLocaleController.LANGUAGE_ENGLISH -> Icons.Default.Translate
+                AppLocaleController.LANGUAGE_SIMPLIFIED_CHINESE -> Icons.Default.LocationCity
+                AppLocaleController.LANGUAGE_TRADITIONAL_CHINESE -> Icons.Default.Layers
+                else -> fallback
+            }
+        "notification_mode" ->
+            when (TopDisplayMode.fromString(value)) {
+                TopDisplayMode.OFF -> Icons.Default.PowerSettingsNew
+                TopDisplayMode.STATUS_LYRIC -> Icons.Default.NotificationsActive
+                TopDisplayMode.LIVE_UPDATE -> Icons.Default.AutoAwesome
+            }
+        else -> fallback
+    }
