@@ -95,7 +95,7 @@
             android:label="@string/spica_app_label"
             android:launchMode="singleTask"
             android:screenOrientation="portrait"
-            android:theme="@style/Theme.SPICaMusic"
+            android:theme="@style/Theme.SPICaMusic.Starting"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

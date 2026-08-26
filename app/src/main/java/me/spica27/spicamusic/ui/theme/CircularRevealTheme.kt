@@ -37,6 +37,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalView
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.math.hypot
@@ -128,6 +129,12 @@ fun CircularRevealThemeHost(
     var displayedDarkTheme by remember { mutableStateOf(targetDarkTheme) }
     var displayedThemeColor by remember { mutableStateOf(targetThemeColor) }
     var hostOriginInWindow by remember { mutableStateOf(Offset.Zero) }
+    var waitingForInitialPalette by remember { mutableStateOf(true) }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        delay(AUTOMATIC_REVEAL_STARTUP_FALLBACK_MS)
+        waitingForInitialPalette = false
+    }
 
     androidx.compose.runtime.LaunchedEffect(enabled, targetDarkTheme, targetThemeColor) {
         val darkChanged = displayedDarkTheme != targetDarkTheme
@@ -136,8 +143,17 @@ fun CircularRevealThemeHost(
 
         val armedOrigin = controller.consumeOrigin()
         // Preference restoration and cold-start player metadata can update the target shortly
-        // after the first frame. Only a real user gesture is allowed to start a reveal; otherwise
-        // a fixed app theme on a differently themed system would animate from the fallback corner.
+        // after the first frame. Apply those updates directly so startup never looks like a song
+        // transition over a blank window. A real user gesture is still allowed during this grace
+        // period, and later automatic track changes reveal from the artwork area as usual.
+        val isAutomaticStartupUpdate = armedOrigin == null && waitingForInitialPalette
+        if (isAutomaticStartupUpdate) {
+            displayedDarkTheme = targetDarkTheme
+            displayedThemeColor = targetThemeColor
+            if (colorChanged) waitingForInitialPalette = false
+            return@LaunchedEffect
+        }
+
         // A direct tap (row or transport control) supplies the exact reveal origin. Automatic
         // track changes have no pointer event, so reveal from the artwork area instead. The
         // palette is emitted only after artwork extraction finishes, which means the retained old
@@ -232,6 +248,8 @@ fun CircularRevealThemeHost(
         }
     }
 }
+
+private const val AUTOMATIC_REVEAL_STARTUP_FALLBACK_MS = 10_000L
 
 private const val REVEAL_LOG_TAG = "SPICaThemeReveal"
 

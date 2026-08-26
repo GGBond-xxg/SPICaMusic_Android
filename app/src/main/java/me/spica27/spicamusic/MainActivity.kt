@@ -50,6 +50,9 @@ class MainActivity :
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // The manifest uses a translucent theme only to prevent Xiaomi's blank starting card.
+        // Restore the normal opaque app theme before ComponentActivity creates the real window.
+        setTheme(R.style.Theme_SPICaMusic)
         super.onCreate(savedInstanceState)
 
         ContextCompat.registerReceiver(
