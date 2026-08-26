@@ -650,7 +650,7 @@
   <string name="settings_theme_mode_title">Theme mode</string>
   <string name="settings_theme_mode_subtitle">Follow system, light, or dark</string>
   <string name="settings_circular_reveal_title">Circular Reveal</string>
-  <string name="settings_circular_reveal_subtitle">Use a circular reveal when switching between light and dark themes</string>
+  <string name="settings_circular_reveal_subtitle">Reveal theme and song color changes with a circular transition</string>
   <string name="settings_theme_mode_system">Follow</string>
   <string name="settings_theme_mode_light">Light</string>
   <string name="settings_theme_mode_dark">Dark</string>
@@ -749,6 +749,14 @@
   <string name="sleep_timer_minutes">%1$d minutes</string>
   <string name="sleep_timer_cancel">Cancel timer</string>
   <string name="sleep_timer_close">Close</string>
+  <string name="sleep_timer_dialog_subtitle">Choose when playback should stop.</string>
+  <string name="sleep_timer_unit_minutes">min</string>
+  <string name="sleep_timer_custom">Custom duration</string>
+  <string name="sleep_timer_custom_hint">Fine-tune the duration with −/+</string>
+  <string name="sleep_timer_start">Start timer</string>
+  <string name="sleep_timer_active_hint">Playback pauses when the timer ends</string>
+  <string name="local_lyrics_source">Local lyrics</string>
+  <string name="embedded_lyrics_tag">Embedded tag</string>
   <string name="cloud_library">Cloud library</string>
   <string name="music_source_all">All songs</string>
   <string name="music_source_local">Local</string>

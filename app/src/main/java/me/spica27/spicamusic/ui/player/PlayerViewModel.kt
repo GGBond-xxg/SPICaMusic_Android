@@ -135,6 +135,8 @@ class PlayerViewModel(
 
     private val _sleepTimerRemainingMs = MutableStateFlow<Long?>(null)
     val sleepTimerRemainingMs: StateFlow<Long?> = _sleepTimerRemainingMs.asStateFlow()
+    private val _sleepTimerDurationMs = MutableStateFlow<Long?>(null)
+    val sleepTimerDurationMs: StateFlow<Long?> = _sleepTimerDurationMs.asStateFlow()
     private var sleepTimerJob: Job? = null
 
     // ==================== 基础播放控制 ====================
@@ -220,10 +222,12 @@ class PlayerViewModel(
     fun setSleepTimer(durationMinutes: Int) {
         sleepTimerJob?.cancel()
         if (durationMinutes <= 0) {
+            _sleepTimerDurationMs.value = null
             _sleepTimerRemainingMs.value = null
             return
         }
         val durationMs = durationMinutes * 60_000L
+        _sleepTimerDurationMs.value = durationMs
         sleepTimerJob =
             viewModelScope.launch {
                 val endAt = SystemClock.elapsedRealtime() + durationMs
@@ -234,6 +238,7 @@ class PlayerViewModel(
                     kotlinx.coroutines.delay(minOf(1_000L, remaining))
                 }
                 pause()
+                _sleepTimerDurationMs.value = null
                 _sleepTimerRemainingMs.value = null
             }
     }
@@ -241,6 +246,7 @@ class PlayerViewModel(
     fun cancelSleepTimer() {
         sleepTimerJob?.cancel()
         sleepTimerJob = null
+        _sleepTimerDurationMs.value = null
         _sleepTimerRemainingMs.value = null
     }
 

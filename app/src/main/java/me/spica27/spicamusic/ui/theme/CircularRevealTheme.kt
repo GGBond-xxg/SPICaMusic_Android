@@ -138,12 +138,18 @@ fun CircularRevealThemeHost(
         // Preference restoration and cold-start player metadata can update the target shortly
         // after the first frame. Only a real user gesture is allowed to start a reveal; otherwise
         // a fixed app theme on a differently themed system would animate from the fallback corner.
-        // Album-art palette updates are ordinary playback state changes. Revealing the entire
-        // app for those updates briefly exposes the light window background while switching
-        // tracks, which looks like a white flash. Keep circular reveal exclusively for an
-        // actual light/dark theme change; cover-color updates are committed in place and the
-        // player background handles their own transition.
-        val shouldReveal = enabled && darkChanged && armedOrigin != null
+        // A direct tap (row or transport control) supplies the exact reveal origin. Automatic
+        // track changes have no pointer event, so reveal from the artwork area instead. The
+        // palette is emitted only after artwork extraction finishes, which means the retained old
+        // frame stays visible until the next song's background is actually ready.
+        val revealOrigin =
+            armedOrigin
+                ?: if (colorChanged && view.width > 0 && view.height > 0) {
+                    hostOriginInWindow + Offset(view.width * 0.5f, view.height * 0.38f)
+                } else {
+                    null
+                }
+        val shouldReveal = enabled && (darkChanged || colorChanged) && revealOrigin != null
         if (!shouldReveal || view.width <= 0 || view.height <= 0) {
             displayedDarkTheme = targetDarkTheme
             displayedThemeColor = targetThemeColor
@@ -162,7 +168,7 @@ fun CircularRevealThemeHost(
             return@LaunchedEffect
         }
 
-        val revealOrigin = requireNotNull(armedOrigin)
+        val resolvedRevealOrigin = requireNotNull(revealOrigin)
         val revealMode =
             if (darkChanged && !targetDarkTheme) {
                 RevealMode.Shrink
@@ -175,7 +181,7 @@ fun CircularRevealThemeHost(
                 NativeRevealTransition.attach(
                     anchor = view,
                     oldFrame = oldFrame,
-                    originInWindow = revealOrigin,
+                    originInWindow = resolvedRevealOrigin,
                     revealMode = revealMode,
                 )
             }.onFailure {

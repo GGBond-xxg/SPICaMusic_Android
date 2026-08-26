@@ -84,15 +84,11 @@ fun AppScaffold() {
     CircularRevealThemeHost(
         enabled = circularRevealEnabled,
         targetDarkTheme = isDarkMode,
-        // Artwork palette updates must not pass through the reveal host's asynchronous
-        // displayed-state hand-off. Doing so briefly leaves the navigation content without a
-        // rendered frame while Media3 advances. The host only owns light/dark changes; album
-        // colors flow directly into Material Kolor just as they do in the upstream project.
-        targetThemeColor = Color.Unspecified,
-    ) { revealedDarkTheme, _ ->
+        targetThemeColor = color,
+    ) { revealedDarkTheme, revealedThemeColor ->
         AppThemeContent(
             darkTheme = revealedDarkTheme,
-            themeColor = color,
+            themeColor = revealedThemeColor,
             themeColorStyle = ThemeColorStyle.fromString(themeColorStyleValue),
             playerViewModel = playerViewModel,
         )

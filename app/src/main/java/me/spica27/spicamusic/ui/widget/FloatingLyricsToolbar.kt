@@ -58,6 +58,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import me.spcia.lyric_core.entity.SongLyrics
@@ -226,7 +227,7 @@ fun LyricsEditorSheet(
                 val currentSource = lyricSources.getOrNull(currentLyricSourceIndex)
                 ExpandableEditorSection(
                     title = stringResource(R.string.toggle_lyrics),
-                    value = currentSource?.name.orEmpty(),
+                    value = currentSource?.let { localizedLyricSourceName(it) }.orEmpty(),
                     icon = Icons.Rounded.LibraryMusic,
                     expanded = expandedSection == SECTION_LYRICS_SOURCE,
                     onToggle = {
@@ -243,8 +244,8 @@ fun LyricsEditorSheet(
                         lyricSources.forEachIndexed { index, source ->
                             if (index > 0) DropdownDivider()
                             DropdownChoice(
-                                title = source.name,
-                                subtitle = source.artist,
+                                title = localizedLyricSourceName(source),
+                                subtitle = localizedLyricSourceArtist(source),
                                 selected = index == currentLyricSourceIndex,
                                 onClick = { onLyricSourceSelected(index) },
                             )
@@ -301,7 +302,8 @@ private fun ExpandableEditorSection(
                 color = MaterialTheme.colorScheme.primary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(0.75f, fill = false),
+                textAlign = TextAlign.End,
+                modifier = Modifier.width(96.dp),
             )
             Spacer(modifier = Modifier.width(6.dp))
             Icon(
@@ -460,9 +462,27 @@ private fun formatOffset(offsetMs: Long): String {
     }
 }
 
+@Composable
+private fun localizedLyricSourceName(source: SongLyrics): String =
+    if (source.name == LEGACY_LOCAL_LYRICS_NAME) {
+        stringResource(R.string.local_lyrics_source)
+    } else {
+        source.name
+    }
+
+@Composable
+private fun localizedLyricSourceArtist(source: SongLyrics): String? =
+    when {
+        source.artist == LEGACY_LOCAL_LYRICS_ARTIST -> stringResource(R.string.embedded_lyrics_tag)
+        source.artist.isBlank() -> null
+        else -> source.artist
+    }
+
 private const val SECTION_TEXT_SIZE = "text_size"
 private const val SECTION_FONT = "font"
 private const val SECTION_LYRICS_SOURCE = "lyrics_source"
 private const val MIN_TEXT_SCALE = 0.8f
 private const val MAX_TEXT_SCALE = 1.3f
 private const val TEXT_SCALE_STEP = 0.05f
+private const val LEGACY_LOCAL_LYRICS_NAME = "本地歌词"
+private const val LEGACY_LOCAL_LYRICS_ARTIST = "内嵌标签"

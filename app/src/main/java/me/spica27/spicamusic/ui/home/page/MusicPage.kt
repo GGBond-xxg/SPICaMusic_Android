@@ -1504,7 +1504,7 @@ private fun MusicSectionHeader(
                     Icon(
                         imageVector = sourceIcon,
                         contentDescription = stringResource(R.string.music_source_selector_cd),
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.size(18.dp),
                     )
                 }
@@ -1638,7 +1638,11 @@ private fun MusicSongRow(
                     Text(
                         text = source,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        // Album-derived primary colors can be almost black in a dark flat palette.
+                        // Provider labels are information, not decoration, so keep them on a
+                        // guaranteed high-contrast surface role.
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.End,

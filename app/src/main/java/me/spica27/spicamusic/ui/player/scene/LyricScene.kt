@@ -150,6 +150,7 @@ class LyricScene(
         val position by playerViewModel.currentPosition.collectAsStateWithLifecycle()
         val duration by playerViewModel.currentDuration.collectAsStateWithLifecycle()
         val sleepTimerRemainingMs by playerViewModel.sleepTimerRemainingMs.collectAsStateWithLifecycle()
+        val sleepTimerDurationMs by playerViewModel.sleepTimerDurationMs.collectAsStateWithLifecycle()
         val playerColor by playerViewModel.playerThemeColor.collectAsStateWithLifecycle()
 
         Box(
@@ -219,6 +220,7 @@ class LyricScene(
                         onPlayMode = playerViewModel::togglePlayMode,
                         onFavorite = playerViewModel::toggleLikeCurrentSong,
                         sleepTimerRemainingMs = sleepTimerRemainingMs,
+                        sleepTimerDurationMs = sleepTimerDurationMs,
                         onSleepTimerSet = playerViewModel::setSleepTimer,
                         onSleepTimerCancel = playerViewModel::cancelSleepTimer,
                     )
@@ -356,6 +358,7 @@ private fun LyricsPlaybackControls(
     onPlayMode: () -> Unit,
     onFavorite: () -> Unit,
     sleepTimerRemainingMs: Long?,
+    sleepTimerDurationMs: Long?,
     onSleepTimerSet: (Int) -> Unit,
     onSleepTimerCancel: () -> Unit,
 ) {
@@ -399,6 +402,7 @@ private fun LyricsPlaybackControls(
         onPlayModeClick = onPlayMode,
         onFavoriteClick = onFavorite,
         sleepTimerRemainingMs = sleepTimerRemainingMs,
+        sleepTimerDurationMs = sleepTimerDurationMs,
         onSleepTimerSet = onSleepTimerSet,
         onSleepTimerCancel = onSleepTimerCancel,
         showControls = true,
@@ -458,9 +462,11 @@ private fun LyricsHeader(
             onClick = onBack,
             enabled = showNavigationButton,
             modifier =
-                Modifier.graphicsLayer {
-                    alpha = if (showNavigationButton) 1f else 0f
-                },
+                Modifier
+                    .size(48.dp)
+                    .graphicsLayer {
+                        alpha = if (showNavigationButton) 1f else 0f
+                    },
             colors =
                 IconButtonDefaults.iconButtonColors().copy(
                     containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -472,7 +478,7 @@ private fun LyricsHeader(
                 contentDescription = stringResource(R.string.back),
                 modifier =
                     Modifier
-                        .size(32.dp)
+                        .size(24.dp)
                         .graphicsLayer {
                             rotationZ = 90f * enterProgressProvider().coerceIn(0f, 1f)
                         },

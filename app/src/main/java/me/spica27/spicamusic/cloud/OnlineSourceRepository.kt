@@ -109,7 +109,7 @@ class OnlineSourceStreamProxy(
                             }
 
                             var resolutionError: Throwable? = null
-                            val onlineUrl =
+                            val resolveOnlineUrl: suspend () -> String? = {
                                 runCatching {
                                     this@OnlineSourceStreamProxy.engine.resolveUrl(
                                         entry.source,
@@ -117,12 +117,19 @@ class OnlineSourceStreamProxy(
                                     )
                                 }.onFailure { resolutionError = it }
                                     .getOrNull()
+                            }
+                            // Logged-in QQ/NetEase streams are normally the fastest and most
+                            // complete source. Do not block them behind an anonymous resolver;
+                            // resolve that fallback lazily only if the authenticated URL fails.
+                            var onlineResolutionDeferred =
+                                shouldDeferOnlineResolution(entry.preferFallback, entry.fallbackUrl)
+                            val onlineUrl = if (onlineResolutionDeferred) null else resolveOnlineUrl()
                             val candidates =
                                 orderedStreamCandidates(
                                     onlineUrl = onlineUrl,
                                     fallbackUrl = entry.fallbackUrl,
                                     preferFallback = entry.preferFallback,
-                                )
+                                ).toMutableList()
                             if (candidates.isEmpty()) {
                                 call.respond(
                                     HttpStatusCode.BadGateway,
@@ -133,7 +140,16 @@ class OnlineSourceStreamProxy(
 
                             var lastStatus = HttpStatusCode.BadGateway
                             var lastFailure = resolutionError?.message ?: "Unable to open cloud stream"
-                            for (upstreamUrl in candidates) {
+                            var candidateIndex = 0
+                            while (true) {
+                                if (candidateIndex >= candidates.size) {
+                                    if (!onlineResolutionDeferred) break
+                                    onlineResolutionDeferred = false
+                                    val deferredOnlineUrl = resolveOnlineUrl()
+                                    if (deferredOnlineUrl == null || deferredOnlineUrl in candidates) break
+                                    candidates += deferredOnlineUrl
+                                }
+                                val upstreamUrl = candidates[candidateIndex++]
                                 val requestBuilder =
                                     Request
                                         .Builder()
@@ -249,6 +265,11 @@ internal fun orderedStreamCandidates(
     } else {
         listOfNotNull(onlineUrl, fallbackUrl).distinct()
     }
+
+internal fun shouldDeferOnlineResolution(
+    preferFallback: Boolean,
+    fallbackUrl: String?,
+): Boolean = preferFallback && !fallbackUrl.isNullOrBlank()
 
 internal fun isClearlyNonAudioContentType(value: String?): Boolean {
     val normalized =

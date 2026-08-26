@@ -16,6 +16,7 @@ import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -112,7 +113,9 @@ class PlaybackService : MediaLibraryService() {
     private var fadeInStartedAtMs = 0L
     private var fadeMonitorJob: Job? = null
     private var manualFadeJob: Job? = null
+    private var trackChangeFadePending = false
     private var cloudErrorSkipJob: Job? = null
+    private var cloudPrefetchJob: Job? = null
     private var cloudPreviewHandledMediaId: String? = null
     private var cloudSinkEmptySinceMs = 0L
     private var cloudRecentCandidateMediaId: String? = null
@@ -169,6 +172,14 @@ class PlaybackService : MediaLibraryService() {
                     fadeInStartedAtMs = 0L
                     exoPlayer.volume = 1f
                 }
+                scheduleNextCloudPrefetch()
+            }
+
+            override fun onTimelineChanged(
+                timeline: Timeline,
+                reason: Int,
+            ) {
+                scheduleNextCloudPrefetch()
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -605,6 +616,7 @@ class PlaybackService : MediaLibraryService() {
         fadeMonitorJob?.cancel()
         manualFadeJob?.cancel()
         cloudErrorSkipJob?.cancel()
+        cloudPrefetchJob?.cancel()
         exoPlayer.removeListener(playbackListener)
         topDisplayModeController.release()
         desktopLyricsController.release()
@@ -617,6 +629,19 @@ class PlaybackService : MediaLibraryService() {
         }
         cloudAudioCache.release()
         super.onDestroy()
+    }
+
+    private fun scheduleNextCloudPrefetch() {
+        cloudPrefetchJob?.cancel()
+        val nextIndex = exoPlayer.currentMediaItemIndex + 1
+        if (nextIndex !in 0 until exoPlayer.mediaItemCount) return
+        val nextItem = exoPlayer.getMediaItemAt(nextIndex)
+        cloudPrefetchJob =
+            serviceScope.launch {
+                delay(CLOUD_PREFETCH_DELAY_MS)
+                runCatching { cloudPlaybackItemResolver.prefetch(nextItem) }
+                    .onFailure { Timber.tag("PlaybackService").d(it, "Unable to prefetch next cloud stream") }
+            }
     }
 
     private fun buildExoPlayer(enableHiFi: Boolean): ExoPlayer {
@@ -871,6 +896,7 @@ class PlaybackService : MediaLibraryService() {
                     fadeEnabled = it
                     if (!it) {
                         manualFadeJob?.cancel()
+                        trackChangeFadePending = false
                         manualFadeActive = false
                         fadeInStartedAtMs = 0L
                         playerScope.launch { exoPlayer.volume = 1f }
@@ -1049,6 +1075,14 @@ class PlaybackService : MediaLibraryService() {
     }
 
     private fun requestPlayWithFade(action: () -> Unit) {
+        // seekToNext()/seekTo(index) is intentionally delayed for a very short fade-out.
+        // MediaBrowser immediately follows those commands with play()/playWhenReady=true.
+        // Cancelling manualFadeJob here used to cancel the still-pending seek itself, which made
+        // every next/previous/list-row action appear dead until playback was paused.
+        if (trackChangeFadePending) {
+            action()
+            return
+        }
         manualFadeJob?.cancel()
         manualFadeActive = false
         if (!fadeEnabled || exoPlayer.currentMediaItem == null || exoPlayer.isPlaying) {
@@ -1060,12 +1094,17 @@ class PlaybackService : MediaLibraryService() {
         action()
     }
 
-    private fun requestFadeOut(action: () -> Unit) {
+    private fun requestFadeOut(
+        trackChange: Boolean = false,
+        action: () -> Unit,
+    ) {
         if (!fadeEnabled || !exoPlayer.isPlaying) {
+            trackChangeFadePending = false
             action()
             return
         }
         manualFadeJob?.cancel()
+        trackChangeFadePending = trackChange
         manualFadeJob =
             playerScope.launch {
                 manualFadeActive = true
@@ -1084,13 +1123,14 @@ class PlaybackService : MediaLibraryService() {
                     exoPlayer.volume = 0f
                     action()
                 } finally {
+                    trackChangeFadePending = false
                     manualFadeActive = false
                 }
             }
     }
 
     private fun requestTrackChangeWithFade(action: () -> Unit) {
-        requestFadeOut {
+        requestFadeOut(trackChange = true) {
             action()
             if (!fadeEnabled) exoPlayer.volume = 1f
         }
@@ -1162,11 +1202,15 @@ class PlaybackService : MediaLibraryService() {
 
         const val DEFAULT_FADE_DURATION_MS = 4_000L
         const val FADE_TICK_MS = 50L
-        const val CONTROL_FADE_MAX_MS = 600L
+
+        // Transport controls must still feel immediate. Natural end-of-track fading continues to
+        // use the user-selected duration; only explicit next/previous/list selection is capped.
+        const val CONTROL_FADE_MAX_MS = 180L
         const val CACHE_TRIM_INTERVAL_MS = 30_000L
         const val HEADSET_RESUME_WINDOW_MS = 10 * 60 * 1_000L
         const val CLOUD_MEDIA_ID_PREFIX = "cloud:"
         const val CLOUD_ERROR_SKIP_DELAY_MS = 600L
+        const val CLOUD_PREFETCH_DELAY_MS = 120L
         const val CLOUD_UNDERRUN_CONFIRM_MS = 3_000L
         const val CLOUD_UNDERRUN_MIN_BUFFERED_MS = 8_000L
         const val CLOUD_NATURAL_END_GUARD_MS = 5_000L

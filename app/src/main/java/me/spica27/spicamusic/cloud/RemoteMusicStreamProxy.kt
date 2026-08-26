@@ -1,5 +1,6 @@
 package me.spica27.spicamusic.cloud
 
+import android.os.SystemClock
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.cio.CIO
@@ -21,6 +22,7 @@ import okhttp3.Request
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.ServerSocket
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Keeps provider credentials and short-lived upstream URLs out of Media3's queue.
@@ -32,8 +34,15 @@ class RemoteMusicStreamProxy(
     private val accountStore: CloudAccountStore,
     private val clients: RemoteMusicClientRegistry,
 ) {
+    private data class CachedStreamUrl(
+        val value: String,
+        val expiresAtMs: Long,
+    )
+
     private val upstreamClient = baseClient.newBuilder().build()
     private val startMutex = Mutex()
+    private val streamUrlCache = ConcurrentHashMap<String, CachedStreamUrl>()
+    private val streamUrlLocks = ConcurrentHashMap<String, Mutex>()
 
     @Volatile
     private var server: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>? = null
@@ -52,6 +61,14 @@ class RemoteMusicStreamProxy(
     ): String {
         ensureStarted()
         return "http://127.0.0.1:$port/remote/$accountId/$songId"
+    }
+
+    /** Resolve the short-lived provider URL before ExoPlayer advances to this item. */
+    suspend fun prefetch(
+        account: RemoteMusicAccount,
+        songId: String,
+    ) {
+        resolveUpstreamUrl(account, songId)
     }
 
     private suspend fun ensureStarted() {
@@ -81,7 +98,7 @@ class RemoteMusicStreamProxy(
                                 return@get
                             }
                             val upstreamUrl =
-                                runCatching { clients.resolveStreamUrl(account, songId) }
+                                runCatching { resolveUpstreamUrl(account, songId) }
                                     .getOrElse {
                                         call.respond(
                                             HttpStatusCode.BadGateway,
@@ -112,6 +129,9 @@ class RemoteMusicStreamProxy(
                                 upstreamClient.newCall(requestBuilder.build()).execute()
                             }.use { response ->
                                 if (!response.isSuccessful && response.code != 206) {
+                                    if (response.code == 401 || response.code == 403) {
+                                        streamUrlCache.remove(streamCacheKey(account.id, songId))
+                                    }
                                     call.respond(
                                         HttpStatusCode.fromValue(
                                             if (response.code in 400..599) response.code else 502,
@@ -163,10 +183,37 @@ class RemoteMusicStreamProxy(
         }
     }
 
+    private suspend fun resolveUpstreamUrl(
+        account: RemoteMusicAccount,
+        songId: String,
+    ): String {
+        val key = streamCacheKey(account.id, songId)
+        val nowMs = SystemClock.elapsedRealtime()
+        streamUrlCache[key]?.takeIf { it.expiresAtMs > nowMs }?.let { return it.value }
+        val lock = streamUrlLocks.getOrPut(key, ::Mutex)
+        return lock.withLock {
+            val lockedNowMs = SystemClock.elapsedRealtime()
+            streamUrlCache[key]?.takeIf { it.expiresAtMs > lockedNowMs }?.value
+                ?: clients.resolveStreamUrl(account, songId).also { resolved ->
+                    streamUrlCache[key] =
+                        CachedStreamUrl(
+                            value = resolved,
+                            expiresAtMs = lockedNowMs + STREAM_URL_CACHE_MS,
+                        )
+                }
+        }
+    }
+
+    private fun streamCacheKey(
+        accountId: String,
+        songId: String,
+    ): String = "$accountId:$songId"
+
     private companion object {
         val SAFE_ID = Regex("^[A-Za-z0-9_.:-]{1,160}$")
         val SAFE_RANGE = Regex("^bytes=\\d*-\\d*$")
         const val BUFFER_SIZE = 64 * 1024
+        const val STREAM_URL_CACHE_MS = 2 * 60 * 1000L
     }
 }
 

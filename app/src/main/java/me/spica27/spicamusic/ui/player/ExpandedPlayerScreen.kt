@@ -197,6 +197,7 @@ fun ExpandedPlayerScreen(
 
     val songLikeState by viewModel.currentSongIsLike.collectAsStateWithLifecycle()
     val sleepTimerRemainingMs by viewModel.sleepTimerRemainingMs.collectAsStateWithLifecycle()
+    val sleepTimerDurationMs by viewModel.sleepTimerDurationMs.collectAsStateWithLifecycle()
     var lyricsArtworkPainter by remember { mutableStateOf<Painter?>(null) }
     var showLyricsEditor by remember { mutableStateOf(false) }
 
@@ -557,6 +558,7 @@ fun ExpandedPlayerScreen(
                             onPlayModeClick = viewModel::togglePlayMode,
                             onFavoriteClick = viewModel::toggleLikeCurrentSong,
                             sleepTimerRemainingMs = sleepTimerRemainingMs,
+                            sleepTimerDurationMs = sleepTimerDurationMs,
                             onSleepTimerSet = viewModel::setSleepTimer,
                             onSleepTimerCancel = viewModel::cancelSleepTimer,
                             showControls = true,
@@ -602,7 +604,8 @@ fun ExpandedPlayerScreen(
                             Modifier
                                 .align(Alignment.TopStart)
                                 .statusBarsPadding()
-                                .padding(start = Spacing.Large, top = 12.dp),
+                                .padding(start = Spacing.Large, top = 12.dp)
+                                .size(48.dp),
                         colors =
                             IconButtonDefaults.iconButtonColors().copy(
                                 containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -614,7 +617,7 @@ fun ExpandedPlayerScreen(
                             contentDescription = stringResource(R.string.back),
                             modifier =
                                 Modifier
-                                    .size(32.dp)
+                                    .size(24.dp)
                                     .graphicsLayer {
                                         rotationZ = 90f * lyricsTransitionProgressProvider()
                                     },
@@ -734,9 +737,11 @@ private fun TopBar(
         ) {
             IconButton(
                 modifier =
-                    Modifier.graphicsLayer {
-                        alpha = if (showNavigationButton) 1f else 0f
-                    },
+                    Modifier
+                        .size(48.dp)
+                        .graphicsLayer {
+                            alpha = if (showNavigationButton) 1f else 0f
+                        },
                 enabled = showNavigationButton,
                 onClick = {
                     onCollapse.invoke()
@@ -751,7 +756,7 @@ private fun TopBar(
                     imageVector = Icons.Rounded.KeyboardArrowDown,
                     contentDescription = stringResource(R.string.collapse),
                     tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(32.dp),
+                    modifier = Modifier.size(24.dp),
                 )
             }
             Spacer(modifier = Modifier.weight(1f))

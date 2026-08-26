@@ -650,7 +650,7 @@
   <string name="settings_theme_mode_title">主题模式</string>
   <string name="settings_theme_mode_subtitle">跟随系统、浅色或深色</string>
   <string name="settings_circular_reveal_title">圆形揭示</string>
-  <string name="settings_circular_reveal_subtitle">切换浅色与深色主题时使用圆形扩散动画</string>
+  <string name="settings_circular_reveal_subtitle">切换深浅主题或歌曲配色时使用圆形扩散动画</string>
   <string name="settings_theme_mode_system">跟随系统</string>
   <string name="settings_theme_mode_light">浅色</string>
   <string name="settings_theme_mode_dark">深色</string>
@@ -749,6 +749,14 @@
   <string name="sleep_timer_minutes">%1$d 分钟</string>
   <string name="sleep_timer_cancel">取消定时</string>
   <string name="sleep_timer_close">关闭</string>
+  <string name="sleep_timer_dialog_subtitle">选择停止播放的时间。</string>
+  <string name="sleep_timer_unit_minutes">分钟</string>
+  <string name="sleep_timer_custom">自定义时长</string>
+  <string name="sleep_timer_custom_hint">使用 −/+ 微调时长</string>
+  <string name="sleep_timer_start">开始计时</string>
+  <string name="sleep_timer_active_hint">定时结束后暂停播放</string>
+  <string name="local_lyrics_source">本地歌词</string>
+  <string name="embedded_lyrics_tag">内嵌标签</string>
   <string name="cloud_library">云端音乐库</string>
   <string name="music_source_all">全部歌曲</string>
   <string name="music_source_local">本地歌曲</string>

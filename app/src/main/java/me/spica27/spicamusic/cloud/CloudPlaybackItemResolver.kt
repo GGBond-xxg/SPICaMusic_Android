@@ -20,6 +20,25 @@ class CloudPlaybackItemResolver(
     private val remoteProxy: RemoteMusicStreamProxy,
     private val onlineSourceProxy: OnlineSourceStreamProxy,
 ) {
+    /** Warm the next authenticated cloud stream without downloading its audio body. */
+    suspend fun prefetch(item: MediaItem) {
+        if (!item.mediaId.startsWith(CLOUD_ID_PREFIX)) return
+        val identity = parseCloudMediaIdentity(item.mediaId) ?: return
+        if (
+            identity.provider != NETEASE_PROVIDER &&
+            identity.provider != QQ_MUSIC_PROVIDER &&
+            identity.provider != SUBSONIC_PROVIDER
+        ) {
+            return
+        }
+        val account =
+            accountStore
+                .getRemoteAccounts()
+                .firstOrNull { it.id == identity.accountOrChatId }
+                ?: return
+        remoteProxy.prefetch(account, identity.songId)
+    }
+
     suspend fun resolve(item: MediaItem): MediaItem {
         if (!item.mediaId.startsWith(CLOUD_ID_PREFIX)) return item
 
@@ -188,6 +207,7 @@ class CloudPlaybackItemResolver(
         const val ONLINE_PROVIDER = "online"
         const val NETEASE_PROVIDER = "netease"
         const val QQ_MUSIC_PROVIDER = "qq_music"
+        const val SUBSONIC_PROVIDER = "subsonic"
         const val EXTRA_TELEGRAM_COVER_FILE_ID = "telegramCoverFileId"
         const val EXTRA_CLOUD_ARTWORK_ITEM_ID = "cloudArtworkItemId"
         const val EXTRA_ONLINE_SOURCE = "onlineSource"

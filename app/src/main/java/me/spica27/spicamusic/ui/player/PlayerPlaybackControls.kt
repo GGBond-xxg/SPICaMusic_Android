@@ -43,12 +43,10 @@ import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material.icons.rounded.Timer
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -294,6 +292,7 @@ fun PlayerPlaybackBottomSection(
     onPlayModeClick: () -> Unit,
     onFavoriteClick: () -> Unit,
     sleepTimerRemainingMs: Long? = null,
+    sleepTimerDurationMs: Long? = null,
     onSleepTimerSet: (Int) -> Unit = {},
     onSleepTimerCancel: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -338,6 +337,7 @@ fun PlayerPlaybackBottomSection(
                     onPlayModeClick = onPlayModeClick,
                     onFavoriteClick = onFavoriteClick,
                     sleepTimerRemainingMs = sleepTimerRemainingMs,
+                    sleepTimerDurationMs = sleepTimerDurationMs,
                     onSleepTimerSet = onSleepTimerSet,
                     onSleepTimerCancel = onSleepTimerCancel,
                 )
@@ -521,6 +521,7 @@ fun PlayerTransportControls(
     onPlayModeClick: () -> Unit,
     onFavoriteClick: () -> Unit,
     sleepTimerRemainingMs: Long? = null,
+    sleepTimerDurationMs: Long? = null,
     onSleepTimerSet: (Int) -> Unit = {},
     onSleepTimerCancel: () -> Unit = {},
 ) {
@@ -534,42 +535,12 @@ fun PlayerTransportControls(
         }
 
     if (showSleepTimerDialog) {
-        AlertDialog(
-            onDismissRequest = { showSleepTimerDialog = false },
-            title = {
-                Text(text = stringResource(R.string.sleep_timer))
-            },
-            text = {
-                Column {
-                    listOf(15, 30, 45, 60).forEach { minutes ->
-                        TextButton(
-                            onClick = {
-                                onSleepTimerSet(minutes)
-                                showSleepTimerDialog = false
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(text = stringResource(R.string.sleep_timer_minutes, minutes))
-                        }
-                    }
-                    if (sleepTimerRemainingMs != null) {
-                        TextButton(
-                            onClick = {
-                                onSleepTimerCancel()
-                                showSleepTimerDialog = false
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(text = stringResource(R.string.sleep_timer_cancel))
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showSleepTimerDialog = false }) {
-                    Text(text = stringResource(R.string.sleep_timer_close))
-                }
-            },
+        SleepTimerSheet(
+            durationMs = sleepTimerDurationMs,
+            remainingMs = sleepTimerRemainingMs,
+            onSetTimer = onSleepTimerSet,
+            onCancelTimer = onSleepTimerCancel,
+            onDismiss = { showSleepTimerDialog = false },
         )
     }
 

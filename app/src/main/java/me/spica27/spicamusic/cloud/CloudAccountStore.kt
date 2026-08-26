@@ -24,27 +24,22 @@ class CloudAccountStore(
     private val preferences =
         context.getSharedPreferences("cloud_library_accounts", Context.MODE_PRIVATE)
 
+    private val accountCacheLock = Any()
+
+    @Volatile
+    private var mediaServerAccountsCache: List<MediaServerAccount>? = null
+
+    @Volatile
+    private var remoteMusicAccountsCache: List<RemoteMusicAccount>? = null
+
     fun getAccounts(type: MediaServerType? = null): List<MediaServerAccount> {
-        val payload = decrypt(preferences.getString(KEY_MEDIA_SERVERS, null)) ?: return emptyList()
-        val array = runCatching { JSONArray(payload) }.getOrNull() ?: return emptyList()
-        return buildList {
-            for (index in 0 until array.length()) {
-                val item = array.optJSONObject(index) ?: continue
-                val account =
-                    runCatching {
-                        MediaServerAccount(
-                            id = item.getString("id"),
-                            type = MediaServerType.valueOf(item.getString("type")),
-                            displayName = item.getString("displayName"),
-                            serverUrl = item.getString("serverUrl"),
-                            username = item.getString("username"),
-                            userId = item.getString("userId"),
-                            accessToken = item.getString("accessToken"),
-                        )
-                    }.getOrNull() ?: continue
-                if (type == null || account.type == type) add(account)
+        val accounts =
+            mediaServerAccountsCache ?: synchronized(accountCacheLock) {
+                mediaServerAccountsCache ?: readMediaServerAccounts().also {
+                    mediaServerAccountsCache = it
+                }
             }
-        }
+        return if (type == null) accounts else accounts.filter { it.type == type }
     }
 
     fun saveAccount(account: MediaServerAccount) {
@@ -63,6 +58,7 @@ class CloudAccountStore(
             )
         }
         preferences.edit().putString(KEY_MEDIA_SERVERS, encrypt(array.toString())).apply()
+        mediaServerAccountsCache = accounts
     }
 
     fun removeAccount(id: String) {
@@ -81,31 +77,19 @@ class CloudAccountStore(
             )
         }
         preferences.edit().putString(KEY_MEDIA_SERVERS, encrypt(array.toString())).apply()
+        mediaServerAccountsCache = remaining
     }
 
     fun newAccountId(): String = UUID.randomUUID().toString()
 
     fun getRemoteAccounts(provider: RemoteMusicProvider? = null): List<RemoteMusicAccount> {
-        val payload = decrypt(preferences.getString(KEY_REMOTE_MUSIC, null)) ?: return emptyList()
-        val array = runCatching { JSONArray(payload) }.getOrNull() ?: return emptyList()
-        return buildList {
-            for (index in 0 until array.length()) {
-                val item = array.optJSONObject(index) ?: continue
-                val account =
-                    runCatching {
-                        RemoteMusicAccount(
-                            id = item.getString("id"),
-                            provider = RemoteMusicProvider.valueOf(item.getString("provider")),
-                            displayName = item.getString("displayName"),
-                            serverUrl = item.optString("serverUrl"),
-                            username = item.optString("username"),
-                            secret = item.getString("secret"),
-                            userId = item.optString("userId"),
-                        )
-                    }.getOrNull() ?: continue
-                if (provider == null || account.provider == provider) add(account)
+        val accounts =
+            remoteMusicAccountsCache ?: synchronized(accountCacheLock) {
+                remoteMusicAccountsCache ?: readRemoteMusicAccounts().also {
+                    remoteMusicAccountsCache = it
+                }
             }
-        }
+        return if (provider == null) accounts else accounts.filter { it.provider == provider }
     }
 
     fun saveRemoteAccount(account: RemoteMusicAccount) {
@@ -131,6 +115,49 @@ class CloudAccountStore(
             )
         }
         preferences.edit().putString(KEY_REMOTE_MUSIC, encrypt(array.toString())).apply()
+        remoteMusicAccountsCache = accounts
+    }
+
+    private fun readMediaServerAccounts(): List<MediaServerAccount> {
+        val payload = decrypt(preferences.getString(KEY_MEDIA_SERVERS, null)) ?: return emptyList()
+        val array = runCatching { JSONArray(payload) }.getOrNull() ?: return emptyList()
+        return buildList {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                runCatching {
+                    MediaServerAccount(
+                        id = item.getString("id"),
+                        type = MediaServerType.valueOf(item.getString("type")),
+                        displayName = item.getString("displayName"),
+                        serverUrl = item.getString("serverUrl"),
+                        username = item.getString("username"),
+                        userId = item.getString("userId"),
+                        accessToken = item.getString("accessToken"),
+                    )
+                }.getOrNull()?.let(::add)
+            }
+        }
+    }
+
+    private fun readRemoteMusicAccounts(): List<RemoteMusicAccount> {
+        val payload = decrypt(preferences.getString(KEY_REMOTE_MUSIC, null)) ?: return emptyList()
+        val array = runCatching { JSONArray(payload) }.getOrNull() ?: return emptyList()
+        return buildList {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                runCatching {
+                    RemoteMusicAccount(
+                        id = item.getString("id"),
+                        provider = RemoteMusicProvider.valueOf(item.getString("provider")),
+                        displayName = item.getString("displayName"),
+                        serverUrl = item.optString("serverUrl"),
+                        username = item.optString("username"),
+                        secret = item.getString("secret"),
+                        userId = item.optString("userId"),
+                    )
+                }.getOrNull()?.let(::add)
+            }
+        }
     }
 
     fun getTelegramConfig(): TelegramConfig? {

@@ -816,7 +816,8 @@ private fun SearchRemoteSongItem(
             Text(
                 text = "$sourceLabel · ${song.accountName}",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

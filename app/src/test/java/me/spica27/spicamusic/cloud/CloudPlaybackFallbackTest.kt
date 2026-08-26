@@ -34,6 +34,13 @@ class CloudPlaybackFallbackTest {
     }
 
     @Test
+    fun `authenticated fallback does not wait for anonymous URL resolution`() {
+        assertTrue(shouldDeferOnlineResolution(preferFallback = true, fallbackUrl = "http://account-stream"))
+        assertFalse(shouldDeferOnlineResolution(preferFallback = false, fallbackUrl = "http://account-stream"))
+        assertFalse(shouldDeferOnlineResolution(preferFallback = true, fallbackUrl = null))
+    }
+
+    @Test
     fun `cloud preview underrun skips only when decoded audio is exhausted despite buffered data`() {
         assertTrue(
             shouldHandleCloudAudioUnderrun(
