@@ -62,6 +62,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
@@ -618,20 +619,29 @@ fun ExpandedPlayerScreen(
                                 .size(48.dp),
                         colors =
                             IconButtonDefaults.iconButtonColors().copy(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                containerColor = Color.Transparent,
                                 contentColor = MaterialTheme.colorScheme.onSurface,
                             ),
                     ) {
-                        Icon(
-                            imageVector = Icons.Rounded.KeyboardArrowDown,
-                            contentDescription = stringResource(R.string.back),
+                        Box(
                             modifier =
                                 Modifier
-                                    .size(24.dp)
-                                    .graphicsLayer {
-                                        rotationZ = 90f * lyricsTransitionProgressProvider()
-                                    },
-                        )
+                                    .size(42.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surfaceContainer),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.KeyboardArrowDown,
+                                contentDescription = stringResource(R.string.back),
+                                modifier =
+                                    Modifier
+                                        .size(28.dp)
+                                        .graphicsLayer {
+                                            rotationZ = 90f * lyricsTransitionProgressProvider()
+                                        },
+                            )
+                        }
                     }
                     MorphingPlayerTopAction(
                         transitionProgressProvider = lyricsTransitionProgressProvider,
@@ -758,16 +768,25 @@ private fun TopBar(
                 },
                 colors =
                     IconButtonDefaults.iconButtonColors().copy(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        containerColor = Color.Transparent,
                         contentColor = MaterialTheme.colorScheme.onSurface,
                     ),
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.KeyboardArrowDown,
-                    contentDescription = stringResource(R.string.collapse),
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(24.dp),
-                )
+                Box(
+                    modifier =
+                        Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.KeyboardArrowDown,
+                        contentDescription = stringResource(R.string.collapse),
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(28.dp),
+                    )
+                }
             }
             Spacer(modifier = Modifier.weight(1f))
         }
@@ -783,12 +802,12 @@ private fun MorphingPlayerTopAction(
     modifier: Modifier = Modifier,
 ) {
     val progress = smoothStepProgress(transitionProgressProvider().coerceIn(0f, 1f))
-    val width = floatLerp(108f, 48f, progress).dp
+    val width = floatLerp(104f, 42f, progress).dp
     Box(
         modifier =
             modifier
                 .width(width)
-                .height(48.dp)
+                .height(42.dp)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .clickable {
@@ -809,7 +828,7 @@ private fun MorphingPlayerTopAction(
                 imageVector = Icons.AutoMirrored.Default.PlaylistPlay,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(24.dp),
+                modifier = Modifier.size(26.dp),
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
@@ -825,7 +844,7 @@ private fun MorphingPlayerTopAction(
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier =
                 Modifier
-                    .size(24.dp)
+                    .size(28.dp)
                     .graphicsLayer {
                         alpha = ((progress - 0.42f) / 0.58f).coerceIn(0f, 1f)
                         rotationZ = (1f - progress) * -24f

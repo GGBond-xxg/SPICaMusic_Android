@@ -74,6 +74,7 @@ fun LyricsEditorSheet(
     offsetMs: Long,
     textAlignment: LyricsTextAlignment,
     textScale: Float,
+    activeLineScale: Float,
     lineSpacing: Float,
     selectedFontId: String,
     customFonts: List<LyricsCustomFont>,
@@ -82,6 +83,7 @@ fun LyricsEditorSheet(
     onOffsetChange: (Long) -> Unit,
     onTextAlignmentChange: (LyricsTextAlignment) -> Unit,
     onTextScaleChange: (Float) -> Unit,
+    onActiveLineScaleChange: (Float) -> Unit,
     onLineSpacingChange: (Float) -> Unit,
     onFontSelected: (String) -> Unit,
     onFontDeleted: (LyricsCustomFont) -> Unit,
@@ -166,23 +168,6 @@ fun LyricsEditorSheet(
             }
 
             ExpandableEditorSection(
-                title = stringResource(R.string.lyrics_text_size),
-                value = stringResource(R.string.percentage_format, (textScale * 100f).roundToInt()),
-                icon = Icons.Rounded.FormatSize,
-                expanded = expandedSection == SECTION_TEXT_SIZE,
-                onToggle = {
-                    expandedSection = if (expandedSection == SECTION_TEXT_SIZE) null else SECTION_TEXT_SIZE
-                },
-            ) {
-                StepperRow(
-                    value = stringResource(R.string.percentage_format, (textScale * 100f).roundToInt()),
-                    onDecrease = { onTextScaleChange((textScale - TEXT_SCALE_STEP).coerceAtLeast(MIN_TEXT_SCALE)) },
-                    onReset = { onTextScaleChange(1f) },
-                    onIncrease = { onTextScaleChange((textScale + TEXT_SCALE_STEP).coerceAtMost(MAX_TEXT_SCALE)) },
-                )
-            }
-
-            ExpandableEditorSection(
                 title = stringResource(R.string.lyrics_line_spacing),
                 value = stringResource(R.string.percentage_format, (lineSpacing * 100f).roundToInt()),
                 icon = Icons.Rounded.FormatLineSpacing,
@@ -200,6 +185,23 @@ fun LyricsEditorSheet(
                     onIncrease = {
                         onLineSpacingChange((lineSpacing + LINE_SPACING_STEP).coerceAtMost(MAX_LINE_SPACING))
                     },
+                )
+            }
+
+            ExpandableEditorSection(
+                title = stringResource(R.string.lyrics_text_size),
+                value = stringResource(R.string.percentage_format, (textScale * 100f).roundToInt()),
+                icon = Icons.Rounded.FormatSize,
+                expanded = expandedSection == SECTION_TEXT_SIZE,
+                onToggle = {
+                    expandedSection = if (expandedSection == SECTION_TEXT_SIZE) null else SECTION_TEXT_SIZE
+                },
+            ) {
+                StepperRow(
+                    value = stringResource(R.string.percentage_format, (textScale * 100f).roundToInt()),
+                    onDecrease = { onTextScaleChange((textScale - TEXT_SCALE_STEP).coerceAtLeast(MIN_TEXT_SCALE)) },
+                    onReset = { onTextScaleChange(1f) },
+                    onIncrease = { onTextScaleChange((textScale + TEXT_SCALE_STEP).coerceAtMost(MAX_TEXT_SCALE)) },
                 )
             }
 
@@ -276,6 +278,32 @@ fun LyricsEditorSheet(
                         }
                     }
                 }
+            }
+
+            ExpandableEditorSection(
+                title = stringResource(R.string.lyrics_active_line_size),
+                value = formatScale(activeLineScale),
+                icon = Icons.Rounded.FormatSize,
+                expanded = expandedSection == SECTION_ACTIVE_LINE_SIZE,
+                onToggle = {
+                    expandedSection =
+                        if (expandedSection == SECTION_ACTIVE_LINE_SIZE) null else SECTION_ACTIVE_LINE_SIZE
+                },
+            ) {
+                ActiveLineScaleRow(
+                    value = activeLineScale,
+                    onDecrease = {
+                        onActiveLineScaleChange(
+                            (activeLineScale - ACTIVE_LINE_SCALE_STEP).coerceAtLeast(MIN_ACTIVE_LINE_SCALE),
+                        )
+                    },
+                    onPreset = onActiveLineScaleChange,
+                    onIncrease = {
+                        onActiveLineScaleChange(
+                            (activeLineScale + ACTIVE_LINE_SCALE_STEP).coerceAtMost(MAX_ACTIVE_LINE_SCALE),
+                        )
+                    },
+                )
             }
 
             EditorSection(title = stringResource(R.string.lyrics_timing)) {
@@ -378,6 +406,69 @@ private fun StepperRow(
         }
         LyricsCircleButton(onClick = onIncrease, size = 40.dp, containerColor = MaterialTheme.colorScheme.surface) {
             Icon(Icons.Rounded.Add, increaseDescription)
+        }
+    }
+}
+
+@Composable
+private fun ActiveLineScaleRow(
+    value: Float,
+    onDecrease: () -> Unit,
+    onPreset: (Float) -> Unit,
+    onIncrease: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                .padding(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        LyricsCircleButton(
+            onClick = onDecrease,
+            size = 40.dp,
+            containerColor = MaterialTheme.colorScheme.surface,
+        ) {
+            Icon(Icons.Rounded.Remove, null)
+        }
+        ACTIVE_LINE_SCALE_PRESETS.forEach { preset ->
+            val selected = kotlin.math.abs(value - preset) < 0.005f
+            LyricsPill(
+                modifier = Modifier.weight(1f),
+                onClick = { onPreset(preset) },
+                horizontalPadding = 4.dp,
+                verticalPadding = 10.dp,
+                containerColor =
+                    if (selected) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surface
+                    },
+            ) {
+                Text(
+                    text = formatScale(preset),
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    color =
+                        if (selected) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                )
+            }
+        }
+        LyricsCircleButton(
+            onClick = onIncrease,
+            size = 40.dp,
+            containerColor = MaterialTheme.colorScheme.surface,
+        ) {
+            Icon(Icons.Rounded.Add, null)
         }
     }
 }
@@ -486,6 +577,8 @@ private fun formatOffset(offsetMs: Long): String {
     }
 }
 
+private fun formatScale(scale: Float): String = String.format(Locale.US, "%.2f", scale)
+
 @Composable
 private fun localizedLyricSourceName(source: SongLyrics): String =
     if (source.name == LEGACY_LOCAL_LYRICS_NAME) {
@@ -503,12 +596,17 @@ private fun localizedLyricSourceArtist(source: SongLyrics): String? =
     }
 
 private const val SECTION_TEXT_SIZE = "text_size"
+private const val SECTION_ACTIVE_LINE_SIZE = "active_line_size"
 private const val SECTION_LINE_SPACING = "line_spacing"
 private const val SECTION_FONT = "font"
 private const val SECTION_LYRICS_SOURCE = "lyrics_source"
 private const val MIN_TEXT_SCALE = 0.8f
 private const val MAX_TEXT_SCALE = 1.3f
 private const val TEXT_SCALE_STEP = 0.05f
+private const val MIN_ACTIVE_LINE_SCALE = 1f
+private const val MAX_ACTIVE_LINE_SCALE = 1.2f
+private const val ACTIVE_LINE_SCALE_STEP = 0.02f
+private val ACTIVE_LINE_SCALE_PRESETS = listOf(1f, 1.12f, 1.2f)
 private const val MIN_LINE_SPACING = 0.6f
 private const val MAX_LINE_SPACING = 1.8f
 private const val LINE_SPACING_STEP = 0.1f

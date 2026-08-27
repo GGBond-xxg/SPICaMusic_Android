@@ -337,6 +337,7 @@
   <string name="lyrics_alignment">歌词对齐</string>
   <string name="lyrics_timing">时间偏移</string>
   <string name="lyrics_text_size">文字大小</string>
+  <string name="lyrics_active_line_size">当前歌词大小</string>
   <string name="lyrics_line_spacing">行间距</string>
   <string name="lyrics_font_style">字体样式</string>
   <string name="default_font">默认字体</string>

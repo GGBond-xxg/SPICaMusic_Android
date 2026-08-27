@@ -49,6 +49,7 @@ class PreferencesManager(
         val PROGRESS_BAR_STYLE = stringPreferencesKey("progress_bar_style")
         val LYRICS_TEXT_ALIGNMENT = stringPreferencesKey("lyrics_text_alignment")
         val LYRICS_TEXT_SCALE = stringPreferencesKey("lyrics_text_scale")
+        val LYRICS_ACTIVE_LINE_SCALE = stringPreferencesKey("lyrics_active_line_scale")
         val LYRICS_LINE_SPACING = stringPreferencesKey("lyrics_line_spacing")
         val LYRICS_FONT_ID = stringPreferencesKey("lyrics_font_id")
         val LYRICS_CUSTOM_FONTS = stringPreferencesKey("lyrics_custom_fonts")

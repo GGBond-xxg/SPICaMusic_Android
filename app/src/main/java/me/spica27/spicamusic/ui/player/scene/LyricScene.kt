@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.MusicNote
@@ -40,6 +41,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
@@ -265,55 +267,16 @@ fun LyricsPlayerPage(
             ?.toString()
             ?: stringResource(R.string.unknown_artist)
     val artworkUri = currentMediaItem?.mediaMetadata?.artworkUri ?: heroArtworkUri
-    val playerColor by playerViewModel.playerThemeColor.collectAsStateWithLifecycle()
 
     Box(
         modifier =
             modifier
                 .fillMaxSize()
-                // The 56.dp ambient artwork blur must stay inside this pager page.
-                // Without clipping it paints a vertical band over the player page
-                // while the two pages are being dragged between.
-                .clipToBounds()
-                .background(MaterialTheme.colorScheme.surface),
+                // This page intentionally has no backdrop. ExpandedPlayerScreen owns the
+                // single shared player background, so swiping to lyrics only replaces
+                // foreground components instead of sliding in another color treatment.
+                .clipToBounds(),
     ) {
-        val backdropModifier =
-            Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    scaleX = 1.28f
-                    scaleY = 1.28f
-                    alpha = 0.42f
-                }.blur(56.dp)
-        if (artworkPainter != null) {
-            Image(
-                painter = artworkPainter,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = backdropModifier,
-            )
-        } else {
-            AudioCover(
-                uri = artworkUri,
-                modifier = backdropModifier,
-            )
-        }
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors =
-                                listOf(
-                                    playerColor.copy(alpha = 0.72f),
-                                    playerColor.copy(alpha = 0.58f),
-                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                                ),
-                        ),
-                    ),
-        )
-
         Column(modifier = Modifier.fillMaxSize()) {
             LyricsHeader(
                 title = title,
@@ -472,20 +435,29 @@ private fun LyricsHeader(
                     },
             colors =
                 IconButtonDefaults.iconButtonColors().copy(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    containerColor = Color.Transparent,
                     contentColor = MaterialTheme.colorScheme.onSurface,
                 ),
         ) {
-            Icon(
-                imageVector = Icons.Rounded.KeyboardArrowDown,
-                contentDescription = stringResource(R.string.back),
+            Box(
                 modifier =
                     Modifier
-                        .size(24.dp)
-                        .graphicsLayer {
-                            rotationZ = 90f * enterProgressProvider().coerceIn(0f, 1f)
-                        },
-            )
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = stringResource(R.string.back),
+                    modifier =
+                        Modifier
+                            .size(28.dp)
+                            .graphicsLayer {
+                                rotationZ = 90f * enterProgressProvider().coerceIn(0f, 1f)
+                            },
+                )
+            }
         }
 
         // 封面缩略图（飞行目标）
@@ -572,7 +544,7 @@ private fun LyricsHeader(
         if (reserveTrailingActionSpace) {
             // ExpandedPlayerScreen draws the lyric-edit action above this header. Reserve its
             // complete touch target plus the Row spacing so long titles never run underneath it.
-            Spacer(modifier = Modifier.width(48.dp))
+            Spacer(modifier = Modifier.width(42.dp))
         }
     }
 }

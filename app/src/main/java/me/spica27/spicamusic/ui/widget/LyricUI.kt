@@ -54,9 +54,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.clipRect
@@ -101,6 +104,8 @@ private object LyricUIConstants {
     const val EMPHASIS_FACTOR = 0.18f
     const val MIN_EMPHASIS = 0.35f
     const val MAX_BLUR_RADIUS = 6f
+
+    const val FULLSCREEN_TOP_FADE_HEIGHT = 88f
 
     const val ELASTIC_OFFSET_INITIAL = 100f
     const val STAGGER_DELAY_PER_ITEM = 35L
@@ -186,6 +191,7 @@ private data class LyricsUIStyle(
     val wordsTextStyle: TextStyle,
     val wordsTranslationTextStyle: TextStyle,
     val activeScale: Float,
+    val scaleSafetyGutter: Dp,
     val itemSpacing: Dp,
     val horizontalPadding: Dp,
     val verticalPadding: Dp,
@@ -195,11 +201,12 @@ private data class LyricsUIStyle(
 private fun rememberLyricsUIStyle(
     displayMode: LyricsDisplayMode,
     textScale: Float,
+    activeLineScale: Float,
     lineSpacing: Float,
     fontFamily: FontFamily?,
 ): LyricsUIStyle {
     val typography = MaterialTheme.typography
-    return remember(typography, displayMode, textScale, lineSpacing, fontFamily) {
+    return remember(typography, displayMode, textScale, activeLineScale, lineSpacing, fontFamily) {
         fun TextStyle.forLyrics(): TextStyle =
             copy(
                 fontSize = fontSize * textScale,
@@ -214,7 +221,8 @@ private fun rememberLyricsUIStyle(
                     translationTextStyle = typography.titleMedium.forLyrics(),
                     wordsTextStyle = typography.headlineSmall.forLyrics().copy(fontWeight = FontWeight.ExtraBold),
                     wordsTranslationTextStyle = typography.bodySmall.forLyrics(),
-                    activeScale = 1.12f,
+                    activeScale = activeLineScale,
+                    scaleSafetyGutter = 16.dp,
                     itemSpacing = 12.dp * lineSpacing,
                     horizontalPadding = 24.dp,
                     verticalPadding = 16.dp * lineSpacing,
@@ -226,7 +234,8 @@ private fun rememberLyricsUIStyle(
                     translationTextStyle = typography.bodyMedium.forLyrics(),
                     wordsTextStyle = typography.titleLarge.forLyrics().copy(fontWeight = FontWeight.ExtraBold),
                     wordsTranslationTextStyle = typography.bodySmall.forLyrics(),
-                    activeScale = 1.06f,
+                    activeScale = 1f + (activeLineScale - 1f) * 0.5f,
+                    scaleSafetyGutter = 8.dp,
                     itemSpacing = 6.dp * lineSpacing,
                     horizontalPadding = 16.dp,
                     verticalPadding = 8.dp * lineSpacing,
@@ -249,6 +258,7 @@ fun LyricsUI(
     displayMode: LyricsDisplayMode = LyricsDisplayMode.Fullscreen,
     textAlignment: LyricsTextAlignment = LyricsTextAlignment.Start,
     textScale: Float = 1f,
+    activeLineScale: Float = 1.12f,
     lineSpacing: Float = 1f,
     fontFamily: FontFamily? = null,
     onSeekToTime: (Long) -> Unit = {},
@@ -265,6 +275,7 @@ fun LyricsUI(
         rememberLyricsUIStyle(
             displayMode = displayMode,
             textScale = textScale.coerceIn(0.75f, 1.4f),
+            activeLineScale = activeLineScale.coerceIn(1f, 1.2f),
             lineSpacing = lineSpacing.coerceIn(0.6f, 1.8f),
             fontFamily = fontFamily,
         )
@@ -397,8 +408,35 @@ fun LyricsUI(
 
         val density = LocalDensity.current
 
+        val topFadeHeightPx =
+            with(density) { LyricUIConstants.FULLSCREEN_TOP_FADE_HEIGHT.dp.toPx() }
+        val edgeFadeModifier =
+            if (displayMode == LyricsDisplayMode.Fullscreen) {
+                Modifier
+                    .graphicsLayer {
+                        compositingStrategy = CompositingStrategy.Offscreen
+                    }.drawWithContent {
+                        drawContent()
+                        drawRect(
+                            brush =
+                                Brush.verticalGradient(
+                                    colors = listOf(Color.Transparent, Color.Black),
+                                    startY = 0f,
+                                    endY = topFadeHeightPx,
+                                ),
+                            size = Size(size.width, topFadeHeightPx),
+                            blendMode = BlendMode.DstIn,
+                        )
+                    }
+            } else {
+                Modifier
+            }
+
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .then(edgeFadeModifier),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(style.itemSpacing),
             contentPadding =
@@ -595,13 +633,21 @@ private fun LyricLine(
 ) {
     val inactiveTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
     val activeTextColor = MaterialTheme.colorScheme.onSurface
+    val scaleStartGutter =
+        if (textAlignment == LyricsTextAlignment.End) style.scaleSafetyGutter else 0.dp
+    val scaleEndGutter =
+        if (textAlignment == LyricsTextAlignment.Start) style.scaleSafetyGutter else 0.dp
+    val centeredGutter =
+        if (textAlignment == LyricsTextAlignment.Center) style.scaleSafetyGutter / 2 else 0.dp
 
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(Shapes.ExtraLarge2CornerBasedShape)
-                .graphicsLayer {
+                .padding(
+                    start = scaleStartGutter + centeredGutter,
+                    end = scaleEndGutter + centeredGutter,
+                ).graphicsLayer {
                     this.alpha = alpha
                     scaleX = scale
                     scaleY = scale
@@ -731,6 +777,12 @@ private fun WordsLyricLine(
     val baseTextColor = activeTextColor.copy(alpha = LyricUIConstants.BASE_TEXT_ALPHA * alpha)
     val translationColor =
         activeTextColor.copy(alpha = LyricUIConstants.TRANSLATION_TEXT_ALPHA * alpha)
+    val scaleStartGutter =
+        if (textAlignment == LyricsTextAlignment.End) style.scaleSafetyGutter else 0.dp
+    val scaleEndGutter =
+        if (textAlignment == LyricsTextAlignment.Start) style.scaleSafetyGutter else 0.dp
+    val centeredGutter =
+        if (textAlignment == LyricsTextAlignment.Center) style.scaleSafetyGutter / 2 else 0.dp
     val sortedWords = remember(lyric) { lyric.words.sortedBy { it.startTime } }
     val sentence = remember(sortedWords) { sortedWords.joinToString(separator = "") { it.content } }
     val wordRanges = remember(sortedWords) { buildWordRanges(sortedWords) }
@@ -781,13 +833,15 @@ private fun WordsLyricLine(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .blur(blurRadius)
-                .clip(Shapes.ExtraLarge2CornerBasedShape)
-                .graphicsLayer {
+                .padding(
+                    start = scaleStartGutter + centeredGutter,
+                    end = scaleEndGutter + centeredGutter,
+                ).graphicsLayer {
                     scaleX = scale
                     scaleY = scale
                     transformOrigin = textAlignment.transformOrigin
-                }.padding(
+                }.blur(blurRadius)
+                .padding(
                     horizontal = style.horizontalPadding,
                     vertical = style.verticalPadding,
                 ),

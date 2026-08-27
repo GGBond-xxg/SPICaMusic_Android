@@ -335,6 +335,7 @@
   <string name="lyrics_alignment">歌詞對齊</string>
   <string name="lyrics_timing">時間偏移</string>
   <string name="lyrics_text_size">文字大小</string>
+  <string name="lyrics_active_line_size">目前歌詞大小</string>
   <string name="lyrics_line_spacing">行距</string>
   <string name="lyrics_font_style">字體樣式</string>
   <string name="default_font">預設字體</string>
