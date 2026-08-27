@@ -13,6 +13,7 @@ import com.squareup.moshi.Moshi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import me.spica27.spicamusic.App
+import me.spica27.spicamusic.diagnostics.DiagnosticLog
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -41,6 +42,13 @@ object CrashHandler : Thread.UncaughtExceptionHandler {
     ) {
         if (!this::mContext.isInitialized) return
 
+        DiagnosticLog.write(
+            level = "E",
+            tag = "UncaughtException",
+            message = "thread=${t.name} id=${t.id} state=${t.state}",
+            throwable = e,
+        )
+        DiagnosticLog.writeRuntimeSnapshot(mContext, "java-crash")
         e.printStackTrace()
 
         try {

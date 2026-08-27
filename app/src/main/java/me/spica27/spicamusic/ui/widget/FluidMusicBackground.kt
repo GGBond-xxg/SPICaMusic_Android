@@ -10,8 +10,14 @@ import android.net.Uri
 import android.view.TextureView
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -26,10 +32,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
@@ -586,20 +594,6 @@ private fun TopGlowBackground(
     )
 }
 
-/** 线程安全数据持有者，供 LiquidAuroraBackground 绘制线程读取 */
-private class LiquidAuroraHolder {
-    @Volatile
-    var fftData: FloatArray = FloatArray(0)
-
-    @Volatile
-    var phase: Float = 0f
-
-    val layerColorA = IntArray(3)
-    val layerColorB = IntArray(3)
-    val paths = Array(3) { android.graphics.Path() }
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-}
-
 @Composable
 private fun LiquidAuroraBackground(
     modifier: Modifier,
@@ -609,135 +603,84 @@ private fun LiquidAuroraBackground(
     visualAlpha: Float,
     onFirstFrame: () -> Unit,
 ) {
-    val holder = remember { LiquidAuroraHolder() }
-    val renderLoop = remember { TextureViewRenderLoop("LiquidAurora-Renderer") }
     val currentOnFirstFrame = rememberUpdatedState(onFirstFrame)
-    val firstFrameDispatched = remember { AtomicBoolean(false) }
-
-    SideEffect {
-        holder.fftData = fftDrawData
-        val elapsed = System.currentTimeMillis() % 20_000L
-        holder.phase = elapsed / 20_000f * 360f
-
-        val alpha = if (isDarkMode == true) 0.9f else 0.75f
-        for (layer in 0 until 3) {
-            val colorA = shiftHue(coverColor, layer * 18f + 120f)
-            val colorB = shiftHue(coverColor, layer * -14f - 116f)
-            holder.layerColorA[layer] = colorA.copy(alpha = (alpha - layer * 0.2f)).toArgb()
-            holder.layerColorB[layer] =
-                colorB.copy(alpha = (alpha - layer * 0.3f).coerceAtLeast(0.1f)).toArgb()
-        }
-    }
-
-    DisposableEffect(renderLoop) {
-        onDispose {
-            renderLoop.release()
-        }
-    }
-
-    AndroidView(
-        modifier = modifier,
-        factory = { ctx ->
-            TextureView(ctx).also { tv ->
-                tv.isOpaque = true
-                tv.alpha = visualAlpha.coerceIn(0f, 1f)
-                tv.surfaceTextureListener =
-                    object : TextureView.SurfaceTextureListener {
-                        override fun onSurfaceTextureAvailable(
-                            surface: SurfaceTexture,
-                            width: Int,
-                            height: Int,
-                        ) {
-                            renderLoop.start(tv) { canvas ->
-                                canvas.drawColor(
-                                    android.graphics.Color.TRANSPARENT,
-                                    PorterDuff.Mode.CLEAR,
-                                )
-                                val data = holder.fftData
-                                if (data.isEmpty()) return@start
-
-                                val w = canvas.width.toFloat()
-                                val h = canvas.height.toFloat()
-                                val layers = 3
-                                val chunkSize = (data.size / layers).coerceAtLeast(1)
-
-                                repeat(layers) { layer ->
-                                    val startIndex = layer * chunkSize
-                                    val endIndex = min(data.size, startIndex + chunkSize)
-                                    if (startIndex >= endIndex) return@repeat
-
-                                    val path = holder.paths[layer]
-                                    path.reset()
-                                    path.moveTo(0f, 0f)
-
-                                    val steps = endIndex - startIndex
-                                    val amplitude = h * (0.28f - layer * 0.05f)
-                                    val phaseShift =
-                                        (holder.phase + layer * 45f) * (PI / 180.0)
-
-                                    for (index in 0 until steps) {
-                                        val progress =
-                                            if (steps == 1) {
-                                                0f
-                                            } else {
-                                                index / (steps - 1f)
-                                            }
-                                        val energy = data[startIndex + index].coerceIn(0f, 1f)
-                                        val wave =
-                                            sin(progress * 6f + phaseShift).toFloat()
-                                        val y =
-                                            h * 0.35f -
-                                                amplitude * energy -
-                                                amplitude * 0.2f * wave
-                                        path.lineTo(progress * w, y)
-                                    }
-
-                                    path.lineTo(w, 0f)
-                                    path.close()
-
-                                    holder.paint.shader =
-                                        LinearGradient(
-                                            0f,
-                                            0f,
-                                            0f,
-                                            h * 0.5f,
-                                            intArrayOf(
-                                                holder.layerColorA[layer],
-                                                holder.layerColorB[layer],
-                                                holder.layerColorB[layer],
-                                            ),
-                                            null,
-                                            Shader.TileMode.CLAMP,
-                                        )
-                                    canvas.drawPath(path, holder.paint)
-                                }
-                            }
-                        }
-
-                        override fun onSurfaceTextureSizeChanged(
-                            surface: SurfaceTexture,
-                            width: Int,
-                            height: Int,
-                        ) {
-                        }
-
-                        override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
-                            renderLoop.stop()
-                            return true
-                        }
-
-                        override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {
-                            if (firstFrameDispatched.compareAndSet(false, true)) {
-                                currentOnFirstFrame.value.invoke()
-                            }
-                        }
-                    }
+    val transition = rememberInfiniteTransition(label = "LiquidAuroraPhase")
+    val phaseDegrees by
+        transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec =
+                infiniteRepeatable(
+                    animation = tween(durationMillis = 20_000, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart,
+                ),
+            label = "LiquidAuroraPhaseValue",
+        )
+    val layerColors =
+        remember(coverColor, isDarkMode) {
+            val alpha = if (isDarkMode == true) 0.9f else 0.75f
+            List(3) { layer ->
+                val colorA = shiftHue(coverColor, layer * 18f + 120f)
+                val colorB = shiftHue(coverColor, layer * -14f - 116f)
+                colorA.copy(alpha = alpha - layer * 0.2f) to
+                    colorB.copy(alpha = (alpha - layer * 0.3f).coerceAtLeast(0.1f))
             }
-        },
-        update = { textureView ->
-            textureView.alpha = visualAlpha.coerceIn(0f, 1f)
-        },
-    )
+        }
+
+    // The old implementation called TextureView.lockCanvas() from a worker thread. On some
+    // Android 16 builds (observed on vivo PD2352), translucent drawPath() calls then crashed in
+    // libhwui's software SkRasterPipeline while reading the destination buffer. Keep all path
+    // recording in Compose so HWUI owns both the canvas and its surface lifecycle.
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        currentOnFirstFrame.value.invoke()
+    }
+
+    Canvas(
+        modifier =
+            modifier.graphicsLayer {
+                alpha = visualAlpha.coerceIn(0f, 1f)
+            },
+    ) {
+        if (fftDrawData.isEmpty()) return@Canvas
+
+        val layers = 3
+        val chunkSize = (fftDrawData.size / layers).coerceAtLeast(1)
+        repeat(layers) { layer ->
+            val startIndex = layer * chunkSize
+            val endIndex = min(fftDrawData.size, startIndex + chunkSize)
+            if (startIndex >= endIndex) return@repeat
+
+            val path = Path().apply { moveTo(0f, 0f) }
+            val steps = endIndex - startIndex
+            val amplitude = size.height * (0.28f - layer * 0.05f)
+            val phaseShift = (phaseDegrees + layer * 45f) * (PI / 180.0)
+
+            for (index in 0 until steps) {
+                val progress = if (steps == 1) 0f else index / (steps - 1f)
+                val energy = fftDrawData[startIndex + index].coerceIn(0f, 1f)
+                val wave = sin(progress * 6f + phaseShift).toFloat()
+                val y =
+                    size.height * 0.35f -
+                        amplitude * energy -
+                        amplitude * 0.2f * wave
+                path.lineTo(progress * size.width, y)
+            }
+
+            path.lineTo(size.width, 0f)
+            path.close()
+            val (colorA, colorB) = layerColors[layer]
+            drawPath(
+                path = path,
+                brush =
+                    Brush.verticalGradient(
+                        colors = listOf(colorA, colorB, colorB),
+                        startY = 0f,
+                        endY = size.height * 0.5f,
+                    ),
+            )
+        }
+    }
 }
 
 /**

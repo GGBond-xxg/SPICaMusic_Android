@@ -58,6 +58,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
@@ -158,6 +159,18 @@ enum class LyricsTextAlignment(
                 End -> Arrangement.End
             }
 
+    val transformOrigin: TransformOrigin
+        get() =
+            TransformOrigin(
+                pivotFractionX =
+                    when (this) {
+                        Start -> 0f
+                        Center -> 0.5f
+                        End -> 1f
+                    },
+                pivotFractionY = 0.5f,
+            )
+
     companion object {
         fun fromValue(value: String): LyricsTextAlignment = entries.firstOrNull { it.value == value } ?: Start
     }
@@ -182,10 +195,11 @@ private data class LyricsUIStyle(
 private fun rememberLyricsUIStyle(
     displayMode: LyricsDisplayMode,
     textScale: Float,
+    lineSpacing: Float,
     fontFamily: FontFamily?,
 ): LyricsUIStyle {
     val typography = MaterialTheme.typography
-    return remember(typography, displayMode, textScale, fontFamily) {
+    return remember(typography, displayMode, textScale, lineSpacing, fontFamily) {
         fun TextStyle.forLyrics(): TextStyle =
             copy(
                 fontSize = fontSize * textScale,
@@ -201,9 +215,9 @@ private fun rememberLyricsUIStyle(
                     wordsTextStyle = typography.headlineSmall.forLyrics().copy(fontWeight = FontWeight.ExtraBold),
                     wordsTranslationTextStyle = typography.bodySmall.forLyrics(),
                     activeScale = 1.12f,
-                    itemSpacing = 12.dp,
+                    itemSpacing = 12.dp * lineSpacing,
                     horizontalPadding = 24.dp,
-                    verticalPadding = 16.dp,
+                    verticalPadding = 16.dp * lineSpacing,
                 )
 
             LyricsDisplayMode.Compact ->
@@ -213,9 +227,9 @@ private fun rememberLyricsUIStyle(
                     wordsTextStyle = typography.titleLarge.forLyrics().copy(fontWeight = FontWeight.ExtraBold),
                     wordsTranslationTextStyle = typography.bodySmall.forLyrics(),
                     activeScale = 1.06f,
-                    itemSpacing = 6.dp,
+                    itemSpacing = 6.dp * lineSpacing,
                     horizontalPadding = 16.dp,
-                    verticalPadding = 8.dp,
+                    verticalPadding = 8.dp * lineSpacing,
                 )
         }
     }
@@ -235,6 +249,7 @@ fun LyricsUI(
     displayMode: LyricsDisplayMode = LyricsDisplayMode.Fullscreen,
     textAlignment: LyricsTextAlignment = LyricsTextAlignment.Start,
     textScale: Float = 1f,
+    lineSpacing: Float = 1f,
     fontFamily: FontFamily? = null,
     onSeekToTime: (Long) -> Unit = {},
     onUserScrollStateChanged: (Boolean) -> Unit = {},
@@ -246,7 +261,13 @@ fun LyricsUI(
         return
     }
 
-    val style = rememberLyricsUIStyle(displayMode, textScale.coerceIn(0.75f, 1.4f), fontFamily)
+    val style =
+        rememberLyricsUIStyle(
+            displayMode = displayMode,
+            textScale = textScale.coerceIn(0.75f, 1.4f),
+            lineSpacing = lineSpacing.coerceIn(0.6f, 1.8f),
+            fontFamily = fontFamily,
+        )
     val lazyListState = rememberLazyListState()
     var isAutoScrolling by remember { mutableStateOf(false) }
     var isUserScrolling by remember { mutableStateOf(false) }
@@ -584,6 +605,7 @@ private fun LyricLine(
                     this.alpha = alpha
                     scaleX = scale
                     scaleY = scale
+                    transformOrigin = textAlignment.transformOrigin
                 }.blur(blurRadius)
                 .padding(
                     horizontal = style.horizontalPadding,
@@ -764,6 +786,7 @@ private fun WordsLyricLine(
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
+                    transformOrigin = textAlignment.transformOrigin
                 }.padding(
                     horizontal = style.horizontalPadding,
                     vertical = style.verticalPadding,

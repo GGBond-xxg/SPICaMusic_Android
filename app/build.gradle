@@ -85,6 +85,7 @@ android {
     versionCode buildVersionCode
     versionName buildVersionName
     buildConfigField "String", "TELEGRAM_API_ENCRYPTED", "\"\""
+    buildConfigField "boolean", "DIAGNOSTIC_LOGGING", "false"
 
     testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     vectorDrawables {
@@ -124,6 +125,14 @@ android {
       matchingFallbacks = ['release']
       signingConfig signingConfigs.signingConfig
       buildConfigField "String", "TELEGRAM_API_ENCRYPTED", "\"${bundledTelegramPayload}\""
+    }
+    // 志愿者问题定位包：保留正式版优化与 Telegram 能力，只额外写入公开下载目录日志。
+    diagnostic {
+      initWith release
+      matchingFallbacks = ['release']
+      signingConfig signingConfigs.signingConfig
+      buildConfigField "String", "TELEGRAM_API_ENCRYPTED", "\"${bundledTelegramPayload}\""
+      buildConfigField "boolean", "DIAGNOSTIC_LOGGING", "true"
     }
     debug {
       minifyEnabled false
@@ -175,15 +184,19 @@ tasks.register('validateTelegramApiCredentials') {
   }
 }
 
-tasks.matching { it.name == "preWithApiBuild" }.configureEach {
+tasks.matching { it.name == "preWithApiBuild" || it.name == "preDiagnosticBuild" }.configureEach {
   dependsOn(tasks.named("validateTelegramApiCredentials"))
 }
 
 android.applicationVariants.all { variant ->
-  if (variant.buildType.name == "release" || variant.buildType.name == "withApi") {
+  if (variant.buildType.name in ["release", "withApi", "diagnostic"]) {
     variant.outputs.all { output ->
       def credentialSuffix =
-          variant.buildType.name == "withApi" ? "with-telegram-api" : "no-telegram-api"
+          variant.buildType.name == "release"
+              ? "no-telegram-api"
+              : variant.buildType.name == "diagnostic"
+                  ? "diagnostic-with-telegram-api"
+                  : "with-telegram-api"
       def safeVersion = variant.versionName.replaceAll("[^A-Za-z0-9._-]+", "-")
       output.outputFileName = "SPICaMusic-${safeVersion}-${credentialSuffix}.apk"
     }

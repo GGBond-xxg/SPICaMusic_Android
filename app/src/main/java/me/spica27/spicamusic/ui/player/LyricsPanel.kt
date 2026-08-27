@@ -89,6 +89,10 @@ fun LyricsPanel(
         preferencesManager
             .getFloat(PreferencesManager.Keys.LYRICS_TEXT_SCALE, 1f)
             .collectAsStateWithLifecycle(initialValue = 1f)
+    val lineSpacing by
+        preferencesManager
+            .getFloat(PreferencesManager.Keys.LYRICS_LINE_SPACING, 1f)
+            .collectAsStateWithLifecycle(initialValue = 1f)
     val selectedFontId by
         preferencesManager
             .getString(PreferencesManager.Keys.LYRICS_FONT_ID, LyricsFontIds.DEFAULT)
@@ -149,6 +153,7 @@ fun LyricsPanel(
             offsetMs = uiState.lyricsOffsetMs,
             textAlignment = textAlignment,
             textScale = textScale,
+            lineSpacing = lineSpacing,
             selectedFontId = selectedFontId,
             customFonts = customFonts,
             lyricSources = uiState.allLyricSources,
@@ -165,6 +170,11 @@ fun LyricsPanel(
             onTextScaleChange = { scale ->
                 coroutineScope.launch {
                     preferencesManager.setFloat(PreferencesManager.Keys.LYRICS_TEXT_SCALE, scale)
+                }
+            },
+            onLineSpacingChange = { spacing ->
+                coroutineScope.launch {
+                    preferencesManager.setFloat(PreferencesManager.Keys.LYRICS_LINE_SPACING, spacing)
                 }
             },
             onFontSelected = { id ->
@@ -299,6 +309,7 @@ fun LyricsPanel(
                     displayMode = displayMode,
                     textAlignment = textAlignment,
                     textScale = textScale,
+                    lineSpacing = lineSpacing,
                     fontFamily = lyricsFontFamily,
                     onSeekToTime = { posMs ->
                         viewModel.seekToAndPlay((posMs - uiState.lyricsOffsetMs).coerceAtLeast(0L))

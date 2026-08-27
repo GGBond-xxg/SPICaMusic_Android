@@ -48,6 +48,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -93,6 +94,7 @@ import me.spica27.spicamusic.feature.library.domain.SongUseCases
 import me.spica27.spicamusic.player.api.PlayMode
 import me.spica27.spicamusic.ui.player.pages.CurrentPlaylistPage
 import me.spica27.spicamusic.ui.player.scene.LyricsPlayerPage
+import me.spica27.spicamusic.ui.theme.LocalThemeRevealController
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
 import me.spica27.spicamusic.ui.widget.FluidMusicBackground
@@ -163,6 +165,14 @@ fun ExpandedPlayerScreen(
     artworkMorphInFlightProvider: () -> Boolean = { false },
     dragToCollapseModifier: Modifier = Modifier,
 ) {
+    val themeRevealController = LocalThemeRevealController.current
+    DisposableEffect(themeRevealController, isActive) {
+        if (isActive) themeRevealController.acquirePlayerSurface()
+        onDispose {
+            if (isActive) themeRevealController.releasePlayerSurface()
+        }
+    }
+
     // 在播放器展开后提前启动本地歌词读取，点击歌词时无需再等待 ViewModel 初始化。
     koinActivityViewModel<LyricsViewModel>()
 

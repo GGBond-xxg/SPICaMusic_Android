@@ -34,6 +34,7 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.FontDownload
 import androidx.compose.material.icons.rounded.FormatAlignCenter
+import androidx.compose.material.icons.rounded.FormatLineSpacing
 import androidx.compose.material.icons.rounded.FormatSize
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.Remove
@@ -73,6 +74,7 @@ fun LyricsEditorSheet(
     offsetMs: Long,
     textAlignment: LyricsTextAlignment,
     textScale: Float,
+    lineSpacing: Float,
     selectedFontId: String,
     customFonts: List<LyricsCustomFont>,
     lyricSources: List<SongLyrics>,
@@ -80,6 +82,7 @@ fun LyricsEditorSheet(
     onOffsetChange: (Long) -> Unit,
     onTextAlignmentChange: (LyricsTextAlignment) -> Unit,
     onTextScaleChange: (Float) -> Unit,
+    onLineSpacingChange: (Float) -> Unit,
     onFontSelected: (String) -> Unit,
     onFontDeleted: (LyricsCustomFont) -> Unit,
     onAddFont: () -> Unit,
@@ -176,6 +179,27 @@ fun LyricsEditorSheet(
                     onDecrease = { onTextScaleChange((textScale - TEXT_SCALE_STEP).coerceAtLeast(MIN_TEXT_SCALE)) },
                     onReset = { onTextScaleChange(1f) },
                     onIncrease = { onTextScaleChange((textScale + TEXT_SCALE_STEP).coerceAtMost(MAX_TEXT_SCALE)) },
+                )
+            }
+
+            ExpandableEditorSection(
+                title = stringResource(R.string.lyrics_line_spacing),
+                value = stringResource(R.string.percentage_format, (lineSpacing * 100f).roundToInt()),
+                icon = Icons.Rounded.FormatLineSpacing,
+                expanded = expandedSection == SECTION_LINE_SPACING,
+                onToggle = {
+                    expandedSection = if (expandedSection == SECTION_LINE_SPACING) null else SECTION_LINE_SPACING
+                },
+            ) {
+                StepperRow(
+                    value = stringResource(R.string.percentage_format, (lineSpacing * 100f).roundToInt()),
+                    onDecrease = {
+                        onLineSpacingChange((lineSpacing - LINE_SPACING_STEP).coerceAtLeast(MIN_LINE_SPACING))
+                    },
+                    onReset = { onLineSpacingChange(1f) },
+                    onIncrease = {
+                        onLineSpacingChange((lineSpacing + LINE_SPACING_STEP).coerceAtMost(MAX_LINE_SPACING))
+                    },
                 )
             }
 
@@ -479,10 +503,14 @@ private fun localizedLyricSourceArtist(source: SongLyrics): String? =
     }
 
 private const val SECTION_TEXT_SIZE = "text_size"
+private const val SECTION_LINE_SPACING = "line_spacing"
 private const val SECTION_FONT = "font"
 private const val SECTION_LYRICS_SOURCE = "lyrics_source"
 private const val MIN_TEXT_SCALE = 0.8f
 private const val MAX_TEXT_SCALE = 1.3f
 private const val TEXT_SCALE_STEP = 0.05f
+private const val MIN_LINE_SPACING = 0.6f
+private const val MAX_LINE_SPACING = 1.8f
+private const val LINE_SPACING_STEP = 0.1f
 private const val LEGACY_LOCAL_LYRICS_NAME = "本地歌词"
 private const val LEGACY_LOCAL_LYRICS_ARTIST = "内嵌标签"

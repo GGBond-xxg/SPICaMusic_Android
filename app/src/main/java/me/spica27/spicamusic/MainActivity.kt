@@ -26,6 +26,7 @@ import me.spica27.spicamusic.player.api.IMusicPlayer
 import me.spica27.spicamusic.player.api.PlayerAction
 import me.spica27.spicamusic.ui.AppScaffold
 import org.koin.android.ext.android.inject
+import timber.log.Timber
 
 /**
  * 主 Activity
@@ -88,6 +89,29 @@ class MainActivity :
         super.onNewIntent(intent)
         setIntent(intent)
         playExternalAudio(intent)
+    }
+
+    override fun onUserLeaveHint() {
+        Timber.tag("MainActivity").i(
+            "onUserLeaveHint playing=${musicPlayer.isPlaying.value} " +
+                "initialized=${musicPlayer.isInitialized.value}",
+        )
+        super.onUserLeaveHint()
+    }
+
+    override fun onPause() {
+        Timber.tag("MainActivity").i(
+            "onPause playing=${musicPlayer.isPlaying.value} finishing=$isFinishing",
+        )
+        super.onPause()
+    }
+
+    override fun onStop() {
+        Timber.tag("MainActivity").i(
+            "onStop playing=${musicPlayer.isPlaying.value} finishing=$isFinishing " +
+                "changingConfiguration=$isChangingConfigurations",
+        )
+        super.onStop()
     }
 
     override fun onDestroy() {

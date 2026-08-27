@@ -333,10 +333,11 @@
   <!-- Lyrics toolbar -->
   <string name="lyrics_tool">歌词工具</string>
   <string name="lyrics_editor">编辑歌词</string>
-  <string name="lyrics_editor_description">调整排版、字号、字体、时间和歌词来源</string>
+  <string name="lyrics_editor_description">调整排版、字号、间距、字体、时间和歌词来源</string>
   <string name="lyrics_alignment">歌词对齐</string>
   <string name="lyrics_timing">时间偏移</string>
   <string name="lyrics_text_size">文字大小</string>
+  <string name="lyrics_line_spacing">行间距</string>
   <string name="lyrics_font_style">字体样式</string>
   <string name="default_font">默认字体</string>
   <string name="add_more_fonts">添加更多</string>

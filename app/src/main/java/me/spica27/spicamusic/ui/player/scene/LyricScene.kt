@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.MusicNote
@@ -323,6 +324,7 @@ fun LyricsPlayerPage(
                 enterProgressProvider = transitionProgressProvider,
                 artworkModifier = artworkModifier,
                 showNavigationButton = showNavigationButton,
+                reserveTrailingActionSpace = true,
                 onBack = onBack,
             )
 
@@ -446,6 +448,7 @@ private fun LyricsHeader(
     enterProgressProvider: () -> Float,
     artworkModifier: Modifier = Modifier,
     showNavigationButton: Boolean = true,
+    reserveTrailingActionSpace: Boolean = false,
     onBack: () -> Unit,
 ) {
     Row(
@@ -532,7 +535,10 @@ private fun LyricsHeader(
         }
 
         Column(
-            modifier = Modifier.weight(1f),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .clipToBounds(),
         ) {
             // 歌名（飞行目标）——与播放器页面同一文字样式，飞行为纯位移，无字号突变
             Text(
@@ -543,7 +549,10 @@ private fun LyricsHeader(
                 maxLines = 1,
                 modifier =
                     Modifier
-                        .basicMarquee(),
+                        .basicMarquee(
+                            iterations = Int.MAX_VALUE,
+                            repeatDelayMillis = 1_200,
+                        ),
             )
             Spacer(modifier = Modifier.height(2.dp))
             // 作者（飞行目标）
@@ -554,8 +563,16 @@ private fun LyricsHeader(
                 maxLines = 1,
                 modifier =
                     Modifier
-                        .basicMarquee(),
+                        .basicMarquee(
+                            iterations = Int.MAX_VALUE,
+                            repeatDelayMillis = 1_200,
+                        ),
             )
+        }
+        if (reserveTrailingActionSpace) {
+            // ExpandedPlayerScreen draws the lyric-edit action above this header. Reserve its
+            // complete touch target plus the Row spacing so long titles never run underneath it.
+            Spacer(modifier = Modifier.width(48.dp))
         }
     }
 }

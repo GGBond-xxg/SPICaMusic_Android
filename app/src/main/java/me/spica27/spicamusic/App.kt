@@ -2,6 +2,7 @@ package me.spica27.spicamusic
 
 import android.app.Application
 import android.content.Context
+import android.content.res.Configuration
 import androidx.annotation.OptIn
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -10,6 +11,7 @@ import androidx.media3.common.util.UnstableApi
 import me.spcia.lyric_core.di.extraInfoModule
 import me.spica27.spicamusic.crash.CrashHandler
 import me.spica27.spicamusic.di.AppModule
+import me.spica27.spicamusic.diagnostics.DiagnosticLog
 import me.spica27.spicamusic.feature.library.domain.MusicScanUseCases
 import me.spica27.spicamusic.feature.library.domain.libraryDomainModule
 import me.spica27.spicamusic.feature.lyrics.domain.lyricsDomainModule
@@ -44,6 +46,10 @@ class App : Application() {
         instance = this
 
         // 初始化日志
+        DiagnosticLog.initialize(this)
+        if (BuildConfig.DIAGNOSTIC_LOGGING) {
+            Timber.plant(DiagnosticLog.timberTree)
+        }
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }
@@ -82,11 +88,13 @@ class App : Application() {
                 override fun onStart(owner: LifecycleOwner) {
                     musicPlayer.fftProcessor.enable()
                     Timber.d("应用进入前台，FFT 采样已开启")
+                    DiagnosticLog.writeProcessSnapshot(this@App, "process-foreground")
                 }
 
                 override fun onStop(owner: LifecycleOwner) {
                     musicPlayer.fftProcessor.disable()
                     Timber.d("应用进入后台，FFT 采样已停止")
+                    DiagnosticLog.writeProcessSnapshot(this@App, "process-background")
                 }
             },
         )
@@ -117,6 +125,27 @@ class App : Application() {
                 }
             },
         )
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        DiagnosticLog.write(
+            level = "I",
+            tag = "Application",
+            message =
+                "configuration-changed locales=${newConfig.locales.toLanguageTags()} " +
+                    "uiMode=${newConfig.uiMode}",
+        )
+    }
+
+    override fun onTrimMemory(level: Int) {
+        DiagnosticLog.write("W", "Application", "trim-memory level=$level")
+        super.onTrimMemory(level)
+    }
+
+    override fun onLowMemory() {
+        DiagnosticLog.write("W", "Application", "low-memory")
+        super.onLowMemory()
     }
 
     companion object {

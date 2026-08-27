@@ -331,10 +331,11 @@
   <!-- Lyrics toolbar -->
   <string name="lyrics_tool">歌詞工具</string>
   <string name="lyrics_editor">編輯歌詞</string>
-  <string name="lyrics_editor_description">調整排版、字號、字體、時間和歌詞來源</string>
+  <string name="lyrics_editor_description">調整排版、字號、行距、字體、時間和歌詞來源</string>
   <string name="lyrics_alignment">歌詞對齊</string>
   <string name="lyrics_timing">時間偏移</string>
   <string name="lyrics_text_size">文字大小</string>
+  <string name="lyrics_line_spacing">行距</string>
   <string name="lyrics_font_style">字體樣式</string>
   <string name="default_font">預設字體</string>
   <string name="add_more_fonts">新增更多</string>

@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -56,6 +57,18 @@ class ThemeRevealController internal constructor() {
     private var armedAtMs: Long = 0L
     private var recentPointerOrigin: Offset? = null
     private var pointerRecordedAtMs: Long = 0L
+    private var activePlayerSurfaces by mutableIntStateOf(0)
+
+    internal val isPlayerSurfaceActive: Boolean
+        get() = activePlayerSurfaces > 0
+
+    internal fun acquirePlayerSurface() {
+        activePlayerSurfaces += 1
+    }
+
+    internal fun releasePlayerSurface() {
+        activePlayerSurfaces = (activePlayerSurfaces - 1).coerceAtLeast(0)
+    }
 
     fun arm(originInWindow: Offset) {
         if (!originInWindow.x.isFinite() || !originInWindow.y.isFinite()) return
@@ -130,13 +143,19 @@ fun CircularRevealThemeHost(
     var displayedThemeColor by remember { mutableStateOf(targetThemeColor) }
     var hostOriginInWindow by remember { mutableStateOf(Offset.Zero) }
     var waitingForInitialPalette by remember { mutableStateOf(true) }
+    val isPlayerSurfaceActive = controller.isPlayerSurfaceActive
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
         delay(AUTOMATIC_REVEAL_STARTUP_FALLBACK_MS)
         waitingForInitialPalette = false
     }
 
-    androidx.compose.runtime.LaunchedEffect(enabled, targetDarkTheme, targetThemeColor) {
+    androidx.compose.runtime.LaunchedEffect(
+        enabled,
+        targetDarkTheme,
+        targetThemeColor,
+        isPlayerSurfaceActive,
+    ) {
         val darkChanged = displayedDarkTheme != targetDarkTheme
         val colorChanged = displayedThemeColor != targetThemeColor
         if (!darkChanged && !colorChanged) return@LaunchedEffect
@@ -165,7 +184,14 @@ fun CircularRevealThemeHost(
                 } else {
                     null
                 }
-        val shouldReveal = enabled && (darkChanged || colorChanged) && revealOrigin != null
+        // The player already owns its cover/palette transition. A window-wide circular reveal on
+        // top of that makes previous/next look like two competing animations, so the player always
+        // receives the new palette directly regardless of the preference value.
+        val shouldReveal =
+            enabled &&
+                !isPlayerSurfaceActive &&
+                (darkChanged || colorChanged) &&
+                revealOrigin != null
         if (!shouldReveal || view.width <= 0 || view.height <= 0) {
             displayedDarkTheme = targetDarkTheme
             displayedThemeColor = targetThemeColor

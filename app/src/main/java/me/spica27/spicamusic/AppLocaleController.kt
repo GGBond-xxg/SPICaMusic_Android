@@ -5,6 +5,7 @@ import android.app.LocaleManager
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.res.Configuration
+import android.content.res.Resources
 import android.os.Build
 import android.os.LocaleList
 import java.util.Locale
@@ -62,8 +63,38 @@ object AppLocaleController {
                     LocaleList.forLanguageTags(language)
                 }
         } else {
-            context.findActivity()?.recreate()
+            applyLegacyLanguageInPlace(context, language)
         }
+    }
+
+    /**
+     * Android 12 and earlier do not expose [LocaleManager]. Updating the Activity resources and
+     * dispatching the configuration change keeps the existing Compose navigation stack alive,
+     * matching the in-place behavior used on Android 13+ via MainActivity's configChanges entry.
+     */
+    @Suppress("DEPRECATION")
+    private fun applyLegacyLanguageInPlace(
+        context: Context,
+        language: String,
+    ) {
+        val activity = context.findActivity() ?: return
+        val locales =
+            if (language == LANGUAGE_SYSTEM) {
+                Resources.getSystem().configuration.locales
+            } else {
+                LocaleList(Locale.forLanguageTag(language))
+            }
+        val configuration =
+            Configuration(activity.resources.configuration).apply {
+                setLocales(locales)
+            }
+        activity.resources.updateConfiguration(configuration, activity.resources.displayMetrics)
+        activity.application.resources.updateConfiguration(
+            configuration,
+            activity.application.resources.displayMetrics,
+        )
+        locales.get(0)?.let(Locale::setDefault)
+        activity.onConfigurationChanged(configuration)
     }
 
     private fun savedLanguage(context: Context): String =

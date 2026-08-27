@@ -17,6 +17,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
+import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -46,11 +47,13 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.guava.future
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import me.spica27.spicamusic.BuildConfig
 import me.spica27.spicamusic.DesktopLyricsPermissionActivity
 import me.spica27.spicamusic.MainActivity
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.cloud.CloudPlaybackItemResolver
 import me.spica27.spicamusic.cloud.CloudRecentStore
+import me.spica27.spicamusic.diagnostics.DiagnosticLog
 import me.spica27.spicamusic.feature.settings.domain.SettingsUseCases
 import me.spica27.spicamusic.player.api.IMusicPlayer
 import me.spica27.spicamusic.player.impl.SpicaPlayer
@@ -116,6 +119,7 @@ class PlaybackService : MediaLibraryService() {
     private var trackChangeFadePending = false
     private var cloudErrorSkipJob: Job? = null
     private var cloudPrefetchJob: Job? = null
+    private var diagnosticMonitorJob: Job? = null
     private var cloudPreviewHandledMediaId: String? = null
     private var cloudSinkEmptySinceMs = 0L
     private var cloudRecentCandidateMediaId: String? = null
@@ -129,11 +133,17 @@ class PlaybackService : MediaLibraryService() {
     private val audioDeviceCallback =
         object : AudioDeviceCallback() {
             override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
+                Timber.tag("PlaybackService").i(
+                    "audio-devices-added types=${addedDevices.joinToString { it.type.toString() }}",
+                )
                 applyPreferredUsbDevice()
                 if (addedDevices.any(::isReconnectableOutput)) maybeResumeAfterReconnect()
             }
 
             override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
+                Timber.tag("PlaybackService").i(
+                    "audio-devices-removed types=${removedDevices.joinToString { it.type.toString() }}",
+                )
                 applyPreferredUsbDevice()
                 if (removedDevices.any(::isReconnectableOutput) && exoPlayer.playWhenReady) {
                     armReconnectResume()
@@ -146,6 +156,11 @@ class PlaybackService : MediaLibraryService() {
                 playWhenReady: Boolean,
                 reason: Int,
             ) {
+                Timber.tag("PlaybackService").i(
+                    "play-when-ready=$playWhenReady reason=$reason state=${exoPlayer.playbackState} " +
+                        "isPlaying=${exoPlayer.isPlaying} suppression=${exoPlayer.playbackSuppressionReason} " +
+                        "index=${exoPlayer.currentMediaItemIndex}",
+                )
                 when {
                     playWhenReady -> clearReconnectResume()
                     !resumeOnHeadsetEnabled -> clearReconnectResume()
@@ -160,6 +175,12 @@ class PlaybackService : MediaLibraryService() {
                 mediaItem: MediaItem?,
                 reason: Int,
             ) {
+                val uri = mediaItem?.localConfiguration?.uri
+                Timber.tag("PlaybackService").i(
+                    "media-transition reason=$reason index=${exoPlayer.currentMediaItemIndex}/" +
+                        "${exoPlayer.mediaItemCount} id=${mediaItem?.mediaId} " +
+                        "source=${uri?.scheme}://${uri?.host.orEmpty()}",
+                )
                 cloudErrorSkipJob?.cancel()
                 cloudPreviewHandledMediaId = null
                 cloudSinkEmptySinceMs = 0L
@@ -183,19 +204,86 @@ class PlaybackService : MediaLibraryService() {
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
+                Timber.tag("PlaybackService").i(
+                    "is-playing=$isPlaying playWhenReady=${exoPlayer.playWhenReady} " +
+                        "state=${exoPlayer.playbackState} suppression=${exoPlayer.playbackSuppressionReason}",
+                )
                 if (isPlaying && fadeEnabled && exoPlayer.volume <= 0.01f) {
                     fadeInStartedAtMs = SystemClock.elapsedRealtime()
                 }
             }
 
             override fun onPlayerError(error: PlaybackException) {
+                Timber.tag("PlaybackService").e(
+                    error,
+                    "player-error code=${error.errorCode} index=${exoPlayer.currentMediaItemIndex}",
+                )
                 handleCloudPlaybackError(error)
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                Timber.tag("PlaybackService").i(
+                    "playback-state=$playbackState playWhenReady=${exoPlayer.playWhenReady} " +
+                        "isPlaying=${exoPlayer.isPlaying} buffered=${exoPlayer.bufferedPosition}",
+                )
+            }
+
+            override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) {
+                Timber.tag("PlaybackService").w(
+                    "playback-suppression=$playbackSuppressionReason " +
+                        "playWhenReady=${exoPlayer.playWhenReady} state=${exoPlayer.playbackState}",
+                )
+            }
+
+            override fun onAudioSessionIdChanged(audioSessionId: Int) {
+                Timber.tag("PlaybackService").i("audio-session-id=$audioSessionId")
+            }
+
+            override fun onVolumeChanged(volume: Float) {
+                Timber.tag("PlaybackService").i("player-volume=$volume")
+            }
+
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int,
+            ) {
+                Timber.tag("PlaybackService").i(
+                    "position-discontinuity reason=$reason " +
+                        "oldIndex=${oldPosition.mediaItemIndex} oldMs=${oldPosition.positionMs} " +
+                        "newIndex=${newPosition.mediaItemIndex} newMs=${newPosition.positionMs}",
+                )
+            }
+
+            override fun onTracksChanged(tracks: Tracks) {
+                val selected =
+                    tracks.groups
+                        .filter { it.isSelected }
+                        .flatMap { group ->
+                            (0 until group.length)
+                                .filter(group::isTrackSelected)
+                                .map { index ->
+                                    val format = group.getTrackFormat(index)
+                                    "type=${group.type},mime=${format.sampleMimeType},codecs=${format.codecs}," +
+                                        "rate=${format.sampleRate},channels=${format.channelCount},bitrate=${format.bitrate}"
+                                }
+                        }
+                Timber.tag("PlaybackService").i("tracks-selected=${selected.joinToString(" | ")}")
             }
 
             override fun onEvents(
                 player: Player,
                 events: Player.Events,
             ) {
+                if (BuildConfig.DIAGNOSTIC_LOGGING) {
+                    val eventCodes = (0 until events.size()).joinToString { events.get(it).toString() }
+                    Timber.tag("PlaybackService").d(
+                        "events=[$eventCodes] index=${player.currentMediaItemIndex}/${player.mediaItemCount} " +
+                            "position=${player.currentPosition} buffered=${player.bufferedPosition} " +
+                            "duration=${player.duration} state=${player.playbackState} " +
+                            "playWhenReady=${player.playWhenReady} isPlaying=${player.isPlaying}",
+                    )
+                }
                 // Media3 rebuilds the platform PlaybackState after player changes. HyperOS reads
                 // only that legacy state, so restore our custom actions after Media3 has updated it.
                 scheduleLegacySystemCustomActionsRefresh()
@@ -241,6 +329,9 @@ class PlaybackService : MediaLibraryService() {
 
     override fun onCreate() {
         super.onCreate()
+        Timber.tag("PlaybackService").i(
+            "service-created sdk=${Build.VERSION.SDK_INT} device=${Build.MANUFACTURER}/${Build.MODEL}",
+        )
         setMediaNotificationProvider(
             SpicaNotificationProvider(this),
         )
@@ -308,6 +399,7 @@ class PlaybackService : MediaLibraryService() {
         startSettingsObservers()
         startCacheTrimMonitor()
         startFadeMonitor()
+        startDiagnosticMonitor()
         topDisplayModeController.start(exoPlayer)
         desktopLyricsController.start(exoPlayer)
 
@@ -581,8 +673,11 @@ class PlaybackService : MediaLibraryService() {
         intent: Intent?,
         flags: Int,
         startId: Int,
-    ): Int =
-        when (intent?.action) {
+    ): Int {
+        Timber.tag("PlaybackService").i(
+            "start-command action=${intent?.action} flags=$flags startId=$startId",
+        )
+        return when (intent?.action) {
             ACTION_TOGGLE_DESKTOP_LYRICS -> {
                 desktopLyricsController.toggle()
                 START_STICKY
@@ -600,8 +695,14 @@ class PlaybackService : MediaLibraryService() {
 
             else -> super.onStartCommand(intent, flags, startId)
         }
+    }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
+        Timber.tag("PlaybackService").w(
+            "task-removed backgroundPlayback=$backgroundPlaybackEnabled " +
+                "playing=${exoPlayer.isPlaying} playWhenReady=${exoPlayer.playWhenReady} " +
+                "state=${exoPlayer.playbackState}",
+        )
         if (!backgroundPlaybackEnabled) {
             exoPlayer.pause()
             exoPlayer.stop()
@@ -611,12 +712,17 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        Timber.tag("PlaybackService").w(
+            "service-destroyed playing=${exoPlayer.isPlaying} " +
+                "playWhenReady=${exoPlayer.playWhenReady} state=${exoPlayer.playbackState}",
+        )
         runCatching { audioManager.unregisterAudioDeviceCallback(audioDeviceCallback) }
         legacyActionRefreshHandler.removeCallbacks(legacyActionRefreshRunnable)
         fadeMonitorJob?.cancel()
         manualFadeJob?.cancel()
         cloudErrorSkipJob?.cancel()
         cloudPrefetchJob?.cancel()
+        diagnosticMonitorJob?.cancel()
         exoPlayer.removeListener(playbackListener)
         topDisplayModeController.release()
         desktopLyricsController.release()
@@ -879,7 +985,10 @@ class PlaybackService : MediaLibraryService() {
         serviceScope.launch {
             settingsUseCases
                 .getBoolean(SettingsUseCases.Keys.BACKGROUND_PLAYBACK, true)
-                .collect { backgroundPlaybackEnabled = it }
+                .collect {
+                    backgroundPlaybackEnabled = it
+                    Timber.tag("PlaybackService").i("background-playback-setting=$it")
+                }
         }
         serviceScope.launch {
             settingsUseCases
@@ -977,6 +1086,29 @@ class PlaybackService : MediaLibraryService() {
                 cloudAudioCache.trimTo(maxCloudAudioCacheBytes)
             }
         }
+    }
+
+    private fun startDiagnosticMonitor() {
+        if (!BuildConfig.DIAGNOSTIC_LOGGING) return
+        diagnosticMonitorJob?.cancel()
+        diagnosticMonitorJob =
+            playerScope.launch {
+                while (isActive) {
+                    delay(DIAGNOSTIC_PLAYBACK_INTERVAL_MS)
+                    val item = exoPlayer.currentMediaItem
+                    Timber.tag("PlaybackHeartbeat").i(
+                        "id=${item?.mediaId.orEmpty()} index=${exoPlayer.currentMediaItemIndex}/" +
+                            "${exoPlayer.mediaItemCount} position=${exoPlayer.currentPosition} " +
+                            "buffered=${exoPlayer.bufferedPosition} duration=${exoPlayer.duration} " +
+                            "state=${exoPlayer.playbackState} playWhenReady=${exoPlayer.playWhenReady} " +
+                            "isPlaying=${exoPlayer.isPlaying} suppression=${exoPlayer.playbackSuppressionReason} " +
+                            "volume=${exoPlayer.volume} repeat=${exoPlayer.repeatMode} " +
+                            "shuffle=${exoPlayer.shuffleModeEnabled} hiFi=$hiFiOutputEnabled " +
+                            "usbDac=$usbDacOutputEnabled fade=$fadeEnabled background=$backgroundPlaybackEnabled",
+                    )
+                    DiagnosticLog.writeRuntimeSnapshot(this@PlaybackService, "playback-heartbeat")
+                }
+            }
     }
 
     private fun startFadeMonitor() {
@@ -1207,6 +1339,7 @@ class PlaybackService : MediaLibraryService() {
         // use the user-selected duration; only explicit next/previous/list selection is capped.
         const val CONTROL_FADE_MAX_MS = 180L
         const val CACHE_TRIM_INTERVAL_MS = 30_000L
+        const val DIAGNOSTIC_PLAYBACK_INTERVAL_MS = 10_000L
         const val HEADSET_RESUME_WINDOW_MS = 10 * 60 * 1_000L
         const val CLOUD_MEDIA_ID_PREFIX = "cloud:"
         const val CLOUD_ERROR_SKIP_DELAY_MS = 600L

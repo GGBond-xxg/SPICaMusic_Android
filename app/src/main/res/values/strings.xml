@@ -332,10 +332,11 @@
   <!-- Lyrics toolbar -->
   <string name="lyrics_tool">Lyrics Tool</string>
   <string name="lyrics_editor">Edit lyrics</string>
-  <string name="lyrics_editor_description">Adjust layout, size, font, timing, and lyric source</string>
+  <string name="lyrics_editor_description">Adjust layout, size, spacing, font, timing, and lyric source</string>
   <string name="lyrics_alignment">Lyrics alignment</string>
   <string name="lyrics_timing">Timing offset</string>
   <string name="lyrics_text_size">Text size</string>
+  <string name="lyrics_line_spacing">Line spacing</string>
   <string name="lyrics_font_style">Font style</string>
   <string name="default_font">Default font</string>
   <string name="add_more_fonts">Add more</string>
