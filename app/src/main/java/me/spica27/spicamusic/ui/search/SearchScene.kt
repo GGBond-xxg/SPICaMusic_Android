@@ -133,7 +133,9 @@ private enum class SearchContentState { Idle, Loading, Empty, Results }
  * - 滚动结果列表时自动收起键盘（iOS 式）
  * - 键盘 Search 键收起键盘
  */
-class SearchScene : StackScene() {
+class SearchScene(
+    private val initialQuery: String = "",
+) : StackScene() {
     @Composable
     override fun Content() {
         val path = LocalNavigationPath.current
@@ -158,6 +160,12 @@ class SearchScene : StackScene() {
         val keyboardController = LocalSoftwareKeyboardController.current
         val focusManager = LocalFocusManager.current
         val listState = rememberLazyListState()
+
+        LaunchedEffect(initialQuery) {
+            if (initialQuery.isNotBlank() && searchKey != initialQuery) {
+                searchViewModel.updateSearchKeyword(initialQuery)
+            }
+        }
 
         // 等推场动画完成后再唤起键盘，避免键盘上升与场景滑入互相抢帧
         LaunchedEffect(Unit) {

@@ -51,7 +51,6 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Layers
@@ -60,7 +59,6 @@ import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Percent
-import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Visibility
@@ -127,14 +125,6 @@ class SettingsScene : StackScene() {
         val themeModeValue by viewModel.themeMode.collectAsStateWithLifecycle()
         val themeMode = ThemeMode.fromString(themeModeValue)
         val keepScreenOn by viewModel.keepScreenOn.collectAsStateWithLifecycle()
-        val backgroundPlayback by viewModel.backgroundPlayback.collectAsStateWithLifecycle()
-        val resumeOnHeadset by viewModel.resumeOnHeadset.collectAsStateWithLifecycle()
-        val fadeEnabled by viewModel.fadeEnabled.collectAsStateWithLifecycle()
-        val fadeDurationMs by viewModel.fadeDurationMs.collectAsStateWithLifecycle()
-        val cloudAudioCacheMib by viewModel.cloudAudioCacheMib.collectAsStateWithLifecycle()
-        val hiFiMode by viewModel.hiFiMode.collectAsStateWithLifecycle()
-        val usbDacOutput by viewModel.usbDacOutput.collectAsStateWithLifecycle()
-        val usbDeviceName by viewModel.usbDeviceName.collectAsStateWithLifecycle()
         val topDisplayModeValue by viewModel.topDisplayMode.collectAsStateWithLifecycle()
         val spectrumValue by viewModel.dynamicSpectrumBackground.collectAsStateWithLifecycle()
         val coverTypeValue by viewModel.dynamicCoverType.collectAsStateWithLifecycle()
@@ -426,22 +416,6 @@ class SettingsScene : StackScene() {
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             },
-                        )
-                        SettingsItemDivider()
-                        ModernSettingsSwitchItem(
-                            title = stringResource(R.string.settings_background_playback),
-                            subtitle = stringResource(R.string.settings_background_playback_subtitle),
-                            icon = Icons.Default.PlayCircle,
-                            checked = backgroundPlayback,
-                            onCheckedChange = viewModel::setBackgroundPlayback,
-                        )
-                        SettingsItemDivider()
-                        ModernSettingsSwitchItem(
-                            title = stringResource(R.string.settings_headset_resume),
-                            subtitle = stringResource(R.string.settings_headset_resume_subtitle),
-                            icon = Icons.Default.Headphones,
-                            checked = resumeOnHeadset,
-                            onCheckedChange = viewModel::setResumeOnHeadset,
                         )
                         SettingsItemDivider()
                         ModernSettingsSwitchItem(

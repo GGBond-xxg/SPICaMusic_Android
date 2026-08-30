@@ -53,6 +53,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Error
@@ -60,6 +61,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicOff
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Scanner
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material3.HorizontalDivider
@@ -154,6 +156,15 @@ fun LibraryPage() {
     val playlists by viewModel.playlistsWithCover.collectAsStateWithLifecycle()
     val cloudCatalog by cloudCatalogViewModel.state.collectAsStateWithLifecycle()
     val remotePlaylists = cloudCatalog.remotePlaylists
+    val neteasePlaylists =
+        remember(remotePlaylists) {
+            remotePlaylists.filter { it.account.provider == RemoteMusicProvider.NETEASE }
+        }
+    val otherRemotePlaylists =
+        remember(remotePlaylists) {
+            remotePlaylists.filterNot { it.account.provider == RemoteMusicProvider.NETEASE }
+        }
+    val neteaseAccount = neteasePlaylists.firstOrNull()?.account
     val userCloudPlaylists = cloudCatalog.userPlaylists
     val totalPlaylistCount = playlists.size + remotePlaylists.size + userCloudPlaylists.size
     val weeklyStats by viewModel.weeklyStats.collectAsStateWithLifecycle()
@@ -232,6 +243,14 @@ fun LibraryPage() {
                 val entrance = rememberEntrance(order = 0, play = playEntrance)
                 LibraryMasthead(
                     playlistCount = totalPlaylistCount,
+                    subtitle =
+                        stringResource(R.string.library_netease_subtitle)
+                            .takeIf { neteaseAccount != null },
+                    onRefresh =
+                        {
+                            cloudCatalogViewModel.refreshRemotePlaylists(forceRefresh = true)
+                            cloudCatalogViewModel.refreshDailyRecommendations(forceRefresh = true)
+                        }.takeIf { neteaseAccount != null },
                     modifier =
                         Modifier
                             .padding(top = Spacing.Large)
@@ -246,6 +265,74 @@ fun LibraryPage() {
                                 scaleY = 1f - 0.18f * t
                             },
                 )
+            }
+
+            item(key = "cloud_library", span = { GridItemSpan(maxLineSpan) }, contentType = "cloud_library") {
+                CloudLibraryEntryCard(
+                    onClick = { path.push(CloudLibraryScene()) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            if (showStats) {
+                item(key = "weekly_stats", span = { GridItemSpan(maxLineSpan) }, contentType = "stats") {
+                    val entrance = rememberEntrance(order = 2, play = playEntrance)
+                    WeeklyStatsStrip(
+                        stats = weeklyStats ?: return@item,
+                        modifier =
+                            Modifier
+                                .animateItem(
+                                    fadeInSpec = ListItemFadeInSpec,
+                                    placementSpec = null,
+                                    fadeOutSpec = ListItemFadeOutSpec,
+                                ).entranceGraphics(entrance),
+                    )
+                }
+            }
+
+            if (neteaseAccount != null) {
+                item(key = "netease_account", span = { GridItemSpan(maxLineSpan) }, contentType = "account") {
+                    NeteaseAccountSummaryCard(
+                        accountName = neteaseAccount.displayName,
+                        playlistCount = neteasePlaylists.size,
+                        onManageClick = { path.push(CloudLibraryScene()) },
+                    )
+                }
+
+                item(
+                    key = "netease_library_header",
+                    span = { GridItemSpan(maxLineSpan) },
+                    contentType = "section_header",
+                ) {
+                    Text(
+                        text = stringResource(R.string.library_netease_section),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(top = Spacing.Medium),
+                    )
+                }
+
+                itemsIndexed(
+                    items = neteasePlaylists,
+                    key = { _, item -> "netease_library_${item.stableId}" },
+                    contentType = { _, _ -> "netease_playlist" },
+                ) { _, item ->
+                    LibraryCloudPlaylistCard(
+                        name = item.playlist.name,
+                        subtitle =
+                            stringResource(
+                                if (item.playlist.isOwned) {
+                                    R.string.library_netease_playlist_owned
+                                } else {
+                                    R.string.library_netease_playlist_collected
+                                },
+                                item.playlist.songCount,
+                            ),
+                        coverUrl = item.playlist.coverUrl,
+                        onClick = { path.push(NeteasePlaylistScene(item)) },
+                    )
+                }
             }
 
             item(key = "actions", span = { GridItemSpan(maxLineSpan) }, contentType = "actions") {
@@ -277,27 +364,18 @@ fun LibraryPage() {
                 }
             }
 
-            item(key = "cloud_library", span = { GridItemSpan(maxLineSpan) }, contentType = "cloud_library") {
-                CloudLibraryEntryCard(
-                    onClick = { path.push(CloudLibraryScene()) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-
             if (hasInaccessibleFolders) {
                 item(key = "sources_alert", span = { GridItemSpan(maxLineSpan) }, contentType = "alert") {
                     InaccessibleFoldersNotice(
                         onClick = {
-                            // 逐项对应本 Grid 在「媒体库来源」区头之前的 item 声明，增删分区时须同步
                             val sourcesHeaderIndex =
-                                listOf(
-                                    true, // masthead
-                                    true, // actions
-                                    true, // cloud_library
-                                    true, // sources_alert（本回调触发时必然存在）
-                                    showStats, // weekly_stats
-                                    true, // playlists_header
-                                ).count { it } + maxOf(playlists.size, 1)
+                                3 + // masthead、cloud_library、actions
+                                    (if (showStats) 1 else 0) +
+                                    (if (neteaseAccount != null) 2 + neteasePlaylists.size else 0) +
+                                    1 + // sources_alert（本回调触发时必然存在）
+                                    (if (playlists.isNotEmpty()) 1 + playlists.size else 0) +
+                                    otherRemotePlaylists.size +
+                                    userCloudPlaylists.size
                             scope.launch { gridState.animateScrollToItem(sourcesHeaderIndex) }
                         },
                         modifier =
@@ -310,51 +388,24 @@ fun LibraryPage() {
                 }
             }
 
-            if (showStats) {
-                item(key = "weekly_stats", span = { GridItemSpan(maxLineSpan) }, contentType = "stats") {
-                    val entrance = rememberEntrance(order = 2, play = playEntrance)
-                    WeeklyStatsStrip(
-                        stats = weeklyStats ?: return@item,
+            if (playlists.isNotEmpty()) {
+                item(key = "playlists_header", span = { GridItemSpan(maxLineSpan) }, contentType = "section_header") {
+                    val entrance = rememberEntrance(order = 3, play = playEntrance)
+                    Text(
+                        text =
+                            stringResource(
+                                if (neteaseAccount != null) R.string.library_local_playlists else R.string.my_playlists,
+                            ),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
                         modifier =
                             Modifier
-                                .animateItem(
-                                    fadeInSpec = ListItemFadeInSpec,
-                                    placementSpec = null,
-                                    fadeOutSpec = ListItemFadeOutSpec,
-                                ).entranceGraphics(entrance),
+                                .padding(top = Spacing.Medium)
+                                .entranceGraphics(entrance),
                     )
                 }
-            }
 
-            item(key = "playlists_header", span = { GridItemSpan(maxLineSpan) }, contentType = "section_header") {
-                val entrance = rememberEntrance(order = 3, play = playEntrance)
-                Text(
-                    text = stringResource(R.string.my_playlists),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier =
-                        Modifier
-                            .padding(top = Spacing.Medium)
-                            .entranceGraphics(entrance),
-                )
-            }
-
-            if (playlists.isEmpty() && remotePlaylists.isEmpty() && userCloudPlaylists.isEmpty()) {
-                item(key = "playlists_empty", span = { GridItemSpan(maxLineSpan) }, contentType = "empty") {
-                    PlaylistsEmptyState(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                // 空态与歌单卡跨 span 形态切换，只做淡入淡出，不做位移动画
-                                .animateItem(
-                                    fadeInSpec = ListItemFadeInSpec,
-                                    placementSpec = null,
-                                    fadeOutSpec = ListItemFadeOutSpec,
-                                ),
-                    )
-                }
-            } else {
                 itemsIndexed(
                     items = playlists,
                     key = { _, item ->
@@ -396,7 +447,7 @@ fun LibraryPage() {
             }
 
             itemsIndexed(
-                items = remotePlaylists,
+                items = otherRemotePlaylists,
                 key = { _, item -> item.stableId },
                 contentType = { _, _ -> "remote_playlist" },
             ) { _, item ->
@@ -683,20 +734,114 @@ private fun LibraryTopBar(
 @Composable
 private fun LibraryMasthead(
     playlistCount: Int,
+    subtitle: String?,
+    onRefresh: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.library_title),
-            style = MaterialTheme.typography.displaySmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.library_title),
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            onRefresh?.let { refresh ->
+                IconButton(onClick = refresh) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = stringResource(R.string.refresh),
+                        tint = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+        }
         Column(modifier = Modifier.padding(top = 6.dp)) {
-            RollingPlaylistCount(
-                playlistCount = playlistCount,
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                RollingPlaylistCount(
+                    playlistCount = playlistCount,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NeteaseAccountSummaryCard(
+    accountName: String,
+    playlistCount: Int,
+    onManageClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(Shapes.ExtraLargeCornerBasedShape)
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .padding(Spacing.Large),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(56.dp)
+                    .clip(Shapes.LargeCornerBasedShape)
+                    .background(MaterialTheme.colorScheme.tertiaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Default.AccountCircle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier.size(30.dp),
+            )
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = accountName,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = stringResource(R.string.library_netease_account_summary, playlistCount),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+        Box(
+            modifier =
+                Modifier
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                    .clickHighlight(onClick = onManageClick)
+                    .padding(horizontal = Spacing.Large, vertical = Spacing.Small),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = stringResource(R.string.library_account_management),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                maxLines = 1,
             )
         }
     }

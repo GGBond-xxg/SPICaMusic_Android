@@ -19,11 +19,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.HighQuality
+import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.SurroundSound
 import androidx.compose.material.icons.filled.SwapCalls
 import androidx.compose.material.icons.filled.Usb
+import androidx.compose.material.icons.filled.VolumeDown
+import androidx.compose.material.icons.filled.Waves
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -33,6 +39,9 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.spica27.navkit.scene.StackScene
 import me.spica27.spicamusic.R
+import me.spica27.spicamusic.cloud.NeteaseAudioQuality
 import me.spica27.spicamusic.ui.about.AboutItemDivider
 import me.spica27.spicamusic.ui.about.AboutScaffold
 import me.spica27.spicamusic.ui.about.AboutSectionCard
@@ -76,9 +86,17 @@ class AudioEffectsScene : StackScene() {
         val loudnessEnabled by
             audioViewModel.loudnessNormalizationEnabled.collectAsStateWithLifecycle()
         val fadeEnabled by settingsViewModel.fadeEnabled.collectAsStateWithLifecycle()
+        val backgroundPlayback by settingsViewModel.backgroundPlayback.collectAsStateWithLifecycle()
+        val resumeOnHeadset by settingsViewModel.resumeOnHeadset.collectAsStateWithLifecycle()
+        val neteaseQualityValue by settingsViewModel.neteaseAudioQuality.collectAsStateWithLifecycle()
         val hiFiMode by settingsViewModel.hiFiMode.collectAsStateWithLifecycle()
         val usbDacOutput by settingsViewModel.usbDacOutput.collectAsStateWithLifecycle()
         val usbDeviceName by settingsViewModel.usbDeviceName.collectAsStateWithLifecycle()
+        var qualityExpanded by rememberSaveable { mutableStateOf(false) }
+        val qualityLabels = neteaseQualityLabels()
+        val qualityName =
+            qualityLabels[neteaseQualityValue]
+                ?: qualityLabels.getValue(NeteaseAudioQuality.AUTO.value)
 
         AboutScaffold(title = stringResource(R.string.settings_sound_effects)) {
             item(key = "equalizer") {
@@ -173,6 +191,49 @@ class AudioEffectsScene : StackScene() {
                     )
                     AboutItemDivider()
                     AudioSwitchRow(
+                        title = stringResource(R.string.settings_background_playback),
+                        subtitle = stringResource(R.string.settings_background_playback_subtitle),
+                        icon = Icons.Default.PlayCircle,
+                        checked = backgroundPlayback,
+                        onCheckedChange = settingsViewModel::setBackgroundPlayback,
+                    )
+                    AboutItemDivider()
+                    AudioSwitchRow(
+                        title = stringResource(R.string.settings_headset_resume),
+                        subtitle = stringResource(R.string.settings_headset_resume_subtitle),
+                        icon = Icons.Default.Headphones,
+                        checked = resumeOnHeadset,
+                        onCheckedChange = settingsViewModel::setResumeOnHeadset,
+                    )
+                    AboutItemDivider()
+                    AudioSelectRow(
+                        title = stringResource(R.string.settings_audio_quality),
+                        subtitle = stringResource(R.string.settings_netease_quality_short, qualityName),
+                        icon = Icons.Default.Waves,
+                        expanded = qualityExpanded,
+                        onClick = { qualityExpanded = !qualityExpanded },
+                    )
+                    AnimatedVisibility(
+                        visible = qualityExpanded,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut(),
+                    ) {
+                        Column {
+                            NeteaseAudioQuality.entries.forEach { quality ->
+                                AudioQualityOptionRow(
+                                    quality = quality,
+                                    label = qualityLabels.getValue(quality.value),
+                                    selected = quality.value == neteaseQualityValue,
+                                    onClick = {
+                                        settingsViewModel.setNeteaseAudioQuality(quality.value)
+                                        qualityExpanded = false
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    AboutItemDivider()
+                    AudioSwitchRow(
                         title = stringResource(R.string.settings_hifi),
                         subtitle =
                             stringResource(
@@ -201,6 +262,108 @@ class AudioEffectsScene : StackScene() {
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun neteaseQualityLabels(): Map<String, String> =
+    mapOf(
+        NeteaseAudioQuality.AUTO.value to stringResource(R.string.netease_quality_auto),
+        NeteaseAudioQuality.STANDARD.value to stringResource(R.string.netease_quality_standard),
+        NeteaseAudioQuality.EXHIGH.value to stringResource(R.string.netease_quality_exhigh),
+        NeteaseAudioQuality.LOSSLESS.value to stringResource(R.string.netease_quality_lossless),
+        NeteaseAudioQuality.HIRES.value to stringResource(R.string.netease_quality_hires),
+        NeteaseAudioQuality.JY_EFFECT.value to stringResource(R.string.netease_quality_jy_effect),
+        NeteaseAudioQuality.SKY.value to stringResource(R.string.netease_quality_sky),
+        NeteaseAudioQuality.MASTER.value to stringResource(R.string.netease_quality_master),
+    )
+
+private fun NeteaseAudioQuality.icon(): ImageVector =
+    when (this) {
+        NeteaseAudioQuality.AUTO -> Icons.AutoMirrored.Filled.VolumeUp
+        NeteaseAudioQuality.STANDARD -> Icons.Default.VolumeDown
+        NeteaseAudioQuality.EXHIGH -> Icons.Default.Waves
+        NeteaseAudioQuality.LOSSLESS -> Icons.Default.GraphicEq
+        NeteaseAudioQuality.HIRES -> Icons.Default.HighQuality
+        NeteaseAudioQuality.JY_EFFECT -> Icons.Default.SurroundSound
+        NeteaseAudioQuality.SKY -> Icons.Default.SwapCalls
+        NeteaseAudioQuality.MASTER -> Icons.Default.Usb
+    }
+
+@Composable
+private fun AudioSelectRow(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    expanded: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickHighlight(onClick = onClick)
+                .padding(horizontal = Spacing.Large, vertical = Spacing.Medium),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(46.dp)
+                    .clip(Shapes.LargeCornerBasedShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(
+            Icons.Default.ExpandMore,
+            contentDescription = null,
+            modifier = Modifier.graphicsLayer { rotationZ = if (expanded) 180f else 0f },
+        )
+    }
+}
+
+@Composable
+private fun AudioQualityOptionRow(
+    quality: NeteaseAudioQuality,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickHighlight(onClick = onClick)
+                .padding(start = 32.dp, end = Spacing.Large, top = Spacing.Small, bottom = Spacing.Small),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
+    ) {
+        Icon(
+            quality.icon(),
+            contentDescription = null,
+            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(22.dp),
+        )
+        Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        if (selected) {
+            Icon(
+                Icons.Default.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
         }
     }
 }

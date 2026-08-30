@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+  <string name="library_netease_subtitle">网易云歌单与缓存歌曲</string>
+  <string name="library_netease_section">我的网易云资料库</string>
+  <string name="library_netease_account_summary">网易云 · %1$d 个歌单</string>
+  <string name="library_account_management">账号管理</string>
+  <string name="library_local_playlists">本地歌单</string>
+  <string name="library_netease_playlist_owned">%1$d 首 · 我创建的</string>
+  <string name="library_netease_playlist_collected">%1$d 首 · 已收藏</string>
   <string name="online_source_title">在线音源</string>
   <string name="cloud_streaming">云端串流</string>
   <string name="online_source_provider_subtitle">用 LX Music 兼容 JS 音源解析网易云与 QQ 音乐</string>
@@ -16,6 +23,17 @@
   <string name="online_source_resolver_only">此音源用于解析网易云或 QQ 云端音乐库歌曲，不提供搜索。</string>
   <string name="online_source_security_hint">音源脚本在隔离的 JavaScript 引擎中运行。请只导入可信脚本；网络请求由本设备直接发送。</string>
   <string name="settings_background_playback">后台播放</string>
+    <string name="settings_netease_audio_quality">音质</string>
+    <string name="settings_netease_audio_quality_subtitle">%1$s · 网易云</string>
+  <string name="netease_quality_auto">自动</string>
+  <string name="netease_quality_standard">标准</string>
+  <string name="netease_quality_exhigh">极高</string>
+  <string name="netease_quality_lossless">无损</string>
+  <string name="netease_quality_hires">Hi-Res</string>
+  <string name="netease_quality_jy_effect">高清环绕声</string>
+  <string name="netease_quality_sky">沉浸环绕声</string>
+  <string name="netease_quality_master">超清母带</string>
+  <string name="netease_like_sync_failed">网易云喜欢状态更新失败，请检查网络或重新登录</string>
   <string name="settings_background_playback_subtitle">从最近任务划掉应用后继续播放</string>
   <string name="settings_headset_resume">耳机续播</string>
   <string name="settings_headset_resume_subtitle">仅在音频设备断开导致暂停后自动恢复</string>

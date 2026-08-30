@@ -169,8 +169,10 @@ class RemoteMusicScene(
                     IconButton(
                         onClick = {
                             when (provider) {
-                                RemoteMusicProvider.NETEASE ->
+                                RemoteMusicProvider.NETEASE -> {
                                     catalogViewModel.refreshNeteasePlaylists(forceRefresh = true)
+                                    catalogViewModel.refreshDailyRecommendations(forceRefresh = true)
+                                }
                                 RemoteMusicProvider.QQ_MUSIC ->
                                     viewModel.refreshRemotePlaylists(forceRefresh = true)
                                 RemoteMusicProvider.SUBSONIC -> songs.refresh()
@@ -337,11 +339,90 @@ class RemoteMusicScene(
 
                     if (provider == RemoteMusicProvider.NETEASE && !hasSubmittedSearch) {
                         val accountId = state.selectedAccount?.id
+                        val dailySongs =
+                            catalogState.dailyRecommendations.mapNotNull { catalogSong ->
+                                val payload = catalogSong.payload as? CloudCatalogPayload.Remote
+                                payload
+                                    ?.takeIf { it.account.id == accountId }
+                                    ?.song
+                            }
                         val playlists =
                             catalogState.remotePlaylists.filter {
                                 it.account.provider == RemoteMusicProvider.NETEASE &&
                                     it.account.id == accountId
                             }
+                        item(key = "netease_daily_title", contentType = "section_title") {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("每日推荐", fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        "来自你的网易云账号",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                IconButton(
+                                    onClick = {
+                                        catalogViewModel.refreshDailyRecommendations(forceRefresh = true)
+                                    },
+                                ) {
+                                    Icon(Icons.Default.Refresh, "刷新每日推荐")
+                                }
+                            }
+                        }
+                        when {
+                            catalogState.isLoadingDailyRecommendations && dailySongs.isEmpty() -> {
+                                item(key = "netease_daily_loading", contentType = "loading") {
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        CircularProgressIndicator(modifier = Modifier.size(28.dp))
+                                    }
+                                }
+                            }
+                            catalogState.dailyRecommendationsError != null && dailySongs.isEmpty() -> {
+                                item(key = "netease_daily_error", contentType = "error") {
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth().padding(20.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        Text(
+                                            catalogState.dailyRecommendationsError.orEmpty(),
+                                            color = MaterialTheme.colorScheme.error,
+                                        )
+                                        OutlinedButton(
+                                            onClick = {
+                                                catalogViewModel.refreshDailyRecommendations(forceRefresh = true)
+                                            },
+                                        ) {
+                                            Text("重试")
+                                        }
+                                    }
+                                }
+                            }
+                            else -> {
+                                items(
+                                    count = dailySongs.size,
+                                    key = { index -> "daily:${dailySongs[index].id}" },
+                                    contentType = { "netease_daily_song" },
+                                ) { index ->
+                                    val song = dailySongs[index]
+                                    RemoteSongRow(
+                                        song = song,
+                                        onClick = { viewModel.play(song, dailySongs) },
+                                        onAddToPlaylist = {
+                                            pendingPlaylistSong = song
+                                            showPlaylistPicker = true
+                                        },
+                                    )
+                                }
+                            }
+                        }
                         item(key = "netease_collection_title", contentType = "section_title") {
                             Text(
                                 "网易云收藏歌单",

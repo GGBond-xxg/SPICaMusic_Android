@@ -36,6 +36,7 @@ class RemoteMusicStreamProxy(
 ) {
     private data class CachedStreamUrl(
         val value: String,
+        val isPreview: Boolean,
         val expiresAtMs: Long,
     )
 
@@ -69,6 +70,18 @@ class RemoteMusicStreamProxy(
         songId: String,
     ) {
         resolveUpstreamUrl(account, songId)
+    }
+
+    fun isExplicitPreview(
+        accountId: String,
+        songId: String,
+    ): Boolean = streamUrlCache[streamCacheKey(accountId, songId)]?.isPreview == true
+
+    fun invalidate(
+        accountId: String,
+        songId: String,
+    ) {
+        streamUrlCache.remove(streamCacheKey(accountId, songId))
     }
 
     private suspend fun ensureStarted() {
@@ -194,12 +207,14 @@ class RemoteMusicStreamProxy(
         return lock.withLock {
             val lockedNowMs = SystemClock.elapsedRealtime()
             streamUrlCache[key]?.takeIf { it.expiresAtMs > lockedNowMs }?.value
-                ?: clients.resolveStreamUrl(account, songId).also { resolved ->
+                ?: clients.resolveStream(account, songId).let { resolved ->
                     streamUrlCache[key] =
                         CachedStreamUrl(
-                            value = resolved,
+                            value = resolved.url,
+                            isPreview = resolved.isPreview,
                             expiresAtMs = lockedNowMs + STREAM_URL_CACHE_MS,
                         )
+                    resolved.url
                 }
         }
     }

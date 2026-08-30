@@ -1,5 +1,6 @@
 package me.spica27.spicamusic.service
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.media.AudioDeviceCallback
@@ -1155,14 +1156,19 @@ class PlaybackService : MediaLibraryService() {
         val remaining = duration - exoPlayer.currentPosition
         val sinkHasAudio = runCatching { audioSink?.hasPendingData() == true }.getOrDefault(true)
         val stalled =
-            item != null &&
-                item.mediaId.startsWith(CLOUD_MEDIA_ID_PREFIX) &&
-                cloudPreviewHandledMediaId != item.mediaId &&
-                exoPlayer.isPlaying &&
-                exoPlayer.playbackState == Player.STATE_READY &&
-                exoPlayer.totalBufferedDuration >= CLOUD_UNDERRUN_MIN_BUFFERED_MS &&
+            shouldHandleCloudAudioUnderrun(
+                explicitPreview = item?.let(cloudPlaybackItemResolver::isExplicitPreview) == true,
+                stillSameItem =
+                    item != null &&
+                        item.mediaId.startsWith(CLOUD_MEDIA_ID_PREFIX) &&
+                        cloudPreviewHandledMediaId != item.mediaId,
+                isPlaying = exoPlayer.isPlaying,
+                playbackState = exoPlayer.playbackState,
+                totalBufferedDurationMs = exoPlayer.totalBufferedDuration,
+                sinkHasPendingData = sinkHasAudio,
+            ) &&
                 (duration <= 0L || remaining > CLOUD_NATURAL_END_GUARD_MS) &&
-                !sinkHasAudio
+                item != null
         if (!stalled) {
             cloudSinkEmptySinceMs = 0L
             return
@@ -1359,14 +1365,17 @@ internal fun isRestrictedCloudHttpStatus(responseCode: Int?): Boolean =
         responseCode == 410 ||
         responseCode == 451
 
+@SuppressLint("UnsafeOptInUsageError")
 internal fun shouldHandleCloudAudioUnderrun(
+    explicitPreview: Boolean,
     stillSameItem: Boolean,
     isPlaying: Boolean,
     playbackState: Int,
     totalBufferedDurationMs: Long,
     sinkHasPendingData: Boolean,
 ): Boolean =
-    stillSameItem &&
+    explicitPreview &&
+        stillSameItem &&
         isPlaying &&
         playbackState == Player.STATE_READY &&
         totalBufferedDurationMs >= PlaybackService.CLOUD_UNDERRUN_MIN_BUFFERED_MS &&

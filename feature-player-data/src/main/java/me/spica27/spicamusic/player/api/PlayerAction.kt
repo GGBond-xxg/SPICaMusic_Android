@@ -110,4 +110,10 @@ sealed class PlayerAction {
      * 从头开始播放
      */
     data object ReloadAndPlay : PlayerAction()
+
+    /** Rebuild the current media source while preserving its queue position and playhead. */
+    data class ReloadCurrentMedia(
+        val customCacheKey: String,
+        val positionMs: Long,
+    ) : PlayerAction()
 }

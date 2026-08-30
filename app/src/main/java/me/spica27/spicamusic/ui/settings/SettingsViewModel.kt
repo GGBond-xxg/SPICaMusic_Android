@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import me.spica27.spicamusic.cloud.NeteaseAudioQuality
+import me.spica27.spicamusic.cloud.QqAudioQuality
 import me.spica27.spicamusic.common.entity.DynamicCoverType
 import me.spica27.spicamusic.common.entity.DynamicSpectrumBackground
 import me.spica27.spicamusic.common.entity.ProgressBarStyle
@@ -149,6 +151,38 @@ class SettingsViewModel(
         val size = value.toIntOrNull()?.coerceIn(128, 8192) ?: return
         viewModelScope.launch {
             settingsUseCases.setString(SettingsUseCases.Keys.CLOUD_AUDIO_CACHE_MIB, size.toString())
+        }
+    }
+
+    val neteaseAudioQuality =
+        settingsUseCases
+            .getString(
+                SettingsUseCases.Keys.NETEASE_AUDIO_QUALITY,
+                NeteaseAudioQuality.AUTO.value,
+            ).stateIn(viewModelScope, SharingStarted.Eagerly, NeteaseAudioQuality.AUTO.value)
+
+    fun setNeteaseAudioQuality(value: String) {
+        viewModelScope.launch {
+            settingsUseCases.setString(
+                SettingsUseCases.Keys.NETEASE_AUDIO_QUALITY,
+                NeteaseAudioQuality.fromValue(value).value,
+            )
+        }
+    }
+
+    val qqAudioQuality =
+        settingsUseCases
+            .getString(
+                SettingsUseCases.Keys.QQ_AUDIO_QUALITY,
+                QqAudioQuality.AUTO.value,
+            ).stateIn(viewModelScope, SharingStarted.Eagerly, QqAudioQuality.AUTO.value)
+
+    fun setQqAudioQuality(value: String) {
+        viewModelScope.launch {
+            settingsUseCases.setString(
+                SettingsUseCases.Keys.QQ_AUDIO_QUALITY,
+                QqAudioQuality.fromValue(value).value,
+            )
         }
     }
 

@@ -18,6 +18,9 @@ class NeteaseLibraryStore(
                 name = item.optString("name"),
                 coverUrl = item.optString("coverUrl").takeIf(String::isNotBlank),
                 songCount = item.optInt("songCount").coerceAtLeast(0),
+                creatorName = item.optString("creatorName"),
+                isOwned = item.optBoolean("isOwned", false),
+                isLikedSongs = item.optBoolean("isLikedSongs", false),
             )
         }
 
@@ -33,6 +36,9 @@ class NeteaseLibraryStore(
                     .put("name", playlist.name)
                     .put("coverUrl", playlist.coverUrl.orEmpty())
                     .put("songCount", playlist.songCount)
+                    .put("creatorName", playlist.creatorName)
+                    .put("isOwned", playlist.isOwned)
+                    .put("isLikedSongs", playlist.isLikedSongs)
             },
         )
     }

@@ -1,5 +1,6 @@
 package me.spica27.spicamusic.cloud
 
+import android.annotation.SuppressLint
 import android.net.Uri
 import androidx.media3.common.MediaItem
 import me.spica27.spicamusic.service.CloudAudioCache
@@ -13,6 +14,7 @@ import org.json.JSONObject
  * every process. Media-server URLs are also regenerated from the encrypted
  * account store so restored items never depend on an old access token.
  */
+@SuppressLint("UnsafeOptInUsageError")
 class CloudPlaybackItemResolver(
     private val accountStore: CloudAccountStore,
     private val mediaServerClient: MediaServerClient,
@@ -20,6 +22,12 @@ class CloudPlaybackItemResolver(
     private val remoteProxy: RemoteMusicStreamProxy,
     private val onlineSourceProxy: OnlineSourceStreamProxy,
 ) {
+    fun isExplicitPreview(item: MediaItem): Boolean {
+        val identity = parseCloudMediaIdentity(item.mediaId) ?: return false
+        if (identity.provider != NETEASE_PROVIDER) return false
+        return remoteProxy.isExplicitPreview(identity.accountOrChatId, identity.songId)
+    }
+
     /** Warm the next authenticated cloud stream without downloading its audio body. */
     suspend fun prefetch(item: MediaItem) {
         if (!item.mediaId.startsWith(CLOUD_ID_PREFIX)) return
@@ -141,7 +149,12 @@ class CloudPlaybackItemResolver(
             item
                 .buildUpon()
                 .setUri(resolved.streamUrl)
-                .setCustomCacheKey(CloudAudioCache.cacheKey(item.mediaId))
+                .setCustomCacheKey(
+                    resolvedCloudCacheKey(
+                        mediaId = item.mediaId,
+                        customCacheKey = item.localConfiguration?.customCacheKey,
+                    ),
+                )
         resolved.artworkUrl?.let { artworkUrl ->
             builder.setMediaMetadata(
                 item.mediaMetadata
@@ -214,6 +227,12 @@ class CloudPlaybackItemResolver(
         const val EXTRA_ONLINE_SONG_INFO = "onlineSongInfo"
     }
 }
+
+@SuppressLint("UnsafeOptInUsageError")
+internal fun resolvedCloudCacheKey(
+    mediaId: String,
+    customCacheKey: String?,
+): String = customCacheKey ?: CloudAudioCache.cacheKey(mediaId)
 
 internal data class CloudMediaIdentity(
     val provider: String,

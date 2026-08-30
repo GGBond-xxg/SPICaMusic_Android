@@ -16,6 +16,46 @@ enum class RemoteMusicProvider {
 }
 
 @Immutable
+enum class NeteaseAudioQuality(
+    val value: String,
+) {
+    AUTO("auto"),
+    STANDARD("standard"),
+    EXHIGH("exhigh"),
+    LOSSLESS("lossless"),
+    HIRES("hires"),
+    JY_EFFECT("jyeffect"),
+    SKY("sky"),
+    MASTER("jymaster"),
+    ;
+
+    companion object {
+        fun fromValue(value: String?): NeteaseAudioQuality = entries.firstOrNull { it.value == value } ?: AUTO
+    }
+}
+
+@Immutable
+enum class QqAudioQuality(
+    val value: String,
+) {
+    AUTO("auto"),
+    STANDARD("standard"),
+    HIGH("high"),
+    LOSSLESS("lossless"),
+    ;
+
+    companion object {
+        fun fromValue(value: String?): QqAudioQuality = entries.firstOrNull { it.value == value } ?: AUTO
+    }
+}
+
+@Immutable
+data class ResolvedRemoteStream(
+    val url: String,
+    val isPreview: Boolean = false,
+)
+
+@Immutable
 data class RemoteMusicAccount(
     val id: String,
     val provider: RemoteMusicProvider,
@@ -52,6 +92,9 @@ data class RemotePlaylist(
     val name: String,
     val coverUrl: String?,
     val songCount: Int,
+    val creatorName: String = "",
+    val isOwned: Boolean = false,
+    val isLikedSongs: Boolean = false,
 )
 
 @Immutable

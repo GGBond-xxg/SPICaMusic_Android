@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.VerticalPager
@@ -35,15 +36,24 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.SurroundSound
+import androidx.compose.material.icons.filled.Waves
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -57,6 +67,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -88,6 +99,9 @@ import me.spica27.navkit.geometry.GeometryTransition
 import me.spica27.navkit.geometry.geometrySource
 import me.spica27.spicamusic.App
 import me.spica27.spicamusic.R
+import me.spica27.spicamusic.cloud.NeteaseAudioQuality
+import me.spica27.spicamusic.cloud.QqAudioQuality
+import me.spica27.spicamusic.cloud.RemoteMusicProvider
 import me.spica27.spicamusic.common.entity.DynamicCoverType
 import me.spica27.spicamusic.common.entity.ProgressBarStyle
 import me.spica27.spicamusic.core.preferences.PreferencesManager
@@ -95,6 +109,7 @@ import me.spica27.spicamusic.feature.library.domain.SongUseCases
 import me.spica27.spicamusic.player.api.PlayMode
 import me.spica27.spicamusic.ui.player.pages.CurrentPlaylistPage
 import me.spica27.spicamusic.ui.player.scene.LyricsPlayerPage
+import me.spica27.spicamusic.ui.settings.SettingsViewModel
 import me.spica27.spicamusic.ui.theme.LocalThemeRevealController
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
@@ -211,6 +226,15 @@ fun ExpandedPlayerScreen(
     val sleepTimerDurationMs by viewModel.sleepTimerDurationMs.collectAsStateWithLifecycle()
     var lyricsArtworkPainter by remember { mutableStateOf<Painter?>(null) }
     var showLyricsEditor by remember { mutableStateOf(false) }
+    var showAudioQualitySheet by rememberSaveable(mediaId) { mutableStateOf(false) }
+
+    if (showAudioQualitySheet) {
+        PlayerAudioQualitySheet(
+            audioQualityInfo = audioQualityInfo,
+            playerViewModel = viewModel,
+            onDismiss = { showAudioQualitySheet = false },
+        )
+    }
 
     LaunchedEffect(songLikeState) {
         Timber.tag("ExpandedPlayerScreen").d("当前歌曲收藏状态: $songLikeState")
@@ -426,6 +450,7 @@ fun ExpandedPlayerScreen(
                                         isSeekingState = isSeekingState,
                                         currentMediaItem = { currentMediaItem },
                                         audioQualityInfo = audioQualityInfo,
+                                        onAudioQualityClick = { showAudioQualitySheet = true },
                                         realPositionProvider = { positionState.value.toFloat() },
                                         seekPositionProvider = { seekValueState.floatValue },
                                         duration = duration,
@@ -894,6 +919,7 @@ private fun PlayerPage(
     playerViewModel: PlayerViewModel,
     currentMediaItem: () -> MediaItem?,
     audioQualityInfo: AudioQualityInfo,
+    onAudioQualityClick: () -> Unit,
     seekPositionProvider: () -> Float,
     realPositionProvider: () -> Float,
     duration: Long,
@@ -1212,38 +1238,321 @@ private fun PlayerPage(
                     },
             contentAlignment = Alignment.Center,
         ) {
-            if (qualityTags.isNotEmpty()) {
-                Row(
-                    modifier =
-                        Modifier
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.tertiaryContainer)
-                            .padding(horizontal = Spacing.Medium, vertical = 5.dp)
-                            .animateContentSize(),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    qualityTags.forEachIndexed { index, tag ->
-                        if (index > 0) {
-                            Text(
-                                text = "·",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.55f),
-                            )
-                        }
-                        Text(
-                            text = tag,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer,
-                        )
-                    }
+            Row(
+                modifier =
+                    Modifier
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.tertiaryContainer)
+                        .clickHighlight(onClick = onAudioQualityClick)
+                        .padding(horizontal = Spacing.Medium, vertical = 5.dp)
+                        .animateContentSize(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.GraphicEq,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                    modifier = Modifier.size(16.dp),
+                )
+                Text(
+                    text = stringResource(R.string.player_audio_quality_and_effects),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                )
+                qualityTags.forEach { tag ->
+                    Text(
+                        text = "·",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.55f),
+                    )
+                    Text(
+                        text = tag,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    )
                 }
             }
         }
         Spacer(modifier = Modifier.height(Spacing.Medium))
         Spacer(modifier = Modifier.height(playbackSectionHeight))
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlayerAudioQualitySheet(
+    audioQualityInfo: AudioQualityInfo,
+    playerViewModel: PlayerViewModel,
+    onDismiss: () -> Unit,
+) {
+    val settingsViewModel: SettingsViewModel = koinActivityViewModel()
+    val neteaseQuality by settingsViewModel.neteaseAudioQuality.collectAsStateWithLifecycle()
+    val qqQuality by settingsViewModel.qqAudioQuality.collectAsStateWithLifecycle()
+    val progressStyle by settingsViewModel.progressBarStyle.collectAsStateWithLifecycle()
+    val provider = audioQualityInfo.cloudProvider?.uppercase(Locale.ROOT)
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().height(620.dp),
+        ) {
+            item(key = "quality_header") {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Spacing.Large, vertical = Spacing.Medium),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.player_current_audio_quality),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text =
+                                when (provider) {
+                                    "NETEASE" -> stringResource(R.string.player_quality_netease_desc)
+                                    "QQ_MUSIC" -> stringResource(R.string.player_quality_qq_desc)
+                                    else -> localQualityDescription(audioQualityInfo)
+                                },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        text = stringResource(R.string.player_quality_more_adjustments),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+
+            when (provider) {
+                "NETEASE" -> {
+                    NeteaseAudioQuality.entries.forEach { quality ->
+                        item(key = "netease_${quality.value}") {
+                            QualityChoiceRow(
+                                title = quality.neteaseTitle(),
+                                subtitle = quality.neteaseDescription(),
+                                icon = quality.playerIcon(),
+                                selected = neteaseQuality == quality.value,
+                                onClick = {
+                                    playerViewModel.applyCloudQuality(RemoteMusicProvider.NETEASE, quality.value)
+                                },
+                            )
+                        }
+                    }
+                }
+
+                "QQ_MUSIC" -> {
+                    QqAudioQuality.entries.forEach { quality ->
+                        item(key = "qq_${quality.value}") {
+                            QualityChoiceRow(
+                                title = quality.qqTitle(),
+                                subtitle = quality.qqDescription(),
+                                icon = quality.playerIcon(),
+                                selected = qqQuality == quality.value,
+                                onClick = {
+                                    playerViewModel.applyCloudQuality(RemoteMusicProvider.QQ_MUSIC, quality.value)
+                                },
+                            )
+                        }
+                    }
+                }
+
+                else -> {
+                    item(key = "local_quality") {
+                        QualityChoiceRow(
+                            title = stringResource(R.string.player_local_original_quality),
+                            subtitle = localQualityDescription(audioQualityInfo),
+                            icon = Icons.Default.MusicNote,
+                            selected = true,
+                            onClick = {},
+                        )
+                    }
+                }
+            }
+
+            item(key = "progress_divider") {
+                HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.Medium))
+                Text(
+                    text = stringResource(R.string.settings_progress_bar_style),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = Spacing.Large, vertical = Spacing.Small),
+                )
+            }
+            ProgressBarStyle.presets.forEach { style ->
+                item(key = "progress_${style.value}") {
+                    QualityChoiceRow(
+                        title = style.playerTitle(),
+                        subtitle = stringResource(R.string.player_progress_style_desc),
+                        icon =
+                            when (style) {
+                                ProgressBarStyle.ExpressiveWavy -> Icons.Default.Waves
+                                ProgressBarStyle.DynamicWaveform -> Icons.Default.GraphicEq
+                                ProgressBarStyle.TimeDomainWaveform -> Icons.Default.SurroundSound
+                            },
+                        selected = progressStyle == style.value,
+                        onClick = { settingsViewModel.setProgressBarStyle(style.value) },
+                    )
+                }
+            }
+            item(key = "quality_bottom_space") { Spacer(Modifier.height(Spacing.ExtraLarge)) }
+        }
+    }
+}
+
+@Composable
+private fun QualityChoiceRow(
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        color =
+            if (selected) {
+                MaterialTheme.colorScheme.tertiaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerLow
+            },
+        shape = Shapes.LargeCornerBasedShape,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.Large, vertical = 5.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(Spacing.Medium),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (selected) {
+                Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            }
+        }
+    }
+}
+
+@Composable
+private fun NeteaseAudioQuality.neteaseTitle(): String =
+    stringResource(
+        when (this) {
+            NeteaseAudioQuality.AUTO -> R.string.netease_quality_auto
+            NeteaseAudioQuality.STANDARD -> R.string.netease_quality_standard
+            NeteaseAudioQuality.EXHIGH -> R.string.netease_quality_exhigh
+            NeteaseAudioQuality.LOSSLESS -> R.string.netease_quality_lossless
+            NeteaseAudioQuality.HIRES -> R.string.netease_quality_hires
+            NeteaseAudioQuality.JY_EFFECT -> R.string.netease_quality_jy_effect
+            NeteaseAudioQuality.SKY -> R.string.netease_quality_sky
+            NeteaseAudioQuality.MASTER -> R.string.netease_quality_master
+        },
+    )
+
+@Composable
+private fun NeteaseAudioQuality.neteaseDescription(): String =
+    stringResource(
+        when (this) {
+            NeteaseAudioQuality.AUTO -> R.string.netease_quality_auto_desc
+            NeteaseAudioQuality.STANDARD -> R.string.netease_quality_standard_desc
+            NeteaseAudioQuality.EXHIGH -> R.string.netease_quality_exhigh_desc
+            NeteaseAudioQuality.LOSSLESS -> R.string.netease_quality_lossless_desc
+            NeteaseAudioQuality.HIRES -> R.string.netease_quality_hires_desc
+            NeteaseAudioQuality.JY_EFFECT -> R.string.netease_quality_jy_effect_desc
+            NeteaseAudioQuality.SKY -> R.string.netease_quality_sky_desc
+            NeteaseAudioQuality.MASTER -> R.string.netease_quality_master_desc
+        },
+    )
+
+private fun NeteaseAudioQuality.playerIcon() =
+    when (this) {
+        NeteaseAudioQuality.AUTO -> Icons.Default.MusicNote
+        NeteaseAudioQuality.STANDARD -> Icons.Default.Waves
+        NeteaseAudioQuality.EXHIGH -> Icons.Default.GraphicEq
+        NeteaseAudioQuality.LOSSLESS -> Icons.Default.HighQuality
+        NeteaseAudioQuality.HIRES -> Icons.Default.SurroundSound
+        NeteaseAudioQuality.JY_EFFECT -> Icons.Default.GraphicEq
+        NeteaseAudioQuality.SKY -> Icons.Default.Waves
+        NeteaseAudioQuality.MASTER -> Icons.Default.HighQuality
+    }
+
+@Composable
+private fun QqAudioQuality.qqTitle(): String =
+    stringResource(
+        when (this) {
+            QqAudioQuality.AUTO -> R.string.qq_quality_auto
+            QqAudioQuality.STANDARD -> R.string.qq_quality_standard
+            QqAudioQuality.HIGH -> R.string.qq_quality_high
+            QqAudioQuality.LOSSLESS -> R.string.qq_quality_lossless
+        },
+    )
+
+@Composable
+private fun QqAudioQuality.qqDescription(): String =
+    stringResource(
+        when (this) {
+            QqAudioQuality.AUTO -> R.string.qq_quality_auto_desc
+            QqAudioQuality.STANDARD -> R.string.qq_quality_standard_desc
+            QqAudioQuality.HIGH -> R.string.qq_quality_high_desc
+            QqAudioQuality.LOSSLESS -> R.string.qq_quality_lossless_desc
+        },
+    )
+
+private fun QqAudioQuality.playerIcon() =
+    when (this) {
+        QqAudioQuality.AUTO -> Icons.Default.MusicNote
+        QqAudioQuality.STANDARD -> Icons.Default.Waves
+        QqAudioQuality.HIGH -> Icons.Default.GraphicEq
+        QqAudioQuality.LOSSLESS -> Icons.Default.HighQuality
+    }
+
+@Composable
+private fun ProgressBarStyle.playerTitle(): String =
+    stringResource(
+        when (this) {
+            ProgressBarStyle.ExpressiveWavy -> R.string.progress_bar_style_expressive_wavy
+            ProgressBarStyle.DynamicWaveform -> R.string.progress_bar_style_dynamic_waveform
+            ProgressBarStyle.TimeDomainWaveform -> R.string.progress_bar_style_time_domain_waveform
+        },
+    )
+
+@Composable
+private fun localQualityDescription(info: AudioQualityInfo): String {
+    val values =
+        buildList {
+            if (info.sampleRate > 0) add("${info.sampleRate / 1000} kHz")
+            if (info.bitRate > 0) add("${info.bitRate / 1000} kbps")
+            if (info.isLossless) add(stringResource(R.string.lossless))
+        }
+    return values.joinToString(" · ").ifBlank { stringResource(R.string.player_local_quality_unknown) }
 }
 
 private fun String.cloudProviderLabel(): String =

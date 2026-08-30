@@ -42,6 +42,8 @@ class PreferencesManager(
         val HIFI_MODE = booleanPreferencesKey("hifi_mode")
         val USB_DAC_OUTPUT = booleanPreferencesKey("usb_dac_output")
         val CLOUD_AUDIO_CACHE_MIB = stringPreferencesKey("cloud_audio_cache_mib")
+        val NETEASE_AUDIO_QUALITY = stringPreferencesKey("netease_audio_quality")
+        val QQ_AUDIO_QUALITY = stringPreferencesKey("qq_audio_quality")
         val LYRICON_ENABLED = booleanPreferencesKey("lyricon_enabled")
         val TOP_DISPLAY_MODE = stringPreferencesKey("top_display_mode")
         val DYNAMIC_SPECTRUM_BACKGROUND = stringPreferencesKey("dynamic_spectrum_background")

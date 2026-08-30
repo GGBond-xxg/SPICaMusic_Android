@@ -45,12 +45,20 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Scanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -89,6 +97,7 @@ import me.spica27.spicamusic.cloud.CatalogQueueItem
 import me.spica27.spicamusic.cloud.CloudCatalogPlaylist
 import me.spica27.spicamusic.cloud.CloudCatalogSong
 import me.spica27.spicamusic.cloud.CloudMusicCatalogViewModel
+import me.spica27.spicamusic.cloud.CloudSongSource
 import me.spica27.spicamusic.cloud.CloudUserPlaylist
 import me.spica27.spicamusic.cloud.CloudUserPlaylistScene
 import me.spica27.spicamusic.cloud.NeteasePlaylistScene
@@ -144,6 +153,14 @@ private data class FrequentEntry(
     val queueItem: CatalogQueueItem,
 )
 
+private data class NeteaseSceneMusic(
+    val title: String,
+    val query: String,
+    val artworkUri: Uri?,
+    val icon: ImageVector,
+    val colorIndex: Int,
+)
+
 private fun Song.toFrequentEntry(): FrequentEntry =
     FrequentEntry(
         stableId = "local:$mediaStoreId",
@@ -197,7 +214,84 @@ fun FinderPage(playEntrance: Boolean = true) {
     val cloudCatalog by cloudCatalogViewModel.state.collectAsStateWithLifecycle()
     val cloudPlaylists = cloudCatalog.remotePlaylists
     val userCloudPlaylists = cloudCatalog.userPlaylists
-    val totalPlaylistCount = playlists.size + cloudPlaylists.size + userCloudPlaylists.size
+    val overviewCloudPlaylists =
+        remember(cloudPlaylists) {
+            cloudPlaylists.filterNot { it.account.provider == RemoteMusicProvider.NETEASE }
+        }
+    val hasNeteaseAccount = CloudSongSource.NETEASE in cloudCatalog.availableSources
+    val neteasePlaylists =
+        remember(cloudPlaylists) {
+            cloudPlaylists.filter { it.account.provider == RemoteMusicProvider.NETEASE }
+        }
+    val orderedNeteasePlaylists =
+        remember(neteasePlaylists) {
+            neteasePlaylists
+                .filterNot { it.playlist.name.contains("我喜欢") }
+                .sortedWith(
+                    compareByDescending<CloudCatalogPlaylist> {
+                        it.playlist.name.contains("雷达") || it.playlist.name.contains("推荐")
+                    }.thenByDescending { it.playlist.songCount },
+                ).distinctBy { it.playlist.id }
+        }
+    val radarPlaylistCount =
+        when (orderedNeteasePlaylists.size) {
+            0 -> 0
+            1 -> 1
+            2 -> 1
+            else -> ((orderedNeteasePlaylists.size + 1) / 2).coerceAtMost(6)
+        }
+    val radarPlaylists =
+        remember(orderedNeteasePlaylists, radarPlaylistCount) {
+            orderedNeteasePlaylists.take(radarPlaylistCount)
+        }
+    val moreNeteasePlaylists =
+        remember(orderedNeteasePlaylists, radarPlaylistCount) {
+            orderedNeteasePlaylists
+                .drop(radarPlaylistCount)
+                .take(12)
+        }
+    val neteaseSceneArtwork =
+        remember(cloudCatalog.dailyRecommendations, orderedNeteasePlaylists) {
+            (
+                cloudCatalog.dailyRecommendations.mapNotNull(CloudCatalogSong::artworkUri) +
+                    orderedNeteasePlaylists.mapNotNull { playlist ->
+                        playlist.playlist.coverUrl?.let(Uri::parse)
+                    }
+            ).distinctBy(Uri::toString)
+                .take(6)
+        }
+    val sceneTitles =
+        listOf(
+            stringResource(R.string.netease_scene_commute),
+            stringResource(R.string.netease_scene_fun),
+            stringResource(R.string.netease_scene_relax),
+            stringResource(R.string.netease_scene_focus),
+            stringResource(R.string.netease_scene_sleep),
+            stringResource(R.string.netease_scene_classics),
+        )
+    val sceneQueries = listOf("通勤 节奏", "运动 欢快", "放松 治愈", "专注 学习 纯音乐", "助眠 轻音乐", "经典 怀旧")
+    val sceneIcons =
+        listOf(
+            Icons.Default.DirectionsCar,
+            Icons.Default.FitnessCenter,
+            Icons.Default.Spa,
+            Icons.Default.MenuBook,
+            Icons.Default.Bedtime,
+            Icons.Default.History,
+        )
+    val neteaseScenes =
+        remember(sceneTitles, neteaseSceneArtwork) {
+            sceneTitles.mapIndexed { index, title ->
+                NeteaseSceneMusic(
+                    title = title,
+                    query = sceneQueries[index],
+                    artworkUri = neteaseSceneArtwork.getOrNull(index),
+                    icon = sceneIcons[index],
+                    colorIndex = index,
+                )
+            }
+        }
+    val totalPlaylistCount = playlists.size + overviewCloudPlaylists.size + userCloudPlaylists.size
     val frequentEntries =
         remember(frequentSongs, cloudCatalog.recentCloudSongs) {
             (
@@ -336,40 +430,24 @@ fun FinderPage(playEntrance: Boolean = true) {
                 }
             }
 
-            item(key = "favorites_header", contentType = "section_header") {
-                val entrance = rememberEntrance(order = 4, play = playEntrance)
-                SectionHeader(
-                    title = stringResource(R.string.my_favorites),
-                    subtitle = stringResource(R.string.songs_count_format, favoriteSongs.size),
-                    actionLabel = stringResource(R.string.finder_more).takeIf { favoriteSongs.isNotEmpty() },
-                    onActionClick = { path.push(FavoriteScene()) }.takeIf { favoriteSongs.isNotEmpty() },
-                    modifier =
-                        Modifier
-                            .animateItem(
-                                fadeInSpec = ListItemFadeInSpec,
-                                placementSpec = ItemPlacementSpec,
-                                fadeOutSpec = ListItemFadeOutSpec,
-                            ).padding(top = Spacing.Medium)
-                            .entranceGraphics(entrance),
-                )
-            }
-
-            if (favoriteSongs.isEmpty()) {
-                item(key = "favorites_empty", contentType = "empty") {
-                    val entrance = rememberEntrance(order = 5, play = playEntrance)
-                    FinderEmptyRow(
-                        title = stringResource(R.string.finder_no_favorites_title),
-                        subtitle = stringResource(R.string.finder_no_favorites_subtitle),
+            if (favoriteSongs.isNotEmpty()) {
+                item(key = "favorites_header", contentType = "section_header") {
+                    val entrance = rememberEntrance(order = 4, play = playEntrance)
+                    SectionHeader(
+                        title = stringResource(R.string.my_favorites),
+                        subtitle = stringResource(R.string.songs_count_format, favoriteSongs.size),
+                        actionLabel = stringResource(R.string.finder_more),
+                        onActionClick = { path.push(FavoriteScene()) },
                         modifier =
                             Modifier
                                 .animateItem(
                                     fadeInSpec = ListItemFadeInSpec,
-                                    placementSpec = null,
+                                    placementSpec = ItemPlacementSpec,
                                     fadeOutSpec = ListItemFadeOutSpec,
-                                ).entranceGraphics(entrance),
+                                ).padding(top = Spacing.Medium)
+                                .entranceGraphics(entrance),
                     )
                 }
-            } else {
                 item(key = "favorites_card", contentType = "favorites") {
                     val entrance = rememberEntrance(order = 5, play = playEntrance)
                     FavoritesCard(
@@ -405,74 +483,107 @@ fun FinderPage(playEntrance: Boolean = true) {
                 }
             }
 
-            item(key = "playlists_header", contentType = "section_header") {
-                val entrance = rememberEntrance(order = 6, play = playEntrance)
-                SectionHeader(
-                    title = stringResource(R.string.finder_playlists_overview_title),
-                    subtitle = stringResource(R.string.library_summary_playlists, totalPlaylistCount),
-                    actionLabel = stringResource(R.string.finder_more).takeIf { playlists.size >= 2 },
-                    onActionClick = { path.push(AllPlaylistsScene()) }.takeIf { playlists.size >= 2 },
-                    modifier =
-                        Modifier
-                            .animateItem(
-                                fadeInSpec = ListItemFadeInSpec,
-                                placementSpec = ItemPlacementSpec,
-                                fadeOutSpec = ListItemFadeOutSpec,
-                            ).padding(top = Spacing.Medium)
-                            .entranceGraphics(entrance),
-                )
+            if (totalPlaylistCount > 0) {
+                item(key = "playlists_header", contentType = "section_header") {
+                    val entrance = rememberEntrance(order = 6, play = playEntrance)
+                    SectionHeader(
+                        title = stringResource(R.string.finder_playlists_overview_title),
+                        subtitle = stringResource(R.string.library_summary_playlists, totalPlaylistCount),
+                        actionLabel = stringResource(R.string.finder_more).takeIf { playlists.size >= 2 },
+                        onActionClick = { path.push(AllPlaylistsScene()) }.takeIf { playlists.size >= 2 },
+                        modifier =
+                            Modifier
+                                .animateItem(
+                                    fadeInSpec = ListItemFadeInSpec,
+                                    placementSpec = ItemPlacementSpec,
+                                    fadeOutSpec = ListItemFadeOutSpec,
+                                ).padding(top = Spacing.Medium)
+                                .entranceGraphics(entrance),
+                    )
+                }
+                if (playlistsWithCover.isNotEmpty()) {
+                    item(key = "playlists_rail", contentType = "rail") {
+                        val entrance = rememberEntrance(order = 6, play = playEntrance)
+                        PlaylistRail(
+                            playlists = playlistsWithCover,
+                            onPlaylistClick = { item -> path.push(PlaylistDetailScene(item.playlist)) },
+                            modifier =
+                                Modifier
+                                    .animateItem(
+                                        fadeInSpec = ListItemFadeInSpec,
+                                        placementSpec = null,
+                                        fadeOutSpec = ListItemFadeOutSpec,
+                                    ).entranceGraphics(entrance),
+                        )
+                    }
+                }
+                if (overviewCloudPlaylists.isNotEmpty()) {
+                    item(key = "cloud_playlists_rail", contentType = "rail") {
+                        val entrance = rememberEntrance(order = 6, play = playEntrance)
+                        CloudPlaylistRail(
+                            playlists = overviewCloudPlaylists,
+                            onPlaylistClick = { item -> path.push(NeteasePlaylistScene(item)) },
+                            modifier = Modifier.entranceGraphics(entrance),
+                        )
+                    }
+                }
+                if (userCloudPlaylists.isNotEmpty()) {
+                    item(key = "user_cloud_playlists_rail", contentType = "rail") {
+                        val entrance = rememberEntrance(order = 6, play = playEntrance)
+                        CloudUserPlaylistRail(
+                            playlists = userCloudPlaylists,
+                            onPlaylistClick = { item -> path.push(CloudUserPlaylistScene(item)) },
+                            modifier = Modifier.entranceGraphics(entrance),
+                        )
+                    }
+                }
             }
 
-            if (playlistsWithCover.isEmpty() && cloudPlaylists.isEmpty() && userCloudPlaylists.isEmpty()) {
-                item(key = "playlists_empty", contentType = "empty") {
-                    val entrance = rememberEntrance(order = 6, play = playEntrance)
-                    FinderEmptyRow(
-                        title = stringResource(R.string.no_playlists_yet),
-                        subtitle = stringResource(R.string.finder_no_playlists_subtitle),
-                        onClick = { homeViewModel.navigateToPage(HomePage.Library) },
-                        modifier =
-                            Modifier
-                                .animateItem(
-                                    fadeInSpec = ListItemFadeInSpec,
-                                    placementSpec = null,
-                                    fadeOutSpec = ListItemFadeOutSpec,
-                                ).entranceGraphics(entrance),
+            if (hasNeteaseAccount) {
+                item(key = "netease_radar_header", contentType = "section_header") {
+                    SectionHeader(
+                        title = stringResource(R.string.netease_radar_playlists),
+                        subtitle = stringResource(R.string.netease_logged_in_recommendations),
+                        modifier = Modifier.padding(top = Spacing.ExtraLarge),
                     )
                 }
-            } else if (playlistsWithCover.isNotEmpty()) {
-                item(key = "playlists_rail", contentType = "rail") {
-                    val entrance = rememberEntrance(order = 6, play = playEntrance)
-                    PlaylistRail(
-                        playlists = playlistsWithCover,
-                        onPlaylistClick = { item -> path.push(PlaylistDetailScene(item.playlist)) },
-                        modifier =
-                            Modifier
-                                .animateItem(
-                                    fadeInSpec = ListItemFadeInSpec,
-                                    placementSpec = null,
-                                    fadeOutSpec = ListItemFadeOutSpec,
-                                ).entranceGraphics(entrance),
+                if (radarPlaylists.isNotEmpty()) {
+                    item(key = "netease_radar", contentType = "rail") {
+                        CloudPlaylistRail(
+                            playlists = radarPlaylists,
+                            onPlaylistClick = { path.push(NeteasePlaylistScene(it)) },
+                            placeholderIcon = Icons.Default.Radar,
+                        )
+                    }
+                }
+
+                item(key = "netease_scenes_header", contentType = "section_header") {
+                    SectionHeader(
+                        title = stringResource(R.string.netease_scene_music),
+                        subtitle = stringResource(R.string.netease_scene_music_subtitle),
                     )
                 }
-            }
-            if (cloudPlaylists.isNotEmpty()) {
-                item(key = "cloud_playlists_rail", contentType = "rail") {
-                    val entrance = rememberEntrance(order = 6, play = playEntrance)
-                    CloudPlaylistRail(
-                        playlists = cloudPlaylists,
-                        onPlaylistClick = { item -> path.push(NeteasePlaylistScene(item)) },
-                        modifier = Modifier.entranceGraphics(entrance),
+                item(key = "netease_scenes", contentType = "rail") {
+                    NeteaseSceneMusicRail(
+                        scenes = neteaseScenes,
+                        onSceneClick = { scene -> path.push(SearchScene(scene.query)) },
                     )
                 }
-            }
-            if (userCloudPlaylists.isNotEmpty()) {
-                item(key = "user_cloud_playlists_rail", contentType = "rail") {
-                    val entrance = rememberEntrance(order = 6, play = playEntrance)
-                    CloudUserPlaylistRail(
-                        playlists = userCloudPlaylists,
-                        onPlaylistClick = { item -> path.push(CloudUserPlaylistScene(item)) },
-                        modifier = Modifier.entranceGraphics(entrance),
-                    )
+
+                if (moreNeteasePlaylists.isNotEmpty()) {
+                    item(key = "netease_more_header", contentType = "section_header") {
+                        SectionHeader(
+                            title = stringResource(R.string.netease_more_selected),
+                            subtitle = stringResource(R.string.netease_more_selected_subtitle),
+                        )
+                    }
+                    item(key = "netease_more", contentType = "rail") {
+                        CloudPlaylistRail(
+                            playlists = moreNeteasePlaylists,
+                            onPlaylistClick = { path.push(NeteasePlaylistScene(it)) },
+                            placeholderIcon = Icons.Default.AutoAwesome,
+                        )
+                    }
                 }
             }
 
@@ -1404,6 +1515,7 @@ private fun CloudPlaylistRail(
     playlists: List<CloudCatalogPlaylist>,
     onPlaylistClick: (CloudCatalogPlaylist) -> Unit,
     modifier: Modifier = Modifier,
+    placeholderIcon: ImageVector = Icons.Default.LibraryMusic,
 ) {
     LazyRow(
         modifier = modifier.fillMaxWidth(),
@@ -1434,7 +1546,11 @@ private fun CloudPlaylistRail(
                             .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                     placeHolder = {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.LibraryMusic, null)
+                            Icon(
+                                imageVector = placeholderIcon,
+                                contentDescription = null,
+                                modifier = Modifier.size(36.dp),
+                            )
                         }
                     },
                 )
@@ -1453,6 +1569,95 @@ private fun CloudPlaylistRail(
                         text =
                             "${if (item.account.provider == RemoteMusicProvider.NETEASE) "网易云" else "QQ 音乐"} · " +
                                 "${item.playlist.songCount} 首",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NeteaseSceneMusicRail(
+    scenes: List<NeteaseSceneMusic>,
+    onSceneClick: (NeteaseSceneMusic) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyRow(
+        modifier = modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = LayoutTokens.MusicHeaderHorizontalPadding),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
+        overscrollEffect = rememberIOSOverScrollEffect(orientation = Orientation.Horizontal),
+    ) {
+        items(
+            items = scenes,
+            key = NeteaseSceneMusic::query,
+            contentType = { "netease_scene" },
+        ) { scene ->
+            val containerColor =
+                when (scene.colorIndex) {
+                    0 -> MaterialTheme.colorScheme.primaryContainer
+                    1 -> MaterialTheme.colorScheme.secondaryContainer
+                    2 -> MaterialTheme.colorScheme.tertiaryContainer
+                    3 -> MaterialTheme.colorScheme.surfaceContainerHighest
+                    4 -> MaterialTheme.colorScheme.errorContainer
+                    else -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                }
+            val contentColor =
+                when (scene.colorIndex) {
+                    0 -> MaterialTheme.colorScheme.onPrimaryContainer
+                    1 -> MaterialTheme.colorScheme.onSecondaryContainer
+                    2 -> MaterialTheme.colorScheme.onTertiaryContainer
+                    3 -> MaterialTheme.colorScheme.onSurface
+                    4 -> MaterialTheme.colorScheme.onErrorContainer
+                    else -> MaterialTheme.colorScheme.primary
+                }
+            Column(
+                modifier =
+                    Modifier
+                        .width(148.dp)
+                        .clip(Shapes.ExtraLargeCornerBasedShape)
+                        .clickHighlight(onClick = { onSceneClick(scene) }),
+                verticalArrangement = Arrangement.spacedBy(Spacing.Small),
+            ) {
+                AudioCover(
+                    uri = scene.artworkUri,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .clip(Shapes.ExtraLargeCornerBasedShape)
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(containerColor, containerColor.copy(alpha = 0.58f)),
+                                ),
+                            ),
+                    placeHolder = {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = scene.icon,
+                                contentDescription = null,
+                                tint = contentColor,
+                                modifier = Modifier.size(46.dp),
+                            )
+                        }
+                    },
+                )
+                Column(
+                    modifier = Modifier.padding(bottom = Spacing.Small),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        text = scene.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = stringResource(R.string.netease_scene_recommendation),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,

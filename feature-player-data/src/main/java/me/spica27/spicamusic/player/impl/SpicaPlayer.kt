@@ -370,6 +370,24 @@ class SpicaPlayer(
                         // TODO: 实现重新加载并播放逻辑
                     }
 
+                    is PlayerAction.ReloadCurrentMedia -> {
+                        val currentIndex = browser.currentMediaItemIndex
+                        if (currentIndex !in 0 until browser.mediaItemCount) return@launch
+                        val wasPlaying = browser.playWhenReady
+                        val items =
+                            List(browser.mediaItemCount) { index ->
+                                val item = browser.getMediaItemAt(index)
+                                if (index == currentIndex) {
+                                    item.buildUpon().setCustomCacheKey(action.customCacheKey).build()
+                                } else {
+                                    item
+                                }
+                            }
+                        browser.setMediaItems(items, currentIndex, action.positionMs.coerceAtLeast(0L))
+                        browser.prepare()
+                        browser.playWhenReady = wasPlaying
+                    }
+
                     is PlayerAction.AddToQueue -> {
                         val items = withContext(Dispatchers.IO) { MediaLibrary.mediaIdToMediaItems(action.mediaIds) }
                         browser.addMediaItems(items)

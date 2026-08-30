@@ -1,6 +1,7 @@
 package me.spica27.spicamusic.ui.player
 
 import android.os.SystemClock
+import android.widget.Toast
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -26,9 +28,18 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import me.spica27.spicamusic.App
+import me.spica27.spicamusic.R
+import me.spica27.spicamusic.cloud.CloudAccountStore
+import me.spica27.spicamusic.cloud.RemoteMusicClientRegistry
+import me.spica27.spicamusic.cloud.RemoteMusicProvider
+import me.spica27.spicamusic.cloud.RemoteMusicStreamProxy
+import me.spica27.spicamusic.cloud.parseCloudMediaIdentity
 import me.spica27.spicamusic.common.entity.ProgressBarStyle
 import me.spica27.spicamusic.common.entity.Song
 import me.spica27.spicamusic.core.preferences.PreferencesManager
@@ -52,6 +63,9 @@ class PlayerViewModel(
     private val songRepository: SongUseCases,
     private val preferencesManager: PreferencesManager,
     private val topDisplayModeController: TopDisplayModeController,
+    private val cloudAccountStore: CloudAccountStore,
+    private val remoteMusicClients: RemoteMusicClientRegistry,
+    private val remoteMusicStreamProxy: RemoteMusicStreamProxy,
 ) : ViewModel() {
     // ==================== 播放状态 ====================
 
@@ -78,18 +92,38 @@ class PlayerViewModel(
      */
     val currentMediaItem: StateFlow<MediaItem?> = player.currentMediaItem
 
+    private val neteaseLikedSongIds = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
+    private val loadedNeteaseLikeAccounts = mutableSetOf<String>()
+    private val neteaseLikeRefreshMutex = Mutex()
+    private val neteaseLikeMutationMutex = Mutex()
+
     @OptIn(ExperimentalCoroutinesApi::class)
     val currentSongIsLike: StateFlow<Boolean> =
         player.currentMediaItem
             .flatMapLatest { item ->
-                val mediaStoreId = item?.mediaId?.toLongOrNull() ?: -1L
-                if (mediaStoreId == -1L) {
-                    kotlinx.coroutines.flow.flowOf(false)
-                } else {
-                    songRepository
-                        .getSongLikeStatusFlowByMediaStoreId(mediaStoreId)
-                        .distinctUntilChanged()
-                        .flowOn(Dispatchers.IO)
+                val mediaId = item?.mediaId.orEmpty()
+                val cloudIdentity = parseCloudMediaIdentity(mediaId)
+                when {
+                    cloudIdentity?.provider == NETEASE_PROVIDER ->
+                        flow {
+                            emit(false)
+                            refreshNeteaseLikes(cloudIdentity.accountOrChatId)
+                            emitAll(
+                                neteaseLikedSongIds
+                                    .map { likes ->
+                                        cloudIdentity.songId in
+                                            likes[cloudIdentity.accountOrChatId].orEmpty()
+                                    }.distinctUntilChanged(),
+                            )
+                        }.flowOn(Dispatchers.IO)
+
+                    mediaId.toLongOrNull() != null ->
+                        songRepository
+                            .getSongLikeStatusFlowByMediaStoreId(mediaId.toLong())
+                            .distinctUntilChanged()
+                            .flowOn(Dispatchers.IO)
+
+                    else -> kotlinx.coroutines.flow.flowOf(false)
                 }
             }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
@@ -279,6 +313,31 @@ class PlayerViewModel(
         topDisplayModeController.updatePosition(positionMs, force = true)
     }
 
+    fun applyCloudQuality(
+        provider: RemoteMusicProvider,
+        value: String,
+    ) {
+        viewModelScope.launch {
+            val key =
+                when (provider) {
+                    RemoteMusicProvider.NETEASE -> PreferencesManager.Keys.NETEASE_AUDIO_QUALITY
+                    RemoteMusicProvider.QQ_MUSIC -> PreferencesManager.Keys.QQ_AUDIO_QUALITY
+                    RemoteMusicProvider.SUBSONIC -> return@launch
+                }
+            preferencesManager.setString(key, value)
+            val item = currentMediaItem.value ?: return@launch
+            val identity = parseCloudMediaIdentity(item.mediaId) ?: return@launch
+            if (identity.provider != provider.name.lowercase()) return@launch
+            remoteMusicStreamProxy.invalidate(identity.accountOrChatId, identity.songId)
+            player.doAction(
+                PlayerAction.ReloadCurrentMedia(
+                    customCacheKey = "${item.mediaId}:quality:$value:${SystemClock.elapsedRealtime()}",
+                    positionMs = player.currentPosition,
+                ),
+            )
+        }
+    }
+
     // ==================== 播放模式 ====================
 
     /**
@@ -412,12 +471,78 @@ class PlayerViewModel(
      * 切换当前歌曲的喜欢状态
      */
     fun toggleLikeCurrentSong() {
+        val mediaId = currentMediaItem.value?.mediaId ?: return
+        val cloudIdentity = parseCloudMediaIdentity(mediaId)
+        if (cloudIdentity?.provider == NETEASE_PROVIDER) {
+            viewModelScope.launch {
+                toggleNeteaseLike(
+                    accountId = cloudIdentity.accountOrChatId,
+                    songId = cloudIdentity.songId,
+                )
+            }
+            return
+        }
         viewModelScope.launch(Dispatchers.IO) {
-            val mediaStoreId = currentMediaItem.value?.mediaId?.toLongOrNull() ?: return@launch
+            val mediaStoreId = mediaId.toLongOrNull() ?: return@launch
             Timber
                 .tag("PlayerViewModel")
                 .d("切换喜欢状态: mediaStoreId=$mediaStoreId")
             songRepository.toggleLikeByMediaStoreId(mediaStoreId)
         }
+    }
+
+    private suspend fun refreshNeteaseLikes(
+        accountId: String,
+        forceRefresh: Boolean = false,
+    ) {
+        neteaseLikeRefreshMutex.withLock {
+            if (!forceRefresh && accountId in loadedNeteaseLikeAccounts) return
+            val account =
+                cloudAccountStore
+                    .getRemoteAccounts(RemoteMusicProvider.NETEASE)
+                    .firstOrNull { it.id == accountId } ?: return
+            runCatching {
+                remoteMusicClients.neteaseLikedSongIds(account, forceRefresh)
+            }.onSuccess { likedIds ->
+                neteaseLikedSongIds.update { it + (accountId to likedIds) }
+                loadedNeteaseLikeAccounts += accountId
+            }.onFailure { error ->
+                Timber.tag("PlayerViewModel").w(error, "网易云喜欢列表同步失败")
+            }
+        }
+    }
+
+    private suspend fun toggleNeteaseLike(
+        accountId: String,
+        songId: String,
+    ) {
+        neteaseLikeMutationMutex.withLock {
+            refreshNeteaseLikes(accountId)
+            val account =
+                cloudAccountStore
+                    .getRemoteAccounts(RemoteMusicProvider.NETEASE)
+                    .firstOrNull { it.id == accountId } ?: return
+            val previous = neteaseLikedSongIds.value[accountId].orEmpty()
+            val shouldLike = songId !in previous
+            neteaseLikedSongIds.update {
+                it + (accountId to if (shouldLike) previous + songId else previous - songId)
+            }
+            runCatching {
+                remoteMusicClients.setNeteaseLiked(account, songId, shouldLike)
+            }.onFailure { error ->
+                neteaseLikedSongIds.update { it + (accountId to previous) }
+                Timber.tag("PlayerViewModel").w(error, "网易云喜欢状态同步失败")
+                Toast
+                    .makeText(
+                        App.getInstance(),
+                        R.string.netease_like_sync_failed,
+                        Toast.LENGTH_SHORT,
+                    ).show()
+            }
+        }
+    }
+
+    private companion object {
+        const val NETEASE_PROVIDER = "netease"
     }
 }

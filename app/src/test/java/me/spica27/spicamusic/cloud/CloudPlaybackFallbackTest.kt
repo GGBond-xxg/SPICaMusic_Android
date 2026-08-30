@@ -10,6 +10,31 @@ import org.junit.Test
 
 class CloudPlaybackFallbackTest {
     @Test
+    fun `netease auto quality falls back from lossless to broadly available levels`() {
+        assertEquals(
+            listOf(
+                NeteaseAudioQuality.LOSSLESS,
+                NeteaseAudioQuality.EXHIGH,
+                NeteaseAudioQuality.STANDARD,
+            ),
+            NeteaseAudioQuality.AUTO.requestOrder(),
+        )
+    }
+
+    @Test
+    fun `explicit netease quality does not silently change level`() {
+        assertEquals(
+            listOf(NeteaseAudioQuality.MASTER),
+            NeteaseAudioQuality.MASTER.requestOrder(),
+        )
+    }
+
+    @Test
+    fun `unknown stored netease quality safely migrates to auto`() {
+        assertEquals(NeteaseAudioQuality.AUTO, NeteaseAudioQuality.fromValue("legacy-value"))
+    }
+
+    @Test
     fun `logged-in provider stream is tried before anonymous online source`() {
         assertEquals(
             listOf("http://account-stream", "http://online-source"),
@@ -44,6 +69,7 @@ class CloudPlaybackFallbackTest {
     fun `cloud preview underrun skips only when decoded audio is exhausted despite buffered data`() {
         assertTrue(
             shouldHandleCloudAudioUnderrun(
+                explicitPreview = true,
                 stillSameItem = true,
                 isPlaying = true,
                 playbackState = Player.STATE_READY,
@@ -53,6 +79,7 @@ class CloudPlaybackFallbackTest {
         )
         assertFalse(
             shouldHandleCloudAudioUnderrun(
+                explicitPreview = true,
                 stillSameItem = true,
                 isPlaying = true,
                 playbackState = Player.STATE_BUFFERING,
@@ -62,11 +89,46 @@ class CloudPlaybackFallbackTest {
         )
         assertFalse(
             shouldHandleCloudAudioUnderrun(
+                explicitPreview = true,
                 stillSameItem = true,
                 isPlaying = true,
                 playbackState = Player.STATE_READY,
                 totalBufferedDurationMs = 30_000L,
                 sinkHasPendingData = true,
+            ),
+        )
+        assertFalse(
+            shouldHandleCloudAudioUnderrun(
+                explicitPreview = false,
+                stillSameItem = true,
+                isPlaying = true,
+                playbackState = Player.STATE_READY,
+                totalBufferedDurationMs = 30_000L,
+                sinkHasPendingData = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `qq requested quality falls back without losing automatic compatibility`() {
+        assertEquals(
+            listOf(
+                QqAudioQuality.LOSSLESS,
+                QqAudioQuality.HIGH,
+                QqAudioQuality.STANDARD,
+                QqAudioQuality.AUTO,
+            ),
+            QqAudioQuality.LOSSLESS.requestOrder(),
+        )
+    }
+
+    @Test
+    fun `quality reload cache key survives cloud URL resolution`() {
+        assertEquals(
+            "quality:lossless:123",
+            resolvedCloudCacheKey(
+                mediaId = "cloud:netease:account:song",
+                customCacheKey = "quality:lossless:123",
             ),
         )
     }

@@ -1,9 +1,11 @@
 package me.spica27.spicamusic.cloud
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import me.spica27.spicamusic.core.preferences.PreferencesManager
 import okhttp3.FormBody
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -97,14 +99,40 @@ class RemoteMusicClientRegistry(
         return netease.dailyRecommendations(account, forceRefresh)
     }
 
+    suspend fun neteaseLikedSongIds(
+        account: RemoteMusicAccount,
+        forceRefresh: Boolean = false,
+    ): Set<String> {
+        require(account.provider == RemoteMusicProvider.NETEASE) {
+            "Liked-song sync is only available for NetEase accounts"
+        }
+        return netease.likedSongIds(account, forceRefresh)
+    }
+
+    suspend fun setNeteaseLiked(
+        account: RemoteMusicAccount,
+        songId: String,
+        liked: Boolean,
+    ) {
+        require(account.provider == RemoteMusicProvider.NETEASE) {
+            "Liked-song sync is only available for NetEase accounts"
+        }
+        netease.setLiked(account, songId, liked)
+    }
+
     suspend fun resolveStreamUrl(
         account: RemoteMusicAccount,
         songId: String,
-    ): String =
+    ): String = resolveStream(account, songId).url
+
+    suspend fun resolveStream(
+        account: RemoteMusicAccount,
+        songId: String,
+    ): ResolvedRemoteStream =
         when (account.provider) {
-            RemoteMusicProvider.SUBSONIC -> subsonic.streamUrl(account, songId)
-            RemoteMusicProvider.NETEASE -> netease.resolveStreamUrl(account, songId)
-            RemoteMusicProvider.QQ_MUSIC -> qqMusic.resolveStreamUrl(account, songId)
+            RemoteMusicProvider.SUBSONIC -> ResolvedRemoteStream(subsonic.streamUrl(account, songId))
+            RemoteMusicProvider.NETEASE -> netease.resolveStream(account, songId)
+            RemoteMusicProvider.QQ_MUSIC -> ResolvedRemoteStream(qqMusic.resolveStreamUrl(account, songId))
         }
 
     fun clearCache(accountId: String) {
@@ -301,6 +329,7 @@ class SubsonicClient(
 class NeteaseClient(
     baseClient: OkHttpClient,
     private val libraryStore: NeteaseLibraryStore,
+    private val preferencesManager: PreferencesManager,
 ) {
     private val client =
         baseClient
@@ -313,6 +342,7 @@ class NeteaseClient(
     private val playlistCache = ConcurrentHashMap<String, List<RemotePlaylist>>()
     private val playlistSongCache = ConcurrentHashMap<String, List<RemoteSong>>()
     private val dailyRecommendationCache = ConcurrentHashMap<String, List<RemoteSong>>()
+    private val likedSongCache = ConcurrentHashMap<String, Set<String>>()
     private val playlistLocks = ConcurrentHashMap<String, Mutex>()
     private val playlistSongLocks = ConcurrentHashMap<String, Mutex>()
 
@@ -360,42 +390,36 @@ class NeteaseClient(
             }
         }
 
-    suspend fun resolveStreamUrl(
+    suspend fun resolveStream(
         account: RemoteMusicAccount,
         songId: String,
-    ): String =
+    ): ResolvedRemoteStream =
         withContext(Dispatchers.IO) {
             var previewUrl: String? = null
-            for (level in STREAM_LEVEL_ORDER) {
-                val encodeType = if (level == "lossless" || level == "jyeffect") "flac" else "mp3"
+            val selectedQuality =
+                NeteaseAudioQuality.fromValue(
+                    preferencesManager
+                        .getString(
+                            PreferencesManager.Keys.NETEASE_AUDIO_QUALITY,
+                            NeteaseAudioQuality.AUTO.value,
+                        ).first(),
+                )
+            for (quality in selectedQuality.requestOrder()) {
                 val payload =
                     JSONObject()
                         .put("ids", "[$songId]")
-                        .put("level", level)
-                        .put("encodeType", encodeType)
-                val form =
-                    FormBody
-                        .Builder()
-                        .add(
-                            "params",
-                            NeteaseWebApiCrypto.encryptEapi(
-                                NETEASE_PLAYER_EAPI_PATH,
-                                payload,
-                            ),
-                        ).build()
+                        .put("level", quality.value)
+                        .put("encodeType", "flac")
+                if (quality == NeteaseAudioQuality.SKY) payload.put("immerseType", "c51")
                 val root =
                     runCatching {
-                        executeJson(
-                            requestBuilder(STREAM_V1_URL, authenticatedCookieHeader(account.secret))
-                                .post(form)
-                                .build(),
-                        )
+                        executeEapi(account, NETEASE_PLAYER_API_PATH, payload)
                     }.getOrNull()
                 val item = root?.optJSONArray("data")?.optJSONObject(0)
                 val stream = item ?: continue
                 val url = stream.optString("url").takeIf(String::isNotBlank) ?: continue
                 val isPreview = !stream.isNull("freeTrialInfo")
-                if (!isPreview) return@withContext url
+                if (!isPreview) return@withContext ResolvedRemoteStream(url)
                 if (previewUrl == null) previewUrl = url
             }
 
@@ -415,11 +439,17 @@ class NeteaseClient(
                 val stream = item ?: continue
                 val url = stream.optString("url").takeIf(String::isNotBlank) ?: continue
                 val isPreview = !stream.isNull("freeTrialInfo")
-                if (!isPreview) return@withContext url
+                if (!isPreview) return@withContext ResolvedRemoteStream(url)
                 if (previewUrl == null) previewUrl = url
             }
-            previewUrl ?: "https://music.163.com/song/media/outer/url?id=$songId.mp3"
+            previewUrl?.let { ResolvedRemoteStream(it, isPreview = true) }
+                ?: ResolvedRemoteStream("https://music.163.com/song/media/outer/url?id=$songId.mp3")
         }
+
+    suspend fun resolveStreamUrl(
+        account: RemoteMusicAccount,
+        songId: String,
+    ): String = resolveStream(account, songId).url
 
     suspend fun dailyRecommendations(
         account: RemoteMusicAccount,
@@ -457,11 +487,89 @@ class NeteaseClient(
             songs.also { dailyRecommendationCache[account.id] = it }
         }
 
+    suspend fun likedSongIds(
+        account: RemoteMusicAccount,
+        forceRefresh: Boolean = false,
+    ): Set<String> =
+        withContext(Dispatchers.IO) {
+            if (!forceRefresh) likedSongCache[account.id]?.let { return@withContext it }
+            val userId = account.userId.toLongOrNull() ?: error("NetEase user id is missing")
+            val root = executeEapi(account, NETEASE_LIKED_SONGS_API_PATH, JSONObject().put("uid", userId))
+            check(root.optInt("code", 200) == 200) {
+                "网易云喜欢列表同步失败 (${root.optInt("code")})"
+            }
+            buildSet {
+                val ids = root.optJSONArray("ids") ?: JSONArray()
+                for (index in 0 until ids.length()) {
+                    ids
+                        .optLong(index)
+                        .takeIf { it > 0L }
+                        ?.toString()
+                        ?.let(::add)
+                }
+            }.also { likedSongCache[account.id] = it }
+        }
+
+    suspend fun setLiked(
+        account: RemoteMusicAccount,
+        songId: String,
+        liked: Boolean,
+    ) = withContext(Dispatchers.IO) {
+        require(songId.toLongOrNull() != null) { "Invalid NetEase song id" }
+        val userId = account.userId.toLongOrNull() ?: error("NetEase user id is missing")
+        val eapiResult =
+            runCatching {
+                executeEapi(
+                    account,
+                    NETEASE_LIKE_API_PATH,
+                    JSONObject()
+                        .put("trackId", songId)
+                        .put("userid", userId)
+                        .put("like", liked),
+                ).also { root ->
+                    check(root.optInt("code", 200) == 200) {
+                        "NetEase like API ${root.optInt("code")}"
+                    }
+                }
+            }
+        if (eapiResult.isFailure) {
+            val csrf = cookieValue(account.secret, "__csrf")
+            val encrypted =
+                NeteaseWebApiCrypto.encrypt(
+                    JSONObject()
+                        .put("alg", "itembased")
+                        .put("trackId", songId)
+                        .put("like", liked)
+                        .put("time", "3")
+                        .put("csrf_token", csrf),
+                )
+            val form =
+                FormBody
+                    .Builder()
+                    .add("params", encrypted.getValue("params"))
+                    .add("encSecKey", encrypted.getValue("encSecKey"))
+                    .build()
+            val root =
+                executeJson(
+                    requestBuilder("$NETEASE_RADIO_LIKE_URL?csrf_token=$csrf", account.secret)
+                        .post(form)
+                        .build(),
+                )
+            check(root.optInt("code", 200) == 200) {
+                "NetEase like fallback ${root.optInt("code")}"
+            }
+        }
+        likedSongCache.compute(account.id) { _, current ->
+            if (liked) current.orEmpty() + songId else current.orEmpty() - songId
+        }
+    }
+
     fun clearCache(accountId: String) {
         libraryCache.remove(accountId)
         playlistCache.remove(accountId)
         playlistSongCache.keys.removeAll { it.startsWith("$accountId:") }
         dailyRecommendationCache.remove(accountId)
+        likedSongCache.remove(accountId)
         playlistLocks.remove(accountId)
         playlistSongLocks.keys.removeAll { it.startsWith("$accountId:") }
         libraryStore.clear(accountId)
@@ -582,12 +690,18 @@ class NeteaseClient(
             for (index in 0 until array.length()) {
                 val item = array.optJSONObject(index) ?: continue
                 val id = item.optLong("id").takeIf { it > 0L }?.toString() ?: continue
+                val creator = item.optJSONObject("creator")
+                val creatorId = creator?.optLong("userId")?.takeIf { it > 0L }?.toString()
+                val isOwned = creatorId == account.userId || !item.optBoolean("subscribed", false)
                 playlists[id] =
                     RemotePlaylist(
                         id = id,
                         name = item.optString("name", "网易云歌单"),
                         coverUrl = item.optString("coverImgUrl").takeIf(String::isNotBlank),
                         songCount = item.optInt("trackCount").coerceAtLeast(0),
+                        creatorName = creator?.optString("nickname").orEmpty(),
+                        isOwned = isOwned,
+                        isLikedSongs = playlists.isEmpty() && isOwned,
                     )
             }
             offset += array.length()
@@ -717,18 +831,65 @@ class NeteaseClient(
             .header("User-Agent", BROWSER_USER_AGENT)
             .header("Cookie", cookies)
 
-    private fun authenticatedCookieHeader(cookies: String): String {
-        val names =
-            cookies
-                .split(';')
-                .mapNotNull { value -> value.substringBefore('=', "").trim().takeIf(String::isNotBlank) }
-                .toSet()
-        return buildString {
-            append(cookies.trim().trimEnd(';'))
-            if ("os" !in names) append("; os=pc")
-            if ("appver" !in names) append("; appver=8.10.35")
-        }
+    private fun executeEapi(
+        account: RemoteMusicAccount,
+        apiPath: String,
+        payload: JSONObject,
+    ): JSONObject {
+        val now = System.currentTimeMillis()
+        val musicU = cookieValue(account.secret, "MUSIC_U")
+        val deviceId =
+            cookieValue(account.secret, "deviceId")
+                .ifBlank { md5Hex(musicU) }
+        val reportedDeviceId = cookieValue(account.secret, "sDeviceId").ifBlank { deviceId }
+        payload
+            .put("e_r", false)
+            .put(
+                "header",
+                JSONObject()
+                    .put("osver", "Microsoft-Windows-10-Professional-build-19045-64bit")
+                    .put("deviceId", deviceId)
+                    .put("sDeviceId", reportedDeviceId)
+                    .put("os", "pc")
+                    .put("appver", NETEASE_PC_APP_VERSION)
+                    .put("versioncode", "140")
+                    .put("mobilename", "")
+                    .put("buildver", (now / 1000L).toString())
+                    .put("resolution", "1920x1080")
+                    .put("__csrf", cookieValue(account.secret, "__csrf"))
+                    .put("channel", "netease")
+                    .put("requestId", "${now}_${(1000..9999).random()}")
+                    .put("MUSIC_U", musicU),
+            )
+        val form =
+            FormBody
+                .Builder()
+                .add("params", NeteaseWebApiCrypto.encryptEapi(apiPath, payload))
+                .build()
+        val url = NETEASE_EAPI_BASE_URL + apiPath.removePrefix("/api/")
+        return executeJson(
+            requestBuilder(url, desktopCookieHeader(account.secret))
+                .header("User-Agent", NETEASE_PC_USER_AGENT)
+                .post(form)
+                .build(),
+        )
     }
+
+    private fun desktopCookieHeader(cookies: String): String =
+        cookies
+            .split(';')
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .filterNot { value ->
+                value.substringBefore('=').equals("os", ignoreCase = true) ||
+                    value.substringBefore('=').equals("appver", ignoreCase = true)
+            }.joinToString(separator = "; ", postfix = "; os=pc; appver=$NETEASE_PC_APP_VERSION")
+
+    private fun md5Hex(value: String): String =
+        MessageDigest
+            .getInstance("MD5")
+            .digest(value.toByteArray(StandardCharsets.UTF_8))
+            .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
 
     private fun executeJson(request: Request): JSONObject =
         client.newCall(request).execute().use { response ->
@@ -742,8 +903,16 @@ class NeteaseClient(
         const val PLAYLIST_DETAIL_URL = "https://music.163.com/api/v6/playlist/detail"
         const val SEARCH_URL = "https://music.163.com/weapi/search/get"
         const val STREAM_URL = "https://music.163.com/api/song/enhance/player/url"
-        const val STREAM_V1_URL = "https://interface.music.163.com/eapi/song/enhance/player/url/v1"
-        const val NETEASE_PLAYER_EAPI_PATH = "/eapi/song/enhance/player/url/v1"
+        const val NETEASE_EAPI_BASE_URL = "https://interfacepc.music.163.com/eapi/"
+        const val NETEASE_PLAYER_API_PATH = "/api/song/enhance/player/url/v1"
+        const val NETEASE_LIKED_SONGS_API_PATH = "/api/song/like/get"
+        const val NETEASE_LIKE_API_PATH = "/api/song/like"
+        const val NETEASE_RADIO_LIKE_URL = "https://music.163.com/weapi/radio/like"
+        const val NETEASE_PC_APP_VERSION = "3.1.17.204416"
+        const val NETEASE_PC_USER_AGENT =
+            "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 " +
+                "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 " +
+                "NeteaseMusicDesktop/3.1.17.204416"
         const val SONG_DETAIL_URL = "https://music.163.com/api/v3/song/detail"
         const val DAILY_RECOMMENDATIONS_URL =
             "https://music.163.com/weapi/v3/discovery/recommend/songs"
@@ -751,13 +920,47 @@ class NeteaseClient(
         const val MAX_PLAYLIST_PAGES = 200
         const val SONG_DETAIL_BATCH_SIZE = 500
         val STREAM_BITRATE_ORDER = intArrayOf(999_000, 320_000, 128_000)
-        val STREAM_LEVEL_ORDER = arrayOf("lossless", "exhigh", "higher", "standard")
     }
 }
+
+internal fun NeteaseAudioQuality.requestOrder(): List<NeteaseAudioQuality> =
+    if (this == NeteaseAudioQuality.AUTO) {
+        listOf(
+            NeteaseAudioQuality.LOSSLESS,
+            NeteaseAudioQuality.EXHIGH,
+            NeteaseAudioQuality.STANDARD,
+        )
+    } else {
+        listOf(this)
+    }
+
+internal fun QqAudioQuality.requestOrder(): List<QqAudioQuality> =
+    when (this) {
+        QqAudioQuality.AUTO -> listOf(QqAudioQuality.AUTO)
+        QqAudioQuality.STANDARD -> listOf(QqAudioQuality.STANDARD, QqAudioQuality.AUTO)
+        QqAudioQuality.HIGH ->
+            listOf(QqAudioQuality.HIGH, QqAudioQuality.STANDARD, QqAudioQuality.AUTO)
+        QqAudioQuality.LOSSLESS ->
+            listOf(
+                QqAudioQuality.LOSSLESS,
+                QqAudioQuality.HIGH,
+                QqAudioQuality.STANDARD,
+                QqAudioQuality.AUTO,
+            )
+    }
+
+private fun QqAudioQuality.fileName(songId: String): String? =
+    when (this) {
+        QqAudioQuality.AUTO -> null
+        QqAudioQuality.STANDARD -> "M500$songId$songId.mp3"
+        QqAudioQuality.HIGH -> "M800$songId$songId.mp3"
+        QqAudioQuality.LOSSLESS -> "F000$songId$songId.flac"
+    }
 
 class QqMusicClient(
     baseClient: OkHttpClient,
     private val libraryStore: NeteaseLibraryStore,
+    private val preferencesManager: PreferencesManager,
 ) {
     private val client =
         baseClient
@@ -819,56 +1022,82 @@ class QqMusicClient(
             val key =
                 cookieValue(account.secret, "qm_keyst")
                     .ifBlank { cookieValue(account.secret, "qqmusic_key") }
-            val payload =
-                JSONObject(
-                    mapOf(
-                        "req_0" to
-                            mapOf(
-                                "module" to "music.vkey.GetEVkey",
-                                "method" to "GetUrl",
-                                "param" to
-                                    mapOf(
-                                        "guid" to "327783793guid",
-                                        "songmid" to listOf(songId),
-                                        "songtype" to listOf(0),
-                                        "uin" to uin,
-                                        "loginflag" to 1,
-                                        "platform" to "20",
-                                        "xcdn" to 1,
-                                    ),
-                            ),
-                        "comm" to
-                            mapOf(
-                                "uin" to uin,
-                                "format" to "json",
-                                "ct" to 19,
-                                "cv" to 1602,
-                                "authst" to key,
-                            ),
-                    ),
+            val selected =
+                QqAudioQuality.fromValue(
+                    preferencesManager
+                        .getString(
+                            PreferencesManager.Keys.QQ_AUDIO_QUALITY,
+                            QqAudioQuality.AUTO.value,
+                        ).first(),
                 )
-            val request =
-                requestBuilder(VKEY_URL, account.secret)
-                    .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
-                    .build()
-            val root = JSONObject(executeText(request))
-            val data = root.optJSONObject("req_0")?.optJSONObject("data")
-            val purl =
-                data
-                    ?.optJSONArray("midurlinfo")
-                    ?.optJSONObject(0)
-                    ?.optString("purl")
-                    ?.takeIf(String::isNotBlank)
-                    ?: error("QQ Music did not return a playable URL")
-            if (purl.startsWith("http")) {
-                purl
-            } else {
-                val sip = data.optJSONArray("sip")?.optString(0).orEmpty()
-                (sip.ifBlank { "https://ws.stream.qqmusic.qq.com/" }).trimEnd('/') +
-                    "/" +
-                    purl.trimStart('/')
+            selected.requestOrder().forEach { quality ->
+                resolveQualityUrl(
+                    account = account,
+                    songId = songId,
+                    uin = uin,
+                    key = key,
+                    quality = quality,
+                )?.let { return@withContext it }
             }
+            error("QQ Music did not return a playable URL")
         }
+
+    private fun resolveQualityUrl(
+        account: RemoteMusicAccount,
+        songId: String,
+        uin: String,
+        key: String,
+        quality: QqAudioQuality,
+    ): String? {
+        val param =
+            linkedMapOf<String, Any>(
+                "guid" to "327783793guid",
+                "songmid" to listOf(songId),
+                "songtype" to listOf(0),
+                "uin" to uin,
+                "loginflag" to 1,
+                "platform" to "20",
+                "xcdn" to 1,
+            )
+        quality.fileName(songId)?.let { param["filename"] = listOf(it) }
+        val payload =
+            JSONObject(
+                mapOf(
+                    "req_0" to
+                        mapOf(
+                            "module" to "music.vkey.GetEVkey",
+                            "method" to "GetUrl",
+                            "param" to param,
+                        ),
+                    "comm" to
+                        mapOf(
+                            "uin" to uin,
+                            "format" to "json",
+                            "ct" to 19,
+                            "cv" to 1602,
+                            "authst" to key,
+                        ),
+                ),
+            )
+        val request =
+            requestBuilder(VKEY_URL, account.secret)
+                .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
+                .build()
+        val root = runCatching { JSONObject(executeText(request)) }.getOrNull() ?: return null
+        val data = root.optJSONObject("req_0")?.optJSONObject("data") ?: return null
+        val purl =
+            data
+                .optJSONArray("midurlinfo")
+                ?.optJSONObject(0)
+                ?.optString("purl")
+                ?.takeIf(String::isNotBlank)
+                ?: return null
+        if (purl.startsWith("http")) return purl
+        val sip = data.optJSONArray("sip")?.optString(0).orEmpty()
+        return (sip.ifBlank { "https://ws.stream.qqmusic.qq.com/" }).trimEnd('/') +
+            "/" +
+            purl.trimStart('/')
+    }
 
     suspend fun listPlaylists(
         account: RemoteMusicAccount,
