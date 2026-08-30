@@ -230,9 +230,9 @@ class CloudMusicCatalogViewModel(
             viewModelScope.launch {
                 val refreshedByAccount = mutableMapOf<String, List<CloudCatalogPlaylist>>()
                 accounts.values.forEach { account ->
-                    // Cache has already been published above. Always check the server in the
-                    // background so newly added playlists appear without a blank cold-start state.
-                    runCatching { remoteClients.listPlaylists(account, forceRefresh = true) }
+                    // A normal cold start reuses the published disk cache. Only an explicit user
+                    // refresh is allowed to replace it with fresh server metadata.
+                    runCatching { remoteClients.listPlaylists(account, forceRefresh = forceRefresh) }
                         .onSuccess { playlists ->
                             refreshedByAccount[account.id] =
                                 playlists.map { playlist ->

@@ -46,8 +46,12 @@ class NeteaseLibraryStore(
     fun readSongs(
         accountId: String,
         playlistId: String,
-    ): List<RemoteSong> =
-        readArray(file(accountId, "playlist_${safe(playlistId)}.json")) { item ->
+    ): List<RemoteSong> = readSongArray(file(accountId, "playlist_${safe(playlistId)}.json"))
+
+    fun readDailyRecommendations(accountId: String): List<RemoteSong> = readSongArray(file(accountId, DAILY_RECOMMENDATIONS_FILE))
+
+    private fun readSongArray(source: File): List<RemoteSong> =
+        readArray(source) { item ->
             RemoteSong(
                 id = item.getString("id"),
                 title = item.optString("title"),
@@ -63,9 +67,19 @@ class NeteaseLibraryStore(
         accountId: String,
         playlistId: String,
         songs: List<RemoteSong>,
+    ) = writeSongArray(file(accountId, "playlist_${safe(playlistId)}.json"), songs)
+
+    fun writeDailyRecommendations(
+        accountId: String,
+        songs: List<RemoteSong>,
+    ) = writeSongArray(file(accountId, DAILY_RECOMMENDATIONS_FILE), songs)
+
+    private fun writeSongArray(
+        target: File,
+        songs: List<RemoteSong>,
     ) {
         writeArray(
-            file(accountId, "playlist_${safe(playlistId)}.json"),
+            target,
             songs.map { song ->
                 JSONObject()
                     .put("id", song.id)
@@ -120,6 +134,7 @@ class NeteaseLibraryStore(
 
     private companion object {
         const val PLAYLISTS_FILE = "playlists.json"
+        const val DAILY_RECOMMENDATIONS_FILE = "daily_recommendations.json"
         val UNSAFE_FILE_CHARS = Regex("[^A-Za-z0-9_.-]")
     }
 }

@@ -43,47 +43,49 @@ fun AudioCover(
     onPainterReady: (Painter) -> Unit = {},
     onPainterFailed: () -> Unit = {},
 ) {
-    LandscapistImage(
-        modifier = modifier,
-        requestBuilder = {
-            this
-                .model(uri)
-                .tag(uri.toString())
-                .progressiveEnabled(progressiveEnabled)
-                .build()
-        },
-        imageModel = { uri },
-        loading = {
-            placeHolder()
-        },
-        success = { _, painter ->
-            LaunchedEffect(painter) {
-                onPainterReady(painter)
-            }
-            Image(
-                painter = painter,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        },
-        failure = {
-            if (fallbackUri != null && fallbackUri != uri) {
-                CoverFallback(
-                    fallbackUri = fallbackUri,
-                    modifier = Modifier.fillMaxSize(),
-                    placeHolder = placeHolder,
-                    onPainterReady = onPainterReady,
-                    onPainterFailed = onPainterFailed,
-                )
-            } else {
-                LaunchedEffect(uri, fallbackUri) {
-                    onPainterFailed()
-                }
+    key(uri, fallbackUri) {
+        LandscapistImage(
+            modifier = modifier,
+            requestBuilder = {
+                this
+                    .model(uri)
+                    .tag(uri.toString())
+                    .progressiveEnabled(progressiveEnabled)
+                    .build()
+            },
+            imageModel = { uri },
+            loading = {
                 placeHolder()
-            }
-        },
-    )
+            },
+            success = { _, painter ->
+                LaunchedEffect(painter) {
+                    onPainterReady(painter)
+                }
+                Image(
+                    painter = painter,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            },
+            failure = {
+                if (fallbackUri != null && fallbackUri != uri) {
+                    CoverFallback(
+                        fallbackUri = fallbackUri,
+                        modifier = Modifier.fillMaxSize(),
+                        placeHolder = placeHolder,
+                        onPainterReady = onPainterReady,
+                        onPainterFailed = onPainterFailed,
+                    )
+                } else {
+                    LaunchedEffect(uri, fallbackUri) {
+                        onPainterFailed()
+                    }
+                    placeHolder()
+                }
+            },
+        )
+    }
 }
 
 /**
@@ -182,17 +184,21 @@ private const val COVER_CROSSFADE_DURATION_MS = 180
 @Composable
 fun MusicCoverPlaceholder(
     modifier: Modifier = Modifier,
-    containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    containerColor: Color = MaterialTheme.colorScheme.tertiaryContainer,
+    contentColor: Color = MaterialTheme.colorScheme.onTertiaryContainer,
     contentDescription: String? = null,
+    renderScaleProvider: () -> Float = { 1f },
 ) {
     BoxWithConstraints(
         modifier = modifier.background(containerColor),
         contentAlignment = Alignment.Center,
     ) {
+        val renderScale = renderScaleProvider().coerceAtLeast(0.01f)
         val iconSize =
-            (minOf(maxWidth, maxHeight) * 0.36f)
-                .coerceIn(16.dp, 64.dp)
+            coverPlaceholderIconSizeDp(
+                containerMinDp = minOf(maxWidth, maxHeight).value,
+                renderScale = renderScale,
+            ).dp
         Icon(
             imageVector = Icons.Rounded.MusicNote,
             contentDescription = contentDescription,
@@ -201,6 +207,24 @@ fun MusicCoverPlaceholder(
         )
     }
 }
+
+/**
+ * Returns the icon size before an outer shared-element scale is applied.
+ *
+ * Shared-element overlays are measured at one endpoint and then scaled to the other. Compensating
+ * here keeps the icon's visible size identical to a placeholder measured directly at that point.
+ */
+internal fun coverPlaceholderIconSizeDp(
+    containerMinDp: Float,
+    renderScale: Float,
+): Float {
+    val safeScale = renderScale.coerceAtLeast(0.01f)
+    val visibleContainerDp = containerMinDp.coerceAtLeast(0f) * safeScale
+    val visibleIconDp = (visibleContainerDp * COVER_PLACEHOLDER_ICON_RATIO).coerceIn(16f, 64f)
+    return visibleIconDp / safeScale
+}
+
+private const val COVER_PLACEHOLDER_ICON_RATIO = 0.36f
 
 /**
  * 封面兜底层：加载 [fallbackUri]，失败（或为 null）时渲染 [placeHolder]。

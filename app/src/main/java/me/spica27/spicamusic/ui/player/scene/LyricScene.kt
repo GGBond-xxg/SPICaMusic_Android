@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -64,6 +63,7 @@ import me.spica27.spicamusic.ui.player.PlayerPlaybackBottomSection
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
 import me.spica27.spicamusic.ui.widget.AudioCover
+import me.spica27.spicamusic.ui.widget.MusicCoverPlaceholder
 
 /**
  * 全屏歌词页面。
@@ -476,7 +476,7 @@ private fun LyricsHeader(
                             Modifier
                         },
                     ).clip(Shapes.ExtraSmallCornerBasedShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    .background(MaterialTheme.colorScheme.tertiaryContainer),
         ) {
             if (artworkPainter != null) {
                 Image(
@@ -489,17 +489,11 @@ private fun LyricsHeader(
                 AudioCover(
                     uri = artworkUri,
                     placeHolder = {
-                        Box(
+                        MusicCoverPlaceholder(
                             modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.MusicNote,
-                                contentDescription = stringResource(R.string.cover_placeholder),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(24.dp),
-                            )
-                        }
+                            containerColor = Color.Transparent,
+                            contentDescription = stringResource(R.string.cover_placeholder),
+                        )
                     },
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -570,19 +564,13 @@ private fun FlyingCover(uri: Uri?) {
             progressiveEnabled = false,
             uri = uri,
             placeHolder = {
-                Box(
+                MusicCoverPlaceholder(
                     modifier =
                         Modifier
                             .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.MusicNote,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                            .background(MaterialTheme.colorScheme.tertiaryContainer),
+                    containerColor = Color.Transparent,
+                )
             },
             modifier = Modifier.fillMaxSize(),
         )

@@ -457,7 +457,16 @@ class NeteaseClient(
     ): List<RemoteSong> =
         withContext(Dispatchers.IO) {
             if (!forceRefresh) {
-                dailyRecommendationCache[account.id]?.takeIf { it.isNotEmpty() }?.let { return@withContext it }
+                dailyRecommendationCache[account.id]
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let { return@withContext it }
+                libraryStore
+                    .readDailyRecommendations(account.id)
+                    .takeIf { it.isNotEmpty() }
+                    ?.let { cached ->
+                        dailyRecommendationCache[account.id] = cached
+                        return@withContext cached
+                    }
             }
             val encrypted =
                 NeteaseWebApiCrypto.encrypt(
@@ -484,7 +493,10 @@ class NeteaseClient(
             }
             val songs = parseSongs(root.optJSONObject("data")?.optJSONArray("dailySongs"))
             check(songs.isNotEmpty()) { "网易云暂未返回每日推荐" }
-            songs.also { dailyRecommendationCache[account.id] = it }
+            songs.also {
+                dailyRecommendationCache[account.id] = it
+                libraryStore.writeDailyRecommendations(account.id, it)
+            }
         }
 
     suspend fun likedSongIds(

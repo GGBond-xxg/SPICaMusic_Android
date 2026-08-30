@@ -8,9 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.MusicNote
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
@@ -18,7 +15,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -39,6 +35,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import me.spica27.spicamusic.ui.widget.AudioCover
+import me.spica27.spicamusic.ui.widget.MusicCoverPlaceholder
 import kotlin.math.PI
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -159,6 +156,12 @@ fun PlayerLyricsArtworkMorphOverlay(
         remember(state, progressProvider) {
             LyricsArtworkShape(state, progressProvider)
         }
+    val renderScaleProvider = {
+        val progress = progressProvider().coerceIn(0f, 1f)
+        val currentWidth = floatLerp(state.sourceBounds.width, state.targetBounds.width, progress)
+        val currentHeight = floatLerp(state.sourceBounds.height, state.targetBounds.height, progress)
+        minOf(currentWidth / targetWidth, currentHeight / targetHeight).coerceAtLeast(0.01f)
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         Box(
@@ -206,8 +209,7 @@ fun PlayerLyricsArtworkMorphOverlay(
                             } else {
                                 0f
                             }
-                    }.background(MaterialTheme.colorScheme.surfaceContainerHigh),
-            contentAlignment = Alignment.Center,
+                    }.background(MaterialTheme.colorScheme.tertiaryContainer),
         ) {
             if (artworkPainter != null) {
                 Image(
@@ -221,16 +223,12 @@ fun PlayerLyricsArtworkMorphOverlay(
                     uri = artworkUri,
                     modifier = Modifier.fillMaxSize(),
                     placeHolder = {
-                        Box(
+                        MusicCoverPlaceholder(
                             modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.MusicNote,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                            containerColor = Color.Transparent,
+                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                            renderScaleProvider = renderScaleProvider,
+                        )
                     },
                 )
             }

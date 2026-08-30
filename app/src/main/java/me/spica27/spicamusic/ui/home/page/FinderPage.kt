@@ -251,13 +251,10 @@ fun FinderPage(playEntrance: Boolean = true) {
                 .take(12)
         }
     val neteaseSceneArtwork =
-        remember(cloudCatalog.dailyRecommendations, orderedNeteasePlaylists) {
-            (
-                cloudCatalog.dailyRecommendations.mapNotNull(CloudCatalogSong::artworkUri) +
-                    orderedNeteasePlaylists.mapNotNull { playlist ->
-                        playlist.playlist.coverUrl?.let(Uri::parse)
-                    }
-            ).distinctBy(Uri::toString)
+        remember(cloudCatalog.dailyRecommendations) {
+            cloudCatalog.dailyRecommendations
+                .mapNotNull(CloudCatalogSong::artworkUri)
+                .distinctBy(Uri::toString)
                 .take(6)
         }
     val sceneTitles =

@@ -192,6 +192,12 @@ fun PlayerArtworkMorphOverlay(
                 sourceShapeProvider = { currentSourceShape },
             )
         }
+    val renderScaleProvider = {
+        val progress = progressProvider().coerceIn(0f, 1f)
+        val currentWidth = floatLerp(source.width, target.width, progress)
+        val currentHeight = floatLerp(source.height, target.height, progress)
+        minOf(currentWidth / targetWidth, currentHeight / targetHeight).coerceAtLeast(0.01f)
+    }
 
     val artwork: @Composable () -> Unit = {
         if (artworkPainter != null) {
@@ -210,6 +216,7 @@ fun PlayerArtworkMorphOverlay(
                         modifier = Modifier.fillMaxSize(),
                         containerColor = androidx.compose.ui.graphics.Color.Transparent,
                         contentColor = placeholderContentColor,
+                        renderScaleProvider = renderScaleProvider,
                     )
                 },
             )
