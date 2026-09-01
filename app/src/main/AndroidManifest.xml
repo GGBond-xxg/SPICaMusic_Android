@@ -91,7 +91,7 @@
 
         <activity
             android:name=".MainActivity"
-            android:configChanges="locale|layoutDirection"
+            android:configChanges="locale|layoutDirection|screenLayout"
             android:exported="true"
             android:label="@string/spica_app_label"
             android:launchMode="singleTask"
