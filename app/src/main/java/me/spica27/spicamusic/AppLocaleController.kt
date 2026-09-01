@@ -53,7 +53,10 @@ object AppLocaleController {
             .getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
             .edit()
             .putString(KEY_LANGUAGE, language)
-            .commit()
+            // The first commit after clearing app data has to create and fsync the XML file.
+            // Doing that synchronously on the UI thread can drop a frame exactly on the first
+            // language change. apply() updates memory immediately and persists off the main thread.
+            .apply()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             context.getSystemService(LocaleManager::class.java).applicationLocales =
