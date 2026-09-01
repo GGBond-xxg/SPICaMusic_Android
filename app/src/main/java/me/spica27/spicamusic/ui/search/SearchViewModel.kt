@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
@@ -32,6 +33,7 @@ import me.spica27.spicamusic.cloud.RemoteMusicClientRegistry
 import me.spica27.spicamusic.cloud.RemoteMusicProvider
 import me.spica27.spicamusic.cloud.toCatalogSong
 import me.spica27.spicamusic.common.entity.Song
+import me.spica27.spicamusic.core.preferences.PreferencesManager
 import me.spica27.spicamusic.feature.library.domain.SongUseCases
 
 /**
@@ -49,10 +51,24 @@ sealed class SearchListItem {
 
 data class RemoteSearchState(
     val query: String = "",
+    val source: SearchSource = SearchSource.ALL,
     val isLoading: Boolean = false,
     val songs: List<CloudCatalogSong> = emptyList(),
     val failedProviders: Set<RemoteMusicProvider> = emptySet(),
 )
+
+enum class SearchSource(
+    val remoteProvider: RemoteMusicProvider?,
+) {
+    ALL(null),
+    LOCAL(null),
+    QQ_MUSIC(RemoteMusicProvider.QQ_MUSIC),
+    NETEASE(RemoteMusicProvider.NETEASE),
+    ;
+
+    val includesLocal: Boolean
+        get() = this == ALL || this == LOCAL
+}
 
 /**
  * 搜索页面 ViewModel
@@ -63,10 +79,17 @@ class SearchViewModel(
     private val songRepository: SongUseCases,
     private val accountStore: CloudAccountStore,
     private val remoteClients: RemoteMusicClientRegistry,
+    private val preferencesManager: PreferencesManager,
 ) : ViewModel() {
     // 搜索关键词
     private val _searchKeyword = MutableStateFlow("")
     val searchKeyword: StateFlow<String> = _searchKeyword.asStateFlow()
+
+    private val _selectedSource = MutableStateFlow(SearchSource.ALL)
+    val selectedSource: StateFlow<SearchSource> = _selectedSource.asStateFlow()
+
+    private val _recentSearches = MutableStateFlow<List<String>>(emptyList())
+    val recentSearches: StateFlow<List<String>> = _recentSearches.asStateFlow()
 
     private val _remoteSearchState = MutableStateFlow(RemoteSearchState())
     val remoteSearchState: StateFlow<RemoteSearchState> = _remoteSearchState.asStateFlow()
@@ -77,9 +100,9 @@ class SearchViewModel(
      */
     @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
     val searchPagingResults: Flow<PagingData<SearchListItem>> =
-        _searchKeyword
+        combine(_searchKeyword, _selectedSource) { keyword, source -> keyword to source }
             .debounce(300)
-            .flatMapLatest { keyword ->
+            .flatMapLatest { (keyword, source) ->
                 if (keyword.isBlank()) {
                     flowOf(
                         PagingData.empty(
@@ -91,6 +114,8 @@ class SearchViewModel(
                                 ),
                         ),
                     )
+                } else if (!source.includesLocal) {
+                    flowOf(PagingData.empty())
                 } else {
                     songRepository
                         .getSongsBySortNamePagingFlow(keyword)
@@ -111,6 +136,7 @@ class SearchViewModel(
             }.cachedIn(viewModelScope)
 
     init {
+        observeSearchHistory()
         observeRemoteSearch()
     }
 
@@ -122,8 +148,49 @@ class SearchViewModel(
         _remoteSearchState.value =
             RemoteSearchState(
                 query = keyword,
-                isLoading = keyword.isNotBlank() && searchableAccounts().isNotEmpty(),
+                source = _selectedSource.value,
+                isLoading =
+                    keyword.isNotBlank() &&
+                        searchableAccounts(_selectedSource.value).isNotEmpty(),
             )
+    }
+
+    fun selectSource(source: SearchSource) {
+        if (_selectedSource.value == source) return
+        _selectedSource.value = source
+        _remoteSearchState.value =
+            RemoteSearchState(
+                query = _searchKeyword.value,
+                source = source,
+                isLoading =
+                    _searchKeyword.value.isNotBlank() && searchableAccounts(source).isNotEmpty(),
+            )
+    }
+
+    fun submitSearch() {
+        val query =
+            _searchKeyword.value
+                .trim()
+                .replace('\n', ' ')
+                .replace('\r', ' ')
+        if (query.isBlank()) return
+        val updated =
+            (listOf(query) + _recentSearches.value.filterNot { it.equals(query, ignoreCase = true) })
+                .take(MAX_SEARCH_HISTORY)
+        _recentSearches.value = updated
+        viewModelScope.launch {
+            preferencesManager.setString(
+                PreferencesManager.Keys.SEARCH_HISTORY,
+                updated.joinToString(SEARCH_HISTORY_SEPARATOR),
+            )
+        }
+    }
+
+    fun clearSearchHistory() {
+        _recentSearches.value = emptyList()
+        viewModelScope.launch {
+            preferencesManager.setString(PreferencesManager.Keys.SEARCH_HISTORY, "")
+        }
     }
 
     /**
@@ -131,25 +198,51 @@ class SearchViewModel(
      */
     fun clearSearch() {
         _searchKeyword.value = ""
-        _remoteSearchState.value = RemoteSearchState()
+        _remoteSearchState.value =
+            RemoteSearchState(source = _selectedSource.value)
+    }
+
+    private fun observeSearchHistory() {
+        viewModelScope.launch {
+            preferencesManager
+                .getString(PreferencesManager.Keys.SEARCH_HISTORY)
+                .collectLatest { stored ->
+                    _recentSearches.value =
+                        stored
+                            .split(SEARCH_HISTORY_SEPARATOR)
+                            .map(String::trim)
+                            .filter(String::isNotEmpty)
+                            .distinctBy { it.lowercase() }
+                            .take(MAX_SEARCH_HISTORY)
+                }
+        }
     }
 
     @OptIn(FlowPreview::class)
     private fun observeRemoteSearch() {
         viewModelScope.launch {
-            _searchKeyword
-                .debounce(300)
+            combine(_searchKeyword, _selectedSource) { query, source ->
+                query to source
+            }.debounce(300)
                 .distinctUntilChanged()
-                .collectLatest { rawQuery ->
+                .collectLatest { (rawQuery, selectedSource) ->
                     val query = rawQuery.trim()
-                    val accounts = searchableAccounts()
+                    val accounts = searchableAccounts(selectedSource)
                     if (query.isEmpty() || accounts.isEmpty()) {
-                        _remoteSearchState.value = RemoteSearchState(query = rawQuery)
+                        _remoteSearchState.value =
+                            RemoteSearchState(
+                                query = rawQuery,
+                                source = selectedSource,
+                            )
                         return@collectLatest
                     }
 
                     _remoteSearchState.update {
-                        RemoteSearchState(query = rawQuery, isLoading = true)
+                        RemoteSearchState(
+                            query = rawQuery,
+                            source = selectedSource,
+                            isLoading = true,
+                        )
                     }
                     val responses =
                         coroutineScope {
@@ -168,7 +261,12 @@ class SearchViewModel(
                                     }
                                 }.awaitAll()
                         }
-                    if (_searchKeyword.value != rawQuery) return@collectLatest
+                    if (
+                        _searchKeyword.value != rawQuery ||
+                        _selectedSource.value != selectedSource
+                    ) {
+                        return@collectLatest
+                    }
 
                     val failedProviders =
                         responses
@@ -186,6 +284,7 @@ class SearchViewModel(
                     _remoteSearchState.value =
                         RemoteSearchState(
                             query = rawQuery,
+                            source = selectedSource,
                             isLoading = false,
                             songs = songs,
                             failedProviders = failedProviders,
@@ -194,15 +293,22 @@ class SearchViewModel(
         }
     }
 
-    private fun searchableAccounts() =
-        accountStore
-            .getRemoteAccounts()
-            .filter { account ->
-                account.provider == RemoteMusicProvider.NETEASE ||
-                    account.provider == RemoteMusicProvider.QQ_MUSIC
+    private fun searchableAccounts(source: SearchSource) =
+        accountStore.getRemoteAccounts().filter { account ->
+            when (source) {
+                SearchSource.ALL ->
+                    account.provider == RemoteMusicProvider.QQ_MUSIC ||
+                        account.provider == RemoteMusicProvider.NETEASE
+                SearchSource.LOCAL -> false
+                SearchSource.QQ_MUSIC,
+                SearchSource.NETEASE,
+                -> account.provider == source.remoteProvider
             }
+        }
 
     private companion object {
         const val REMOTE_SEARCH_LIMIT = 30
+        const val MAX_SEARCH_HISTORY = 10
+        const val SEARCH_HISTORY_SEPARATOR = "\n"
     }
 }

@@ -41,17 +41,44 @@ object ArtworkRenderCache {
     fun write(
         key: String?,
         fallbackKey: String? = null,
+    ) = writeSnapshot(cacheKey = key, sourceKey = key, fallbackSourceKey = fallbackKey)
+
+    /**
+     * Stores the last confirmed artwork under a stable UI identity such as a playlist id.
+     *
+     * [cacheKey] deliberately does not have to be the image URL. This lets a cold launch render
+     * the previous playlist cover synchronously, while [sourceKey] is fetched again in the normal
+     * image pipeline. The thumbnail is only replaced when that source URL actually changes.
+     */
+    fun writeSnapshot(
+        cacheKey: String?,
+        sourceKey: String?,
+        fallbackSourceKey: String? = null,
     ) {
-        if (key.isNullOrBlank()) return
-        val cachedFile = fileFor(key)
-        if (cachedFile.isFile && cachedFile.length() > 0L) return
+        if (cacheKey.isNullOrBlank() || sourceKey.isNullOrBlank()) return
+        val cachedFile = fileFor(cacheKey)
+        val sourceFile = sourceFileFor(cacheKey)
+        if (
+            cachedFile.isFile &&
+            cachedFile.length() > 0L &&
+            sourceFile.readSourceKey() == sourceKey
+        ) {
+            return
+        }
 
         writer.execute {
-            val destination = fileFor(key)
-            if (destination.isFile && destination.length() > 0L) return@execute
+            val destination = fileFor(cacheKey)
+            val sourceMetadata = sourceFileFor(cacheKey)
+            if (
+                destination.isFile &&
+                destination.length() > 0L &&
+                sourceMetadata.readSourceKey() == sourceKey
+            ) {
+                return@execute
+            }
             runCatching {
                 val source =
-                    sequenceOf(key, fallbackKey)
+                    sequenceOf(sourceKey, fallbackSourceKey)
                         .filterNotNull()
                         .mapNotNull(::decode)
                         .firstOrNull()
@@ -73,10 +100,14 @@ object ArtworkRenderCache {
                 FileOutputStream(temporary).use { output ->
                     thumbnail.compress(Bitmap.CompressFormat.PNG, 100, output)
                 }
+                val sourceTemporary = File(directory, sourceMetadata.name + ".tmp")
+                sourceTemporary.writeText(sourceKey, Charsets.UTF_8)
                 if (thumbnail !== source) thumbnail.recycle()
                 source.recycle()
                 if (destination.exists()) destination.delete()
                 temporary.renameTo(destination)
+                if (sourceMetadata.exists()) sourceMetadata.delete()
+                sourceTemporary.renameTo(sourceMetadata)
                 prune(directory)
             }
         }
@@ -85,11 +116,21 @@ object ArtworkRenderCache {
     private fun fileFor(key: String): File =
         File(
             cacheDirectory(),
-            MessageDigest
-                .getInstance("SHA-256")
-                .digest(key.toByteArray(Charsets.UTF_8))
-                .joinToString(separator = "") { byte -> "%02x".format(byte) } + ".png",
+            hashedKey(key) + ".png",
         )
+
+    private fun sourceFileFor(key: String): File = File(cacheDirectory(), hashedKey(key) + ".source")
+
+    private fun hashedKey(key: String): String =
+        MessageDigest
+            .getInstance("SHA-256")
+            .digest(key.toByteArray(Charsets.UTF_8))
+            .joinToString(separator = "") { byte -> "%02x".format(byte) }
+
+    private fun File.readSourceKey(): String? =
+        takeIf(File::isFile)
+            ?.runCatching { readText(Charsets.UTF_8) }
+            ?.getOrNull()
 
     private fun cacheDirectory(): File = File(App.getInstance().cacheDir, CACHE_DIRECTORY)
 
@@ -122,7 +163,10 @@ object ArtworkRenderCache {
             .filter { it.extension == "png" }
             .sortedByDescending(File::lastModified)
             .drop(MAX_FILES)
-            .forEach(File::delete)
+            .forEach { artwork ->
+                artwork.delete()
+                File(directory, artwork.nameWithoutExtension + ".source").delete()
+            }
     }
 
     private const val CACHE_DIRECTORY = "first_frame_artwork"

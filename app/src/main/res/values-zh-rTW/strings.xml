@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+  <string name="press_back_again_to_exit">再按一次返回鍵退出</string>
   <string name="app_name">柠檬音乐</string>
   <string name="spica_app_label">柠檬音乐</string>
   <string name="action_settings">Settings</string>
@@ -394,6 +395,9 @@
   <string name="dynamic_cover_audio_city">音訊城市</string>
   <string name="dynamic_cover_off">關閉</string>
   <string name="settings_progress_bar_style">進度條樣式</string>
+  <string name="settings_finder_source_title">發現頁推薦內容</string>
+  <string name="settings_finder_source_frequent">最近常聽</string>
+  <string name="settings_finder_source_daily">網易雲每日推薦</string>
   <string name="progress_bar_style_dynamic_waveform">動態波形</string>
   <string name="progress_bar_style_time_domain_waveform">時域波形</string>
   <string name="progress_bar_style_expressive_wavy">流動波浪</string>
@@ -501,9 +505,6 @@
   <string name="finder_summary_format">%1$d 首常聽 · %2$d 首收藏 · %3$d 個歌單</string>
   <string name="finder_search_title">搜尋音樂</string>
   <string name="finder_search_subtitle">按歌曲、歌手、專輯快速查找</string>
-  <string name="finder_no_local_music_title">還沒有本地音樂</string>
-  <string name="finder_no_local_music_subtitle">掃描裝置中的歌曲，開始你的音樂之旅</string>
-  <string name="finder_go_to_scan">前往掃描</string>
   <string name="finder_library_title">我的資料庫</string>
   <string name="finder_library_subtitle">管理歌單、掃描音樂、整理來源</string>
   <string name="finder_all_music_title">全部音樂</string>
@@ -512,6 +513,10 @@
   <string name="finder_settings_subtitle">主題、背景、播放偏好</string>
   <string name="finder_frequent_title">最近常聽</string>
   <string name="finder_frequent_playlist_name">最近常聽歌曲</string>
+  <string name="finder_daily_title">每日推薦</string>
+  <string name="finder_daily_playlist_name">每日推薦歌曲</string>
+  <string name="finder_no_daily_title">暫時沒有每日推薦</string>
+  <string name="finder_no_daily_subtitle">請先登入網易雲音樂，再下拉重新整理試試。</string>
   <string name="finder_no_frequent_title">還沒有常聽歌曲</string>
   <string name="finder_no_frequent_subtitle">開始播放音樂後，這裡會出現你最常聽的內容。</string>
   <string name="finder_no_favorites_title">還沒有收藏歌曲</string>
@@ -628,6 +633,10 @@
   <string name="search_your_music_title">搜尋本機與雲端音樂</string>
   <string name="search_your_music_subtitle">同時搜尋現有曲庫以及網易雲、QQ 音樂中未收藏的歌曲</string>
   <string name="search_source_netease">網易雲音樂</string>
+  <string name="search_filter_all_music">全部音樂</string>
+  <string name="search_filter_local_music">本機音樂</string>
+  <string name="search_recent_history">最近搜尋</string>
+  <string name="search_clear_history">清空</string>
   <string name="search_source_qq_music">QQ 音樂</string>
   <string name="search_source_local_library">現有曲庫與收藏</string>
   <string name="search_remote_source_failed">部分雲端音樂搜尋失敗，請檢查網路或重新登入</string>
@@ -887,7 +896,6 @@
   <string name="player_current_audio_quality">目前歌曲音質</string>
   <string name="player_quality_netease_desc">網易雲線上音源與裝置音效</string>
   <string name="player_quality_qq_desc">QQ 音樂線上音源與裝置音效</string>
-  <string name="player_quality_more_adjustments">更多調節</string>
   <string name="player_local_original_quality">本機原始音質</string>
   <string name="player_local_quality_unknown">依照來源檔案</string>
   <string name="player_progress_style_desc">切換播放頁進度列外觀</string>

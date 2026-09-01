@@ -105,6 +105,7 @@ data class CloudMusicCatalogState(
     val dailyRecommendationsError: String? = null,
     val localPlaylistCloudSongs: Map<Long, List<CloudCatalogSong>> = emptyMap(),
     val recentCloudSongs: List<CloudCatalogSong> = emptyList(),
+    val neteaseLikedSongIds: Map<String, Set<String>> = emptyMap(),
 )
 
 /**
@@ -139,6 +140,9 @@ class CloudMusicCatalogViewModel(
         refreshSources()
         publishLocalPlaylistEntries()
         publishRecentCloudSongs()
+        viewModelScope.launch {
+            accountStore.revision.drop(1).collect { refreshSources() }
+        }
         viewModelScope.launch {
             userPlaylistStore.revision.drop(1).collect { refreshUserPlaylists() }
         }
@@ -191,6 +195,62 @@ class CloudMusicCatalogViewModel(
         refreshUserPlaylists()
         publishLocalPlaylistEntries()
         publishRecentCloudSongs()
+        refreshNeteaseLikes()
+    }
+
+    private fun refreshNeteaseLikes() {
+        accountStore
+            .getRemoteAccounts(RemoteMusicProvider.NETEASE)
+            .forEach { account ->
+                viewModelScope.launch {
+                    runCatching { remoteClients.neteaseLikedSongIds(account) }
+                        .onSuccess { ids ->
+                            _state.update { current ->
+                                current.copy(
+                                    neteaseLikedSongIds =
+                                        current.neteaseLikedSongIds + (account.id to ids),
+                                )
+                            }
+                        }
+                }
+            }
+    }
+
+    fun isNeteaseSongLiked(song: CloudCatalogSong): Boolean {
+        val remote = song.payload as? CloudCatalogPayload.Remote ?: return false
+        if (remote.account.provider != RemoteMusicProvider.NETEASE) return false
+        return remote.song.id in _state.value.neteaseLikedSongIds[remote.account.id].orEmpty()
+    }
+
+    fun toggleNeteaseLike(song: CloudCatalogSong) {
+        val remote = song.payload as? CloudCatalogPayload.Remote ?: return
+        if (remote.account.provider != RemoteMusicProvider.NETEASE) return
+        val currentlyLiked = isNeteaseSongLiked(song)
+        viewModelScope.launch {
+            runCatching {
+                remoteClients.setNeteaseLiked(
+                    account = remote.account,
+                    songId = remote.song.id,
+                    liked = !currentlyLiked,
+                )
+            }.onSuccess {
+                _state.update { current ->
+                    val currentIds = current.neteaseLikedSongIds[remote.account.id].orEmpty()
+                    current.copy(
+                        neteaseLikedSongIds =
+                            current.neteaseLikedSongIds +
+                                (
+                                    remote.account.id to
+                                        if (currentlyLiked) {
+                                            currentIds - remote.song.id
+                                        } else {
+                                            currentIds + remote.song.id
+                                        }
+                                ),
+                    )
+                }
+            }
+        }
     }
 
     fun refreshRemotePlaylists(forceRefresh: Boolean = false) {

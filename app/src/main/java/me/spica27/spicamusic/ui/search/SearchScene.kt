@@ -18,6 +18,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,19 +36,27 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.ArrowBackIosNew
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -56,7 +65,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -95,8 +106,10 @@ import me.spica27.spicamusic.cloud.RemoteMusicProvider
 import me.spica27.spicamusic.common.entity.Song
 import me.spica27.spicamusic.common.entity.getAlbumCoverUri
 import me.spica27.spicamusic.common.entity.getCoverUri
+import me.spica27.spicamusic.ui.cache.ArtworkRenderCache
 import me.spica27.spicamusic.ui.dialog.CloudSongMenuScene
 import me.spica27.spicamusic.ui.dialog.SongMenuScene
+import me.spica27.spicamusic.ui.home.HomeViewModel
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
@@ -105,6 +118,7 @@ import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
 import me.spica27.spicamusic.ui.widget.AudioCover
 import me.spica27.spicamusic.ui.widget.AudioQualityBadges
+import me.spica27.spicamusic.ui.widget.StableAudioCover
 import me.spica27.spicamusic.ui.widget.clickHighlight
 import me.spica27.spicamusic.ui.widget.combinedClickHighlight
 import me.spica27.spicamusic.ui.widget.materialSharedAxisZ
@@ -143,9 +157,15 @@ class SearchScene(
         val searchKey by searchViewModel.searchKeyword.collectAsStateWithLifecycle()
         val searchResult = searchViewModel.searchPagingResults.collectAsLazyPagingItems()
         val remoteSearch by searchViewModel.remoteSearchState.collectAsStateWithLifecycle()
+        val selectedSource by searchViewModel.selectedSource.collectAsStateWithLifecycle()
+        val recentSearches by searchViewModel.recentSearches.collectAsStateWithLifecycle()
         val remoteSongs =
-            remember(searchKey, remoteSearch) {
-                remoteSearch.songs.takeIf { remoteSearch.query == searchKey }.orEmpty()
+            remember(searchKey, remoteSearch, selectedSource) {
+                remoteSearch.songs
+                    .takeIf {
+                        remoteSearch.query == searchKey &&
+                            remoteSearch.source == selectedSource
+                    }.orEmpty()
             }
         val remoteFailures =
             remember(searchKey, remoteSearch) {
@@ -153,8 +173,20 @@ class SearchScene(
             }
         val remoteLoading = remoteSearch.query == searchKey && remoteSearch.isLoading
         val cloudCatalogViewModel: CloudMusicCatalogViewModel = koinActivityViewModel()
+        val homeViewModel: HomeViewModel = koinActivityViewModel()
         val playerViewModel = LocalPlayerViewModel.current
         val currentMediaItem by playerViewModel.currentMediaItem.collectAsStateWithLifecycle()
+        var pendingPlayerMediaId by remember { mutableStateOf<String?>(null) }
+
+        LaunchedEffect(pendingPlayerMediaId) {
+            val expectedMediaId = pendingPlayerMediaId ?: return@LaunchedEffect
+            playerViewModel.currentMediaItem.first { it?.mediaId == expectedMediaId }
+            if (pendingPlayerMediaId == expectedMediaId) {
+                pendingPlayerMediaId = null
+                homeViewModel.expandPlayer()
+                path.popTop()
+            }
+        }
 
         val focusRequester = remember { FocusRequester() }
         val keyboardController = LocalSoftwareKeyboardController.current
@@ -170,8 +202,13 @@ class SearchScene(
         // 等推场动画完成后再唤起键盘，避免键盘上升与场景滑入互相抢帧
         LaunchedEffect(Unit) {
             enterAnimEnd.first { it }
-            focusRequester.requestFocus()
-            keyboardController?.show()
+            if (initialQuery.isBlank()) {
+                focusRequester.requestFocus()
+                keyboardController?.show()
+            } else {
+                keyboardController?.hide()
+                focusManager.clearFocus()
+            }
         }
 
         // 用户开始滚动结果时自动收起键盘，把屏幕还给内容
@@ -233,11 +270,16 @@ class SearchScene(
                 query = searchKey,
                 onQueryChange = searchViewModel::updateSearchKeyword,
                 onClear = searchViewModel::clearSearch,
+                selectedSource = selectedSource,
+                onSourceSelected = searchViewModel::selectSource,
                 onBack = {
                     keyboardController?.hide()
                     path.popTop()
                 },
-                onImeSearch = { keyboardController?.hide() },
+                onImeSearch = {
+                    searchViewModel.submitSearch()
+                    keyboardController?.hide()
+                },
                 focusRequester = focusRequester,
                 listState = listState,
                 modifier = Modifier.entranceGraphics(headerEntrance),
@@ -267,7 +309,15 @@ class SearchScene(
                 ) { state ->
                     when (state) {
                         SearchContentState.Idle ->
-                            SearchIdleHint(modifier = Modifier.fillMaxSize())
+                            SearchIdleHint(
+                                recentSearches = recentSearches,
+                                onRecentSearch = { query ->
+                                    searchViewModel.updateSearchKeyword(query)
+                                    searchViewModel.submitSearch()
+                                },
+                                onClearHistory = searchViewModel::clearSearchHistory,
+                                modifier = Modifier.fillMaxSize(),
+                            )
 
                         SearchContentState.Loading ->
                             SearchSkeletonList(modifier = Modifier.fillMaxSize())
@@ -287,9 +337,15 @@ class SearchScene(
                                 remoteLoading = remoteLoading,
                                 keyword = searchKey,
                                 playingMediaId = currentMediaItem?.mediaId,
-                                onPlay = { song -> playerViewModel.playSong(song) },
+                                onPlay = { song ->
+                                    searchViewModel.submitSearch()
+                                    pendingPlayerMediaId = song.mediaStoreId.toString()
+                                    playerViewModel.playSong(song)
+                                },
                                 onMore = { song -> path.push(SongMenuScene(song)) },
                                 onPlayRemote = { song ->
+                                    searchViewModel.submitSearch()
+                                    pendingPlayerMediaId = song.stableId
                                     cloudCatalogViewModel.playPlaylistSongs(
                                         selectedStableId = song.stableId,
                                         songs = remoteSongs,
@@ -311,6 +367,8 @@ private fun SearchHeader(
     query: String,
     onQueryChange: (String) -> Unit,
     onClear: () -> Unit,
+    selectedSource: SearchSource,
+    onSourceSelected: (SearchSource) -> Unit,
     onBack: () -> Unit,
     onImeSearch: () -> Unit,
     focusRequester: FocusRequester,
@@ -353,6 +411,10 @@ private fun SearchHeader(
                 focusRequester = focusRequester,
                 modifier = Modifier.weight(1f),
             )
+            SearchProviderPicker(
+                selectedSource = selectedSource,
+                onSourceSelected = onSourceSelected,
+            )
         }
         // 列表滚动后浮现的发丝线（Draw 阶段读取滚动值，滚动零重组）
         Box(
@@ -373,6 +435,78 @@ private fun SearchHeader(
         )
     }
 }
+
+@Composable
+private fun SearchProviderPicker(
+    selectedSource: SearchSource,
+    onSourceSelected: (SearchSource) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val labels =
+        mapOf(
+            SearchSource.ALL to stringResource(R.string.search_filter_all_music),
+            SearchSource.LOCAL to stringResource(R.string.search_filter_local_music),
+            SearchSource.QQ_MUSIC to stringResource(R.string.search_source_qq_music),
+            SearchSource.NETEASE to stringResource(R.string.search_source_netease),
+        )
+    Box {
+        Box(
+            modifier =
+                Modifier
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                    .clickHighlight(onClick = { expanded = true }),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = selectedSource.searchSourceIcon(),
+                contentDescription = labels.getValue(selectedSource),
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            SearchSource.entries.forEach { source ->
+                DropdownMenuItem(
+                    leadingIcon = {
+                        Icon(
+                            imageVector = source.searchSourceIcon(),
+                            contentDescription = null,
+                        )
+                    },
+                    text = { Text(labels.getValue(source)) },
+                    trailingIcon =
+                        if (source == selectedSource) {
+                            {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                )
+                            }
+                        } else {
+                            null
+                        },
+                    onClick = {
+                        expanded = false
+                        onSourceSelected(source)
+                    },
+                )
+            }
+        }
+    }
+}
+
+private fun SearchSource.searchSourceIcon() =
+    when (this) {
+        SearchSource.ALL -> Icons.Default.LibraryMusic
+        SearchSource.LOCAL -> Icons.Default.MusicNote
+        SearchSource.QQ_MUSIC -> Icons.Default.Headphones
+        SearchSource.NETEASE -> Icons.Default.Album
+    }
 
 /** 胶囊形搜索输入框：52dp 高，Search 键收起键盘，清除按钮与占位等宽切换避免跳动 */
 @Composable
@@ -770,6 +904,8 @@ private fun SearchRemoteSongItem(
     onMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val artworkCacheKey = remember(song.stableId) { "search_remote_song:${song.stableId}" }
+    val retainedArtwork = remember(artworkCacheKey) { ArtworkRenderCache.read(artworkCacheKey) }
     Row(
         modifier =
             modifier
@@ -786,13 +922,20 @@ private fun SearchRemoteSongItem(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
     ) {
-        AudioCover(
+        StableAudioCover(
             uri = song.artworkUri,
+            retainedPainter = retainedArtwork,
             modifier =
                 Modifier
                     .size(56.dp)
                     .clip(Shapes.LargeCornerBasedShape),
             placeHolder = { SearchCoverPlaceholder() },
+            onPainterReady = {
+                ArtworkRenderCache.writeSnapshot(
+                    cacheKey = artworkCacheKey,
+                    sourceKey = song.artworkUri?.toString(),
+                )
+            },
         )
         Column(
             modifier = Modifier.weight(1f),
@@ -892,7 +1035,12 @@ private fun highlightKeyword(
 
 /** 空关键词引导：开放排版无卡片，图标轻盈浮动（收藏页空态同款） */
 @Composable
-private fun SearchIdleHint(modifier: Modifier = Modifier) {
+private fun SearchIdleHint(
+    recentSearches: List<String>,
+    onRecentSearch: (String) -> Unit,
+    onClearHistory: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val floatTransition = rememberInfiniteTransition(label = "searchIdleFloat")
     val bob by floatTransition.animateFloat(
         initialValue = -1f,
@@ -907,7 +1055,15 @@ private fun SearchIdleHint(modifier: Modifier = Modifier) {
     Column(
         modifier =
             modifier
-                .padding(horizontal = Spacing.ExtraLarge)
+                .clickable(
+                    interactionSource =
+                        remember {
+                            androidx.compose.foundation.interaction
+                                .MutableInteractionSource()
+                        },
+                    indication = null,
+                    onClick = {},
+                ).padding(horizontal = Spacing.ExtraLarge)
                 .padding(top = 64.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.Medium),
@@ -941,6 +1097,50 @@ private fun SearchIdleHint(modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
+        if (recentSearches.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.Large),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.search_recent_history),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = stringResource(R.string.search_clear_history),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier =
+                        Modifier
+                            .clip(CircleShape)
+                            .clickHighlight(onClick = onClearHistory)
+                            .padding(horizontal = Spacing.Medium, vertical = Spacing.Small),
+                )
+            }
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
+                contentPadding = PaddingValues(vertical = Spacing.ExtraSmall),
+            ) {
+                items(recentSearches, key = { it }) { query ->
+                    Text(
+                        text = query,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier =
+                            Modifier
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.secondaryContainer)
+                                .clickHighlight(onClick = { onRecentSearch(query) })
+                                .padding(horizontal = Spacing.Medium, vertical = Spacing.Small),
+                    )
+                }
+            }
+        }
     }
 }
 

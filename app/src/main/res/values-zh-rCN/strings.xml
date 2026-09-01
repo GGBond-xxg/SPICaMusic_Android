@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+  <string name="press_back_again_to_exit">再按一次返回键退出</string>
   <string name="library_netease_subtitle">网易云歌单与缓存歌曲</string>
   <string name="library_netease_section">我的网易云资料库</string>
   <string name="library_netease_account_summary">网易云 · %1$d 个歌单</string>
@@ -70,6 +71,10 @@
   <string name="search_your_music_title">搜索本地与云端音乐</string>
   <string name="search_your_music_subtitle">同时搜索现有曲库以及网易云、QQ 音乐中未收藏的歌曲</string>
   <string name="search_source_netease">网易云音乐</string>
+  <string name="search_filter_all_music">全部音乐</string>
+  <string name="search_filter_local_music">本地音乐</string>
+  <string name="search_recent_history">最近搜索</string>
+  <string name="search_clear_history">清空</string>
   <string name="search_source_qq_music">QQ 音乐</string>
   <string name="search_source_local_library">现有曲库与收藏</string>
   <string name="search_remote_source_failed">部分云端音乐搜索失败，请检查网络或重新登录</string>

@@ -21,6 +21,7 @@ import androidx.media3.common.Timeline
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.HttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
@@ -380,6 +381,7 @@ class PlaybackService : MediaLibraryService() {
                     },
                     renderersFactory,
                 ).setMediaSourceFactory(DefaultMediaSourceFactory(cloudAudioCache.dataSourceFactory))
+                .setLoadControl(createLoadControl())
                 .setWakeMode(C.WAKE_MODE_LOCAL)
                 .setMaxSeekToPreviousPositionMs(Long.MAX_VALUE)
                 .setHandleAudioBecomingNoisy(true)
@@ -740,16 +742,60 @@ class PlaybackService : MediaLibraryService() {
 
     private fun scheduleNextCloudPrefetch() {
         cloudPrefetchJob?.cancel()
-        val nextIndex = exoPlayer.currentMediaItemIndex + 1
-        if (nextIndex !in 0 until exoPlayer.mediaItemCount) return
-        val nextItem = exoPlayer.getMediaItemAt(nextIndex)
+        val nextItems =
+            buildList {
+                var nextIndex = exoPlayer.nextMediaItemIndex
+                while (
+                    size < CLOUD_PREFETCH_AHEAD_COUNT &&
+                    nextIndex in 0 until exoPlayer.mediaItemCount
+                ) {
+                    add(exoPlayer.getMediaItemAt(nextIndex))
+                    val followingIndex =
+                        exoPlayer.currentTimeline.getNextWindowIndex(
+                            nextIndex,
+                            exoPlayer.repeatMode,
+                            exoPlayer.shuffleModeEnabled,
+                        )
+                    if (
+                        followingIndex == C.INDEX_UNSET ||
+                        followingIndex == nextIndex ||
+                        followingIndex == exoPlayer.currentMediaItemIndex
+                    ) {
+                        break
+                    }
+                    nextIndex = followingIndex
+                }
+            }
+        if (nextItems.isEmpty()) return
         cloudPrefetchJob =
             serviceScope.launch {
                 delay(CLOUD_PREFETCH_DELAY_MS)
-                runCatching { cloudPlaybackItemResolver.prefetch(nextItem) }
-                    .onFailure { Timber.tag("PlaybackService").d(it, "Unable to prefetch next cloud stream") }
+                nextItems.forEach { item ->
+                    launch {
+                        runCatching { cloudPlaybackItemResolver.prefetch(item) }
+                            .onFailure {
+                                Timber.tag("PlaybackService").d(it, "Unable to prefetch cloud stream")
+                            }
+                    }
+                }
             }
     }
+
+    /**
+     * Media3's default initial buffer is deliberately conservative (roughly 2.5 seconds). That is
+     * unnecessary for the app's cached audio proxy and makes cloud rows feel unresponsive even
+     * after the command itself was handled immediately. Keep the long steady-state buffer while
+     * allowing playback to begin after a smaller, still safe amount has arrived.
+     */
+    private fun createLoadControl(): DefaultLoadControl =
+        DefaultLoadControl
+            .Builder()
+            .setBufferDurationsMs(
+                STREAM_MIN_BUFFER_MS,
+                STREAM_MAX_BUFFER_MS,
+                STREAM_PLAYBACK_START_BUFFER_MS,
+                STREAM_REBUFFER_START_BUFFER_MS,
+            ).build()
 
     private fun buildExoPlayer(enableHiFi: Boolean): ExoPlayer {
         val renderersFactory =
@@ -786,6 +832,7 @@ class PlaybackService : MediaLibraryService() {
                 },
                 renderersFactory,
             ).setMediaSourceFactory(DefaultMediaSourceFactory(cloudAudioCache.dataSourceFactory))
+            .setLoadControl(createLoadControl())
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .setMaxSeekToPreviousPositionMs(Long.MAX_VALUE)
             .setHandleAudioBecomingNoisy(true)
@@ -1164,7 +1211,6 @@ class PlaybackService : MediaLibraryService() {
                         cloudPreviewHandledMediaId != item.mediaId,
                 isPlaying = exoPlayer.isPlaying,
                 playbackState = exoPlayer.playbackState,
-                totalBufferedDurationMs = exoPlayer.totalBufferedDuration,
                 sinkHasPendingData = sinkHasAudio,
             ) &&
                 (duration <= 0L || remaining > CLOUD_NATURAL_END_GUARD_MS) &&
@@ -1350,8 +1396,12 @@ class PlaybackService : MediaLibraryService() {
         const val CLOUD_MEDIA_ID_PREFIX = "cloud:"
         const val CLOUD_ERROR_SKIP_DELAY_MS = 600L
         const val CLOUD_PREFETCH_DELAY_MS = 120L
+        const val CLOUD_PREFETCH_AHEAD_COUNT = 2
+        const val STREAM_MIN_BUFFER_MS = 15_000
+        const val STREAM_MAX_BUFFER_MS = 50_000
+        const val STREAM_PLAYBACK_START_BUFFER_MS = 750
+        const val STREAM_REBUFFER_START_BUFFER_MS = 1_500
         const val CLOUD_UNDERRUN_CONFIRM_MS = 3_000L
-        const val CLOUD_UNDERRUN_MIN_BUFFERED_MS = 8_000L
         const val CLOUD_NATURAL_END_GUARD_MS = 5_000L
         const val CLOUD_RECENT_MIN_LISTEN_MS = 10_000L
         const val PROCESS_EXIT_DELAY_MS = 500L
@@ -1371,12 +1421,13 @@ internal fun shouldHandleCloudAudioUnderrun(
     stillSameItem: Boolean,
     isPlaying: Boolean,
     playbackState: Int,
-    totalBufferedDurationMs: Long,
     sinkHasPendingData: Boolean,
 ): Boolean =
     explicitPreview &&
         stillSameItem &&
         isPlaying &&
         playbackState == Player.STATE_READY &&
-        totalBufferedDurationMs >= PlaybackService.CLOUD_UNDERRUN_MIN_BUFFERED_MS &&
+        // At the exact point a truncated preview runs dry Media3 commonly reports zero remaining
+        // buffered duration while staying READY and advancing the full-song timeline. The
+        // sustained empty audio sink is the reliable signal here; the caller confirms it for 3s.
         !sinkHasPendingData

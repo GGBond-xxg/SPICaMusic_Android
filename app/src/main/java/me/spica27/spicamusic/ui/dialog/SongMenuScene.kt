@@ -246,10 +246,17 @@ class CloudSongMenuScene(
         val density = LocalDensity.current
         val slideOffsetPx = with(density) { 72.dp.toPx() }
         val viewModel: CloudMusicCatalogViewModel = koinActivityViewModel()
+        val catalogState by viewModel.state.collectAsStateWithLifecycle()
         val playlistViewModel: PlaylistViewModel = koinActivityViewModel()
         val playlists by playlistViewModel.playlists.collectAsStateWithLifecycle()
         var showPlaylistDialog by remember { mutableStateOf(false) }
         var showCreatePlaylistDialog by remember { mutableStateOf(false) }
+        val canToggleLike =
+            song.source == me.spica27.spicamusic.cloud.CloudSongSource.NETEASE
+        val isLiked =
+            remember(song, catalogState.neteaseLikedSongIds) {
+                viewModel.isNeteaseSongLiked(song)
+            }
 
         fun closeMenu() {
             path.pop(scene)
@@ -296,7 +303,7 @@ class CloudSongMenuScene(
                     album = song.album,
                     artworkUri = song.artworkUri,
                     fallbackArtworkUri = null,
-                    isLiked = null,
+                    isLiked = isLiked.takeIf { canToggleLike },
                     onClose = ::closeMenu,
                     onPlayNext = {
                         viewModel.addToNext(song)
@@ -306,7 +313,15 @@ class CloudSongMenuScene(
                         viewModel.addToQueue(song)
                         closeMenu()
                     },
-                    onToggleLike = null,
+                    onToggleLike =
+                        if (canToggleLike) {
+                            {
+                                viewModel.toggleNeteaseLike(song)
+                                closeMenu()
+                            }
+                        } else {
+                            null
+                        },
                     onShowPlaylistDialog = { showPlaylistDialog = true },
                     onOpenAlbum = null,
                     onOpenArtist = null,

@@ -4,6 +4,9 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import org.json.JSONArray
 import org.json.JSONObject
 import java.nio.charset.StandardCharsets
@@ -25,6 +28,9 @@ class CloudAccountStore(
         context.getSharedPreferences("cloud_library_accounts", Context.MODE_PRIVATE)
 
     private val accountCacheLock = Any()
+
+    private val _revision = MutableStateFlow(0L)
+    val revision = _revision.asStateFlow()
 
     @Volatile
     private var mediaServerAccountsCache: List<MediaServerAccount>? = null
@@ -59,6 +65,7 @@ class CloudAccountStore(
         }
         preferences.edit().putString(KEY_MEDIA_SERVERS, encrypt(array.toString())).apply()
         mediaServerAccountsCache = accounts
+        notifyChanged()
     }
 
     fun removeAccount(id: String) {
@@ -78,6 +85,7 @@ class CloudAccountStore(
         }
         preferences.edit().putString(KEY_MEDIA_SERVERS, encrypt(array.toString())).apply()
         mediaServerAccountsCache = remaining
+        notifyChanged()
     }
 
     fun newAccountId(): String = UUID.randomUUID().toString()
@@ -116,6 +124,11 @@ class CloudAccountStore(
         }
         preferences.edit().putString(KEY_REMOTE_MUSIC, encrypt(array.toString())).apply()
         remoteMusicAccountsCache = accounts
+        notifyChanged()
+    }
+
+    private fun notifyChanged() {
+        _revision.update { it + 1L }
     }
 
     private fun readMediaServerAccounts(): List<MediaServerAccount> {

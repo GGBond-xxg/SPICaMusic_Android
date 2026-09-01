@@ -173,6 +173,19 @@ class OnlineSourceStreamProxy(
                                     continue
                                 }
                                 val response = responseResult.getOrThrow()
+                                if (
+                                    isExplicitPreviewFallback(
+                                        candidateUrl = upstreamUrl,
+                                        fallbackUrl = entry.fallbackUrl,
+                                        previewHeader = response.header(REMOTE_STREAM_PREVIEW_HEADER),
+                                    )
+                                ) {
+                                    // A successful provider response can still be only a short
+                                    // preview. Do not feed it into Media3 as an entire-song stream;
+                                    // close it and resolve the complete online source lazily.
+                                    response.close()
+                                    continue
+                                }
                                 val statusAccepted = response.isSuccessful || response.code == 206
                                 val contentTypeHeader = response.header("Content-Type")
                                 val contentRejected = isClearlyNonAudioContentType(contentTypeHeader)
@@ -270,6 +283,14 @@ internal fun shouldDeferOnlineResolution(
     preferFallback: Boolean,
     fallbackUrl: String?,
 ): Boolean = preferFallback && !fallbackUrl.isNullOrBlank()
+
+internal fun isExplicitPreviewFallback(
+    candidateUrl: String,
+    fallbackUrl: String?,
+    previewHeader: String?,
+): Boolean =
+    candidateUrl == fallbackUrl &&
+        previewHeader.equals("true", ignoreCase = true)
 
 internal fun isClearlyNonAudioContentType(value: String?): Boolean {
     val normalized =

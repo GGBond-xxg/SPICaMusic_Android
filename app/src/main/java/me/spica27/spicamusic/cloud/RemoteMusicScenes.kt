@@ -71,14 +71,22 @@ import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemContentType
 import androidx.paging.compose.itemKey
+import kotlinx.coroutines.flow.first
 import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.navkit.scene.StackScene
 import me.spica27.spicamusic.common.entity.Playlist
+import me.spica27.spicamusic.ui.home.HomeViewModel
+import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.playlist.PlaylistViewModel
 import me.spica27.spicamusic.ui.widget.AudioCover
 import org.koin.compose.viewmodel.koinActivityViewModel
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
+
+private fun RemoteSong.remoteMediaId(
+    provider: RemoteMusicProvider,
+    accountId: String,
+): String = "cloud:${provider.name.lowercase()}:$accountId:$id"
 
 class RemoteMusicScene(
     private val provider: RemoteMusicProvider,
@@ -609,6 +617,18 @@ class NeteasePlaylistScene(
     override fun Content() {
         val path = LocalNavigationPath.current
         val viewModel: CloudMusicCatalogViewModel = koinActivityViewModel()
+        val homeViewModel: HomeViewModel = koinActivityViewModel()
+        val playerViewModel = LocalPlayerViewModel.current
+        var pendingPlayerMediaId by remember { mutableStateOf<String?>(null) }
+        LaunchedEffect(pendingPlayerMediaId) {
+            val expectedMediaId = pendingPlayerMediaId ?: return@LaunchedEffect
+            playerViewModel.currentMediaItem.first { it?.mediaId == expectedMediaId }
+            if (pendingPlayerMediaId == expectedMediaId) {
+                pendingPlayerMediaId = null
+                homeViewModel.expandPlayer()
+                path.popTop()
+            }
+        }
         val state by viewModel.state.collectAsStateWithLifecycle()
         val songs = state.playlistSongs[value.stableId].orEmpty()
         val loading = value.stableId in state.loadingPlaylists
@@ -646,6 +666,7 @@ class NeteasePlaylistScene(
                 ) { index ->
                     val song = songs[index]
                     CloudPlaylistSongRow(song) {
+                        pendingPlayerMediaId = song.stableId
                         viewModel.playPlaylistSongs(song.stableId, songs)
                     }
                 }
@@ -678,6 +699,9 @@ class QqPlaylistScene(
     @Composable
     override fun Content() {
         val path = LocalNavigationPath.current
+        val homeViewModel: HomeViewModel = koinActivityViewModel()
+        val playerViewModel = LocalPlayerViewModel.current
+        var pendingPlayerMediaId by remember { mutableStateOf<String?>(null) }
         val viewModel: RemoteMusicViewModel =
             koinViewModel(key = "remote_music_${RemoteMusicProvider.QQ_MUSIC.name}") {
                 parametersOf(RemoteMusicProvider.QQ_MUSIC)
@@ -685,6 +709,15 @@ class QqPlaylistScene(
         val state by viewModel.state.collectAsStateWithLifecycle()
         val songs = state.remotePlaylistSongs[playlist.id].orEmpty()
         val loading = playlist.id in state.loadingRemotePlaylistIds
+        LaunchedEffect(pendingPlayerMediaId) {
+            val expectedMediaId = pendingPlayerMediaId ?: return@LaunchedEffect
+            playerViewModel.currentMediaItem.first { it?.mediaId == expectedMediaId }
+            if (pendingPlayerMediaId == expectedMediaId) {
+                pendingPlayerMediaId = null
+                homeViewModel.expandPlayer()
+                path.popTop()
+            }
+        }
 
         LaunchedEffect(playlist.id) {
             viewModel.loadRemotePlaylist(playlist.id)
@@ -722,7 +755,13 @@ class QqPlaylistScene(
                     val song = songs[index]
                     RemoteSongRow(
                         song = song,
-                        onClick = { viewModel.play(song, songs) },
+                        onClick = {
+                            pendingPlayerMediaId =
+                                state.selectedAccount?.let { account ->
+                                    song.remoteMediaId(account.provider, account.id)
+                                }
+                            viewModel.play(song, songs)
+                        },
                     )
                 }
                 if (loading) {
@@ -762,6 +801,9 @@ class CloudUserPlaylistScene(
     @Composable
     override fun Content() {
         val path = LocalNavigationPath.current
+        val homeViewModel: HomeViewModel = koinActivityViewModel()
+        val playerViewModel = LocalPlayerViewModel.current
+        var pendingPlayerMediaId by remember { mutableStateOf<String?>(null) }
         val viewModel: RemoteMusicViewModel =
             koinViewModel(key = "remote_music_${playlist.provider.name}") {
                 parametersOf(playlist.provider)
@@ -769,6 +811,15 @@ class CloudUserPlaylistScene(
         val state by viewModel.state.collectAsStateWithLifecycle()
         val currentPlaylist = state.localPlaylists.firstOrNull { it.id == playlist.id } ?: playlist
         var showDeleteDialog by rememberSaveable { mutableStateOf(false) }
+        LaunchedEffect(pendingPlayerMediaId) {
+            val expectedMediaId = pendingPlayerMediaId ?: return@LaunchedEffect
+            playerViewModel.currentMediaItem.first { it?.mediaId == expectedMediaId }
+            if (pendingPlayerMediaId == expectedMediaId) {
+                pendingPlayerMediaId = null
+                homeViewModel.expandPlayer()
+                path.popTop()
+            }
+        }
         if (showDeleteDialog) {
             AlertDialog(
                 onDismissRequest = { showDeleteDialog = false },
@@ -840,6 +891,11 @@ class CloudUserPlaylistScene(
                         FilledTonalButton(
                             onClick = {
                                 currentPlaylist.songs.firstOrNull()?.let { first ->
+                                    pendingPlayerMediaId =
+                                        first.remoteMediaId(
+                                            currentPlaylist.provider,
+                                            currentPlaylist.accountId,
+                                        )
                                     viewModel.play(first, currentPlaylist.songs)
                                 }
                             },
@@ -859,7 +915,14 @@ class CloudUserPlaylistScene(
                     val song = currentPlaylist.songs[index]
                     RemoteSongRow(
                         song = song,
-                        onClick = { viewModel.play(song, currentPlaylist.songs) },
+                        onClick = {
+                            pendingPlayerMediaId =
+                                song.remoteMediaId(
+                                    currentPlaylist.provider,
+                                    currentPlaylist.accountId,
+                                )
+                            viewModel.play(song, currentPlaylist.songs)
+                        },
                         onRemoveFromPlaylist = {
                             viewModel.removeSongFromLocalPlaylist(
                                 currentPlaylist.accountId,

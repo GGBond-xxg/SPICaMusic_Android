@@ -66,6 +66,31 @@ class CloudPlaybackFallbackTest {
     }
 
     @Test
+    fun `explicit provider preview is rejected before streaming it as a whole song`() {
+        assertTrue(
+            isExplicitPreviewFallback(
+                candidateUrl = "http://account-stream",
+                fallbackUrl = "http://account-stream",
+                previewHeader = "true",
+            ),
+        )
+        assertFalse(
+            isExplicitPreviewFallback(
+                candidateUrl = "http://online-source",
+                fallbackUrl = "http://account-stream",
+                previewHeader = "true",
+            ),
+        )
+        assertFalse(
+            isExplicitPreviewFallback(
+                candidateUrl = "http://account-stream",
+                fallbackUrl = "http://account-stream",
+                previewHeader = "false",
+            ),
+        )
+    }
+
+    @Test
     fun `cloud preview underrun skips only when decoded audio is exhausted despite buffered data`() {
         assertTrue(
             shouldHandleCloudAudioUnderrun(
@@ -73,7 +98,6 @@ class CloudPlaybackFallbackTest {
                 stillSameItem = true,
                 isPlaying = true,
                 playbackState = Player.STATE_READY,
-                totalBufferedDurationMs = 30_000L,
                 sinkHasPendingData = false,
             ),
         )
@@ -83,7 +107,6 @@ class CloudPlaybackFallbackTest {
                 stillSameItem = true,
                 isPlaying = true,
                 playbackState = Player.STATE_BUFFERING,
-                totalBufferedDurationMs = 0L,
                 sinkHasPendingData = false,
             ),
         )
@@ -93,7 +116,6 @@ class CloudPlaybackFallbackTest {
                 stillSameItem = true,
                 isPlaying = true,
                 playbackState = Player.STATE_READY,
-                totalBufferedDurationMs = 30_000L,
                 sinkHasPendingData = true,
             ),
         )
@@ -103,7 +125,6 @@ class CloudPlaybackFallbackTest {
                 stillSameItem = true,
                 isPlaying = true,
                 playbackState = Player.STATE_READY,
-                totalBufferedDurationMs = 30_000L,
                 sinkHasPendingData = false,
             ),
         )

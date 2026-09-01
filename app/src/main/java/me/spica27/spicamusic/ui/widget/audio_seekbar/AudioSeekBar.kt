@@ -180,16 +180,16 @@ fun AudioWaveSlider(
                         cornerRadius = CornerRadius(spikeRadius.toPx(), spikeRadius.toPx()),
                         style = style,
                     )
-                    drawRect(
-                        brush = progressBrush,
-                        size =
-                            Size(
-                                width = progress * size.width,
-                                height = size.height,
-                            ),
-                        blendMode = BlendMode.SrcAtop,
-                    )
                 }
+                drawRect(
+                    brush = progressBrush,
+                    size =
+                        Size(
+                            width = progress * size.width,
+                            height = size.height,
+                        ),
+                    blendMode = BlendMode.SrcAtop,
+                )
             }
             if (thumbWidth.value > 0.dp) {
                 Box(

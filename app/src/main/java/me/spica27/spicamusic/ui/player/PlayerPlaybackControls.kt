@@ -35,6 +35,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Repeat
@@ -50,6 +51,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -82,6 +84,7 @@ private val PlayerProgressTrackHeight = 64.dp
 /** 播放器与歌词页共用的三样式进度区。 */
 @Composable
 fun PlayerProgressSection(
+    progressKey: Any? = Unit,
     progress: Float,
     currentPosition: Long,
     duration: Long,
@@ -92,6 +95,9 @@ fun PlayerProgressSection(
     amplitudes: List<Int> = emptyList(),
     onProgressChange: (Float) -> Unit,
     onProgressChangeFinished: () -> Unit,
+    onAudioQualityClick: (() -> Unit)? = null,
+    audioQualityActionEnabled: Boolean = true,
+    audioQualityActionModifier: Modifier = Modifier,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
@@ -103,43 +109,47 @@ fun PlayerProgressSection(
         ) {
             // 三种进度条只负责绘制；最上层统一处理点按和拖动，避免不同 Slider
             // 实现与播放器页的嵌套 Pager 争抢手势，造成某些样式无法拖动。
-            when (progressBarStyle) {
-                ProgressBarStyle.ExpressiveWavy ->
-                    ExpressiveWavySlider(
-                        progress = progress.coerceIn(0f, 1f),
-                        onProgressChange = {},
-                        onProgressChangeFinished = {},
-                        isPlaying = isPlaying,
-                        activeColor = MaterialTheme.colorScheme.onSurface,
-                        inactiveColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-
-                ProgressBarStyle.DynamicWaveform -> {
-                    if (fftDrawData != null) {
-                        val drawData by fftDrawData.collectAsStateWithLifecycle()
-                        AudioDynamicWaveSlider(
+            key(progressKey, progressBarStyle) {
+                when (progressBarStyle) {
+                    ProgressBarStyle.ExpressiveWavy ->
+                        ExpressiveWavySlider(
                             progress = progress.coerceIn(0f, 1f),
-                            fftAmplitudes = drawData,
                             onProgressChange = {},
                             onProgressChangeFinished = {},
-                            waveformBrush = SolidColor(MaterialTheme.colorScheme.surfaceContainerHighest),
-                            progressBrush = SolidColor(MaterialTheme.colorScheme.onSurface),
+                            isPlaying = isPlaying,
+                            activeColor = MaterialTheme.colorScheme.onSurface,
+                            inactiveColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                             modifier = Modifier.fillMaxSize(),
                         )
-                    }
-                }
 
-                ProgressBarStyle.TimeDomainWaveform ->
-                    AudioWaveSlider(
-                        progress = progress.coerceIn(0f, 1f),
-                        amplitudes = amplitudes,
-                        onProgressChange = {},
-                        onProgressChangeFinished = {},
-                        waveformBrush = SolidColor(MaterialTheme.colorScheme.surfaceContainerHighest),
-                        progressBrush = SolidColor(MaterialTheme.colorScheme.onSurface),
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                    ProgressBarStyle.DynamicWaveform -> {
+                        if (fftDrawData != null) {
+                            val drawData by fftDrawData.collectAsStateWithLifecycle()
+                            AudioDynamicWaveSlider(
+                                progress = progress.coerceIn(0f, 1f),
+                                fftAmplitudes = drawData,
+                                onProgressChange = {},
+                                onProgressChangeFinished = {},
+                                waveformBrush =
+                                    SolidColor(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f)),
+                                progressBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                    }
+
+                    ProgressBarStyle.TimeDomainWaveform ->
+                        AudioWaveSlider(
+                            progress = progress.coerceIn(0f, 1f),
+                            amplitudes = amplitudes,
+                            onProgressChange = {},
+                            onProgressChangeFinished = {},
+                            waveformBrush =
+                                SolidColor(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f)),
+                            progressBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                }
             }
 
             ProgressSeekGestureOverlay(
@@ -192,6 +202,36 @@ fun PlayerProgressSection(
                         .align(Alignment.CenterEnd)
                         .padding(vertical = 4.dp),
             )
+            onAudioQualityClick?.let { onClick ->
+                Row(
+                    modifier =
+                        Modifier
+                            .align(Alignment.Center)
+                            .then(audioQualityActionModifier)
+                            .height(36.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.tertiaryContainer)
+                            .clickable(
+                                enabled = audioQualityActionEnabled,
+                                role = Role.Button,
+                                onClick = onClick,
+                            ).padding(horizontal = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.GraphicEq,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Text(
+                        text = stringResource(R.string.player_audio_quality_and_effects),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    )
+                }
+            }
         }
     }
 }
@@ -274,6 +314,7 @@ fun PlayerWavyProgressSection(
 /** 播放器封面页与歌词页共用的完整底部播放模块。 */
 @Composable
 fun PlayerPlaybackBottomSection(
+    progressKey: Any? = Unit,
     progress: Float,
     currentPosition: Long,
     duration: Long,
@@ -286,6 +327,8 @@ fun PlayerPlaybackBottomSection(
     amplitudes: List<Int> = emptyList(),
     onProgressChange: (Float) -> Unit,
     onProgressChangeFinished: () -> Unit,
+    onAudioQualityClick: (() -> Unit)? = null,
+    audioQualityActionEnabled: Boolean = true,
     onPlayPauseClick: () -> Unit,
     onPreviousClick: () -> Unit,
     onNextClick: () -> Unit,
@@ -297,11 +340,13 @@ fun PlayerPlaybackBottomSection(
     onSleepTimerCancel: () -> Unit = {},
     modifier: Modifier = Modifier,
     progressModifier: Modifier = Modifier,
+    audioQualityActionModifier: Modifier = Modifier,
     controlsModifier: Modifier = Modifier,
     showControls: Boolean = true,
 ) {
     Column(modifier = modifier) {
         PlayerProgressSection(
+            progressKey = progressKey,
             progress = progress,
             currentPosition = currentPosition,
             duration = duration,
@@ -312,6 +357,9 @@ fun PlayerPlaybackBottomSection(
             amplitudes = amplitudes,
             onProgressChange = onProgressChange,
             onProgressChangeFinished = onProgressChangeFinished,
+            onAudioQualityClick = onAudioQualityClick,
+            audioQualityActionEnabled = audioQualityActionEnabled,
+            audioQualityActionModifier = audioQualityActionModifier,
             modifier = progressModifier,
         )
         AnimatedVisibility(

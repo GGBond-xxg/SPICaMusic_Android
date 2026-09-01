@@ -8,7 +8,7 @@ import android.graphics.Shader
 import android.graphics.SurfaceTexture
 import android.net.Uri
 import android.view.TextureView
-import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -261,67 +261,64 @@ private fun StableBlurredBackdrop(
     uri: Uri?,
     modifier: Modifier = Modifier,
 ) {
-    var retainedPainter by remember { mutableStateOf<Painter?>(null) }
-    val previousPainter = remember(uri) { retainedPainter }
-    var incomingPainter by remember(uri) { mutableStateOf<Painter?>(null) }
-    val incomingAlpha = remember(uri) { Animatable(0f) }
+    // Do not clear the currently visible painter when the media URI changes. The replacement is
+    // prepared invisibly first, then Crossfade takes over from its current visual state. Unlike
+    // the old two-slot Animatable implementation, an interrupted transition does not jump back to
+    // an older retained frame when users skip through several songs quickly.
+    var preparedPainter by remember { mutableStateOf<Painter?>(null) }
 
-    LaunchedEffect(uri, incomingPainter) {
-        val painter = incomingPainter ?: return@LaunchedEffect
-        if (retainedPainter == null) {
-            incomingAlpha.snapTo(1f)
-        } else {
-            incomingAlpha.snapTo(0f)
-            incomingAlpha.animateTo(
-                targetValue = 1f,
-                animationSpec =
-                    tween(
-                        durationMillis = BACKDROP_CROSSFADE_DURATION_MS,
-                        easing = FastOutSlowInEasing,
-                    ),
-            )
-        }
-        retainedPainter = painter
+    LaunchedEffect(uri) {
+        if (uri == null) preparedPainter = null
     }
 
     Box(modifier = modifier) {
-        val basePainter = previousPainter ?: retainedPainter
-        basePainter?.let { painter ->
-            Image(
-                painter = painter,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.matchParentSize(),
-            )
-        }
-
-        incomingPainter?.let { painter ->
-            Image(
-                painter = painter,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier =
-                    Modifier
-                        .matchParentSize()
-                        .graphicsLayer { alpha = incomingAlpha.value },
-            )
+        Crossfade(
+            targetState = preparedPainter,
+            animationSpec =
+                tween(
+                    durationMillis = BACKDROP_CROSSFADE_DURATION_MS,
+                    easing = FastOutSlowInEasing,
+                ),
+            label = "BlurredCoverBackdropCrossfade",
+            modifier = Modifier.matchParentSize(),
+        ) { painter ->
+            painter?.let {
+                Image(
+                    painter = it,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.matchParentSize(),
+                )
+            }
         }
 
         if (uri != null) {
+            val requestedUri = uri
             key(uri) {
                 LandscapistImage(
                     modifier =
                         Modifier
                             .matchParentSize()
                             .graphicsLayer { alpha = 0f },
+                    requestBuilder = {
+                        this
+                            .model(requestedUri)
+                            // BlurHash only needs a tiny colour sample. Decoding the original
+                            // cover here made its CPU encoder run over hundreds of thousands of
+                            // pixels on the UI thread whenever the song changed.
+                            .size(BACKDROP_SAMPLE_SIZE_PX, BACKDROP_SAMPLE_SIZE_PX)
+                            .tag("player-backdrop:$requestedUri")
+                            .progressiveEnabled(false)
+                            .build()
+                    },
                     imageModel = { uri },
                     component =
                         rememberImageComponent {
                             +BlurHashTransformationPlugin()
                         },
                     success = { _, painter ->
-                        LaunchedEffect(painter) {
-                            incomingPainter = painter
+                        LaunchedEffect(requestedUri, painter) {
+                            if (uri == requestedUri) preparedPainter = painter
                         }
                     },
                 )
@@ -330,7 +327,8 @@ private fun StableBlurredBackdrop(
     }
 }
 
-private const val BACKDROP_CROSSFADE_DURATION_MS = 420
+private const val BACKDROP_CROSSFADE_DURATION_MS = 900
+private const val BACKDROP_SAMPLE_SIZE_PX = 96
 
 /**
  * 播放器形变容器和全屏播放器共用的静态底色。

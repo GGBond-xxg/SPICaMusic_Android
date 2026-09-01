@@ -207,6 +207,7 @@ class LyricScene(
                                 .weight(1f),
                     )
                     LyricsPlaybackControls(
+                        mediaId = currentMediaItem?.mediaId,
                         position = position,
                         duration = duration,
                         isPlaying = isPlaying,
@@ -307,6 +308,7 @@ fun LyricsPlayerPage(
 
 @Composable
 private fun LyricsPlaybackControls(
+    mediaId: String?,
     position: Long,
     duration: Long,
     isPlaying: Boolean,
@@ -327,8 +329,8 @@ private fun LyricsPlaybackControls(
     onSleepTimerSet: (Int) -> Unit,
     onSleepTimerCancel: () -> Unit,
 ) {
-    var isSeeking by remember { mutableStateOf(false) }
-    var seekProgress by remember { mutableFloatStateOf(0f) }
+    var isSeeking by remember(mediaId) { mutableStateOf(false) }
+    var seekProgress by remember(mediaId) { mutableFloatStateOf(0f) }
     val transitionProgress = enterProgressProvider().coerceIn(0f, 1f)
     val controlsExitProgress =
         smoothStep(
@@ -343,6 +345,7 @@ private fun LyricsPlaybackControls(
     val displayedProgress = if (isSeeking) seekProgress else playbackProgress
 
     PlayerPlaybackBottomSection(
+        progressKey = mediaId,
         progress = displayedProgress,
         currentPosition = position,
         duration = duration,

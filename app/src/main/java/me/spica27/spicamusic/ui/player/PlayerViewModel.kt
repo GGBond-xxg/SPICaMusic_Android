@@ -151,7 +151,9 @@ class PlayerViewModel(
                 val position = player.currentPosition
                 topDisplayModeController.updatePosition(position)
                 emit(position)
-                kotlinx.coroutines.delay(1000)
+                // Keep waveform and seek indicators visibly moving instead of advancing in
+                // one-second jumps. The progress state is consumed by leaf composables only.
+                kotlinx.coroutines.delay(250)
             }
         }.conflate()
             .stateIn(

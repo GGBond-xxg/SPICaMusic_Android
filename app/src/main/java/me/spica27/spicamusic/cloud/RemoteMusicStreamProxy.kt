@@ -19,6 +19,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import timber.log.Timber
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.ServerSocket
@@ -119,6 +120,10 @@ class RemoteMusicStreamProxy(
                                         )
                                         return@get
                                     }
+                            call.response.header(
+                                REMOTE_STREAM_PREVIEW_HEADER,
+                                isExplicitPreview(account.id, songId).toString(),
+                            )
                             val requestBuilder =
                                 Request
                                     .Builder()
@@ -214,6 +219,10 @@ class RemoteMusicStreamProxy(
                             isPreview = resolved.isPreview,
                             expiresAtMs = lockedNowMs + STREAM_URL_CACHE_MS,
                         )
+                    Timber.tag("RemoteMusicStreamProxy").i(
+                        "resolved provider=${account.provider.name.lowercase()} " +
+                            "song=$songId preview=${resolved.isPreview}",
+                    )
                     resolved.url
                 }
         }
@@ -317,3 +326,5 @@ internal fun remoteStreamRequestHeaders(
 
 private const val REMOTE_STREAM_BROWSER_USER_AGENT =
     "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36"
+
+internal const val REMOTE_STREAM_PREVIEW_HEADER = "X-SPICa-Preview"

@@ -13,8 +13,11 @@ import kotlin.math.min
 import kotlin.math.round
 
 internal object BlurHashEncoder {
-    private const val COMPONENT_X = 8
-    private const val COMPONENT_Y = 8
+    // A blurred full-screen backdrop does not benefit visually from an 8x8 hash. The standard
+    // 4x4 grid cuts the per-cover cosine work to one quarter and avoids blocking interaction
+    // during rapid track changes.
+    private const val COMPONENT_X = 4
+    private const val COMPONENT_Y = 4
 
     private fun applyBasisFunction(
         pixels: IntArray,

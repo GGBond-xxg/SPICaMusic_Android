@@ -664,7 +664,19 @@ class NeteaseClient(
                     .build(),
             )
         val result = root.optJSONObject("result")
-        val songs = parseSongs(result?.optJSONArray("songs"))
+        val parsedSongs = parseSongs(result?.optJSONArray("songs"))
+        val missingArtworkIds =
+            parsedSongs
+                .filter { it.artworkUrl.isNullOrBlank() }
+                .map(RemoteSong::id)
+        val detailedSongs =
+            runCatching { loadSongDetails(account, missingArtworkIds) }
+                .getOrDefault(emptyList())
+                .associateBy(RemoteSong::id)
+        val songs =
+            parsedSongs.map { song ->
+                if (song.artworkUrl.isNullOrBlank()) detailedSongs[song.id] ?: song else song
+            }
         val total = result?.optInt("songCount", offset + songs.size) ?: (offset + songs.size)
         return RemoteSongPage(songs, (offset + songs.size).takeIf { it < total && songs.isNotEmpty() })
     }
@@ -820,7 +832,14 @@ class NeteaseClient(
                             item.optLong("dt").takeIf { it > 0L }
                                 ?: item.optLong("duration").coerceAtLeast(0L),
                         mimeType = "audio/mpeg",
-                        artworkUrl = albumObject?.optString("picUrl")?.takeIf(String::isNotBlank),
+                        artworkUrl =
+                            sequenceOf(
+                                albumObject?.optString("picUrl"),
+                                albumObject?.optString("blurPicUrl"),
+                                item.optString("picUrl"),
+                            ).filterNotNull()
+                                .firstOrNull(String::isNotBlank)
+                                ?.replaceFirst("http://", "https://"),
                     ),
                 )
             }
@@ -1311,7 +1330,7 @@ class QqMusicClient(
                         artworkUrl =
                             albumMid
                                 .takeIf(String::isNotBlank)
-                                ?.let { "https://y.qq.com/music/photo_new/T002R300x300M000$it.jpg" },
+                                ?.let { "https://y.gtimg.cn/music/photo_new/T002R300x300M000$it.jpg" },
                     ),
                 )
             }

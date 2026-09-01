@@ -49,6 +49,8 @@ class PreferencesManager(
         val DYNAMIC_SPECTRUM_BACKGROUND = stringPreferencesKey("dynamic_spectrum_background")
         val DYNAMIC_COVER_TYPE = stringPreferencesKey("dynamic_cover_type")
         val PROGRESS_BAR_STYLE = stringPreferencesKey("progress_bar_style")
+        val FINDER_HERO_SOURCE = stringPreferencesKey("finder_hero_source")
+        val SEARCH_HISTORY = stringPreferencesKey("search_history")
         val LYRICS_TEXT_ALIGNMENT = stringPreferencesKey("lyrics_text_alignment")
         val LYRICS_TEXT_SCALE = stringPreferencesKey("lyrics_text_scale")
         val LYRICS_ACTIVE_LINE_SCALE = stringPreferencesKey("lyrics_active_line_scale")

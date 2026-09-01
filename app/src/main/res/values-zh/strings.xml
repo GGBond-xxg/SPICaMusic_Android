@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+  <string name="press_back_again_to_exit">再按一次返回键退出</string>
   <string name="app_name">柠檬音乐</string>
   <string name="spica_app_label">柠檬音乐</string>
   <string name="action_settings">Settings</string>
@@ -396,6 +397,9 @@
   <string name="dynamic_cover_audio_city">音频城市</string>
   <string name="dynamic_cover_off">关闭</string>
   <string name="settings_progress_bar_style">进度条样式</string>
+  <string name="settings_finder_source_title">发现页推荐内容</string>
+  <string name="settings_finder_source_frequent">最近常听</string>
+  <string name="settings_finder_source_daily">网易云每日推荐</string>
   <string name="progress_bar_style_dynamic_waveform">动态波形</string>
   <string name="progress_bar_style_time_domain_waveform">时域波形</string>
   <string name="progress_bar_style_expressive_wavy">流动波浪</string>
@@ -503,9 +507,6 @@
   <string name="finder_summary_format">%1$d 首常听 · %2$d 首收藏 · %3$d 个歌单</string>
   <string name="finder_search_title">搜索音乐</string>
   <string name="finder_search_subtitle">按歌曲、歌手、专辑快速查找</string>
-  <string name="finder_no_local_music_title">还没有本地音乐</string>
-  <string name="finder_no_local_music_subtitle">扫描设备中的歌曲，开始你的音乐之旅</string>
-  <string name="finder_go_to_scan">前往扫描</string>
   <string name="finder_library_title">我的资料库</string>
   <string name="finder_library_subtitle">管理歌单、扫描音乐、整理来源</string>
   <string name="finder_all_music_title">全部音乐</string>
@@ -514,6 +515,10 @@
   <string name="finder_settings_subtitle">主题、背景、播放偏好</string>
   <string name="finder_frequent_title">最近常听</string>
   <string name="finder_frequent_playlist_name">最近常听歌曲</string>
+  <string name="finder_daily_title">每日推荐</string>
+  <string name="finder_daily_playlist_name">每日推荐歌曲</string>
+  <string name="finder_no_daily_title">暂时没有每日推荐</string>
+  <string name="finder_no_daily_subtitle">请先登录网易云音乐，再下拉刷新试试。</string>
   <string name="finder_no_frequent_title">还没有常听歌曲</string>
   <string name="finder_no_frequent_subtitle">开始播放音乐后，这里会出现你最常听的内容。</string>
   <string name="finder_no_favorites_title">还没有收藏歌曲</string>
@@ -630,6 +635,10 @@
   <string name="search_your_music_title">搜索本地与云端音乐</string>
   <string name="search_your_music_subtitle">同时搜索现有曲库以及网易云、QQ 音乐中未收藏的歌曲</string>
   <string name="search_source_netease">网易云音乐</string>
+  <string name="search_filter_all_music">全部音乐</string>
+  <string name="search_filter_local_music">本地音乐</string>
+  <string name="search_recent_history">最近搜索</string>
+  <string name="search_clear_history">清空</string>
   <string name="search_source_qq_music">QQ 音乐</string>
   <string name="search_source_local_library">现有曲库与收藏</string>
   <string name="search_remote_source_failed">部分云端音乐搜索失败，请检查网络或重新登录</string>
@@ -851,7 +860,6 @@
   <string name="player_current_audio_quality">当前歌曲音质</string>
   <string name="player_quality_netease_desc">网易云在线音源与设备音效</string>
   <string name="player_quality_qq_desc">QQ 音乐在线音源与设备音效</string>
-  <string name="player_quality_more_adjustments">更多调节</string>
   <string name="player_local_original_quality">本地原始音质</string>
   <string name="player_local_quality_unknown">跟随源文件</string>
   <string name="player_progress_style_desc">切换播放页进度条外观</string>

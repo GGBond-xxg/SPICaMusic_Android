@@ -259,6 +259,7 @@ object AppModule {
                     app = androidApplication(),
                     songRepository = get<SongUseCases>(),
                     playlistRepository = get<PlaylistUseCases>(),
+                    settingsUseCases = get<SettingsUseCases>(),
                 )
             }
 
@@ -268,6 +269,7 @@ object AppModule {
                     songRepository = get<SongUseCases>(),
                     accountStore = get(),
                     remoteClients = get(),
+                    preferencesManager = get(),
                 )
             }
 

@@ -4,7 +4,9 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FiniteAnimationSpec
@@ -55,7 +57,6 @@ import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Radar
-import androidx.compose.material.icons.filled.Scanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Spa
@@ -68,8 +69,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -102,10 +105,12 @@ import me.spica27.spicamusic.cloud.CloudUserPlaylist
 import me.spica27.spicamusic.cloud.CloudUserPlaylistScene
 import me.spica27.spicamusic.cloud.NeteasePlaylistScene
 import me.spica27.spicamusic.cloud.RemoteMusicProvider
+import me.spica27.spicamusic.common.entity.FinderHeroSource
 import me.spica27.spicamusic.common.entity.Song
 import me.spica27.spicamusic.common.entity.getAlbumCoverUri
 import me.spica27.spicamusic.common.entity.getCoverUri
 import me.spica27.spicamusic.ui.cache.ArtworkRenderCache
+import me.spica27.spicamusic.ui.cache.PlaylistCoverSnapshotCache
 import me.spica27.spicamusic.ui.favorite.FavoriteScene
 import me.spica27.spicamusic.ui.home.HomePage
 import me.spica27.spicamusic.ui.home.HomeViewModel
@@ -114,7 +119,6 @@ import me.spica27.spicamusic.ui.model.PlaylistWithCover
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.playlist.AllPlaylistsScene
 import me.spica27.spicamusic.ui.playlistdetail.PlaylistDetailScene
-import me.spica27.spicamusic.ui.scan.ScannerScene
 import me.spica27.spicamusic.ui.search.SearchScene
 import me.spica27.spicamusic.ui.settings.SettingsScene
 import me.spica27.spicamusic.ui.theme.LayoutTokens
@@ -204,14 +208,15 @@ fun FinderPage(playEntrance: Boolean = true) {
     val playerViewModel = LocalPlayerViewModel.current
 
     val frequentSongs by homeViewModel.frequentSongs.collectAsStateWithLifecycle()
+    val finderHeroSourceValue by homeViewModel.finderHeroSource.collectAsStateWithLifecycle()
+    val finderHeroSource = FinderHeroSource.fromString(finderHeroSourceValue)
     val frequentSongsInitialized by homeViewModel.frequentSongsInitialized.collectAsStateWithLifecycle()
-    val allSongsInitialized by homeViewModel.allSongsInitialized.collectAsStateWithLifecycle()
     val favoriteSongs by homeViewModel.favoriteSongs.collectAsStateWithLifecycle()
     val playlists by homeViewModel.playlists.collectAsStateWithLifecycle()
     val playlistsWithCover by homeViewModel.playlistsWithCover.collectAsStateWithLifecycle()
-    val allSongs by homeViewModel.allSongs.collectAsStateWithLifecycle()
     val snackbarMessage by homeViewModel.snackbarMessage.collectAsStateWithLifecycle()
     val cloudCatalog by cloudCatalogViewModel.state.collectAsStateWithLifecycle()
+    val dailyPlaylistName = stringResource(R.string.finder_daily_playlist_name)
     val cloudPlaylists = cloudCatalog.remotePlaylists
     val userCloudPlaylists = cloudCatalog.userPlaylists
     val overviewCloudPlaylists =
@@ -288,7 +293,16 @@ fun FinderPage(playEntrance: Boolean = true) {
                 )
             }
         }
-    val totalPlaylistCount = playlists.size + overviewCloudPlaylists.size + userCloudPlaylists.size
+    val overviewPlaylistsWithCover =
+        remember(playlistsWithCover, dailyPlaylistName) {
+            playlistsWithCover.filterNot { it.playlist.playlistName == dailyPlaylistName }
+        }
+    val overviewLocalPlaylistCount =
+        remember(playlists, dailyPlaylistName) {
+            playlists.count { it.playlistName != dailyPlaylistName }
+        }
+    val totalPlaylistCount =
+        overviewLocalPlaylistCount + overviewCloudPlaylists.size + userCloudPlaylists.size
     val frequentEntries =
         remember(frequentSongs, cloudCatalog.recentCloudSongs) {
             (
@@ -297,13 +311,36 @@ fun FinderPage(playEntrance: Boolean = true) {
             ).distinctBy(FrequentEntry::stableId)
                 .take(10)
         }
-    val frequentCardSongs = remember(frequentEntries) { ImmutableList.copyOf(frequentEntries) }
+    val heroEntries =
+        remember(finderHeroSource, frequentEntries, cloudCatalog.dailyRecommendations) {
+            when (finderHeroSource) {
+                FinderHeroSource.RECENT_FREQUENT -> frequentEntries
+                FinderHeroSource.NETEASE_DAILY ->
+                    cloudCatalog.dailyRecommendations
+                        .map(CloudCatalogSong::toFrequentEntry)
+                        .distinctBy(FrequentEntry::stableId)
+                        .take(10)
+            }
+        }
+    val heroSongs = remember(heroEntries) { ImmutableList.copyOf(heroEntries) }
+    val heroInitialized =
+        when (finderHeroSource) {
+            FinderHeroSource.RECENT_FREQUENT -> frequentSongsInitialized
+            FinderHeroSource.NETEASE_DAILY -> !cloudCatalog.isLoadingDailyRecommendations
+        }
     val favoritePreviewSongs =
         remember(favoriteSongs) {
             ImmutableList.copyOf(favoriteSongs.take(FavoritePreviewSongCount))
         }
 
     val frequentPlaylistName = stringResource(R.string.finder_frequent_playlist_name)
+    val heroTitle =
+        stringResource(
+            when (finderHeroSource) {
+                FinderHeroSource.RECENT_FREQUENT -> R.string.finder_frequent_title
+                FinderHeroSource.NETEASE_DAILY -> R.string.finder_daily_title
+            },
+        )
     val favoritePlaylistName = stringResource(R.string.finder_favorites_playlist_name)
 
     LaunchedEffect(snackbarMessage) {
@@ -364,35 +401,32 @@ fun FinderPage(playEntrance: Boolean = true) {
                 )
             }
 
-            // 数据库没有本地音乐时，引导用户前往扫描页面
-            if (allSongsInitialized && allSongs.isEmpty()) {
-                item(key = "scan_guide", contentType = "scan_guide") {
-                    val entrance = rememberEntrance(order = 2, play = playEntrance)
-                    ScanGuideCard(
-                        onClick = { path.push(ScannerScene()) },
-                        modifier =
-                            Modifier
-                                .animateItem(
-                                    fadeInSpec = ListItemFadeInSpec,
-                                    placementSpec = null,
-                                    fadeOutSpec = ListItemFadeOutSpec,
-                                ).entranceGraphics(entrance),
-                    )
-                }
-            }
-
             // 常听榜单：冷启动查询完成后直接呈现，避免 Lazy 条目首次插入淡入导致整卡闪黑。
             // 从其他 Tab 切回发现页时仍由 entranceGraphics 负责统一的控件入场动画。
-            if (!frequentSongsInitialized) {
+            if (!heroInitialized) {
                 item(key = "frequent_loading", contentType = "loading") {
                     FrequentHeroPlaceholder()
                 }
-            } else if (frequentEntries.isEmpty()) {
+            } else if (heroEntries.isEmpty()) {
                 item(key = "frequent_empty", contentType = "empty") {
                     val entrance = rememberEntrance(order = 3, play = playEntrance)
                     FinderEmptyRow(
-                        title = stringResource(R.string.finder_no_frequent_title),
-                        subtitle = stringResource(R.string.finder_no_frequent_subtitle),
+                        title =
+                            stringResource(
+                                if (finderHeroSource == FinderHeroSource.NETEASE_DAILY) {
+                                    R.string.finder_no_daily_title
+                                } else {
+                                    R.string.finder_no_frequent_title
+                                },
+                            ),
+                        subtitle =
+                            stringResource(
+                                if (finderHeroSource == FinderHeroSource.NETEASE_DAILY) {
+                                    R.string.finder_no_daily_subtitle
+                                } else {
+                                    R.string.finder_no_frequent_subtitle
+                                },
+                            ),
                         modifier = Modifier.entranceGraphics(entrance),
                     )
                 }
@@ -400,26 +434,31 @@ fun FinderPage(playEntrance: Boolean = true) {
                 item(key = "frequent_hero", contentType = "hero") {
                     val entrance = rememberEntrance(order = 3, play = playEntrance)
                     FrequentHeroCard(
-                        songs = frequentCardSongs,
-                        renderCachedContentImmediately = homeViewModel.frequentSongsRestoredFromCache,
+                        title = heroTitle,
+                        songs = heroSongs,
                         onPlayAll = {
-                            frequentEntries.firstOrNull()?.let { first ->
+                            heroEntries.firstOrNull()?.let { first ->
                                 cloudCatalogViewModel.play(
                                     first.stableId,
-                                    frequentEntries.map(FrequentEntry::queueItem),
+                                    heroEntries.map(FrequentEntry::queueItem),
                                 )
                             }
                         },
                         onSongClick = { entry ->
                             cloudCatalogViewModel.play(
                                 entry.stableId,
-                                frequentEntries.map(FrequentEntry::queueItem),
+                                heroEntries.map(FrequentEntry::queueItem),
                             )
                         },
                         onSaveAsPlaylist = {
                             cloudCatalogViewModel.createLocalPlaylistFromQueue(
-                                name = frequentPlaylistName,
-                                items = frequentEntries.map(FrequentEntry::queueItem),
+                                name =
+                                    if (finderHeroSource == FinderHeroSource.NETEASE_DAILY) {
+                                        dailyPlaylistName
+                                    } else {
+                                        frequentPlaylistName
+                                    },
+                                items = heroEntries.map(FrequentEntry::queueItem),
                             )
                         },
                         modifier = Modifier.entranceGraphics(entrance),
@@ -486,8 +525,14 @@ fun FinderPage(playEntrance: Boolean = true) {
                     SectionHeader(
                         title = stringResource(R.string.finder_playlists_overview_title),
                         subtitle = stringResource(R.string.library_summary_playlists, totalPlaylistCount),
-                        actionLabel = stringResource(R.string.finder_more).takeIf { playlists.size >= 2 },
-                        onActionClick = { path.push(AllPlaylistsScene()) }.takeIf { playlists.size >= 2 },
+                        actionLabel =
+                            stringResource(R.string.finder_more).takeIf {
+                                overviewLocalPlaylistCount >= 2
+                            },
+                        onActionClick =
+                            { path.push(AllPlaylistsScene()) }.takeIf {
+                                overviewLocalPlaylistCount >= 2
+                            },
                         modifier =
                             Modifier
                                 .animateItem(
@@ -498,11 +543,11 @@ fun FinderPage(playEntrance: Boolean = true) {
                                 .entranceGraphics(entrance),
                     )
                 }
-                if (playlistsWithCover.isNotEmpty()) {
+                if (overviewPlaylistsWithCover.isNotEmpty()) {
                     item(key = "playlists_rail", contentType = "rail") {
                         val entrance = rememberEntrance(order = 6, play = playEntrance)
                         PlaylistRail(
-                            playlists = playlistsWithCover,
+                            playlists = overviewPlaylistsWithCover,
                             onPlaylistClick = { item -> path.push(PlaylistDetailScene(item.playlist)) },
                             modifier =
                                 Modifier
@@ -986,119 +1031,21 @@ private fun SearchCapsule(
     }
 }
 
-/** 本地音乐为空时的引导卡片：提示用户前往扫描页面导入歌曲 */
-@Composable
-private fun ScanGuideCard(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .padding(horizontal = LayoutTokens.MusicHeaderHorizontalPadding)
-                .clip(Shapes.ExtraLarge1CornerBasedShape)
-                .background(MaterialTheme.colorScheme.primaryContainer)
-                .clickHighlight(onClick = onClick)
-                .padding(Spacing.Large),
-        verticalArrangement = Arrangement.spacedBy(Spacing.Medium),
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Scanner,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-            Column {
-                Text(
-                    text = stringResource(R.string.finder_no_local_music_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-                Text(
-                    text = stringResource(R.string.finder_no_local_music_subtitle),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
-                )
-            }
-        }
-        Row(
-            modifier =
-                Modifier
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary)
-                    .clickHighlight(onClick = onClick)
-                    .padding(horizontal = Spacing.Large, vertical = Spacing.Small),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall),
-        ) {
-            Text(
-                text = stringResource(R.string.finder_go_to_scan),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onPrimary,
-            )
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = MaterialTheme.colorScheme.onPrimary,
-            )
-        }
-    }
-}
-
 /**
- * 常听榜单主卡：页面唯一的渐变强调卡。眉题 + 播放键 + 前三名榜单行 + 存为歌单药丸，
- * 整卡点按即播放全部，无死区
+ * 常听榜单主卡：默认展示前三首，点按卡片空白区域展开全部歌曲，再次点按收起。
+ * 播放键、歌曲行和存为歌单按钮保留各自独立动作。
  */
 @Composable
 private fun FrequentHeroCard(
+    title: String,
     songs: ImmutableList<FrequentEntry>,
-    renderCachedContentImmediately: Boolean,
     onPlayAll: () -> Unit,
     onSongClick: (FrequentEntry) -> Unit,
     onSaveAsPlaylist: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val previewSongs = songs.take(3)
-    val resolvedArtwork =
-        remember(previewSongs.map(FrequentEntry::stableId)) {
-            mutableStateMapOf<String, Boolean>()
-        }
-    val rowsReady =
-        renderCachedContentImmediately ||
-            previewSongs.all { song ->
-                resolvedArtwork[song.stableId] == true
-            }
-    val rowsReveal by animateFloatAsState(
-        targetValue = if (rowsReady) 1f else 0f,
-        animationSpec =
-            tween(
-                durationMillis = 180,
-                delayMillis = if (rowsReady) 70 else 0,
-            ),
-        label = "frequentRowsReveal",
-    )
-    val rowsLoadingReveal by animateFloatAsState(
-        targetValue = if (rowsReady) 0f else 1f,
-        animationSpec = tween(durationMillis = 90),
-        label = "frequentRowsLoadingReveal",
-    )
+    var isExpanded by rememberSaveable(title) { mutableStateOf(false) }
+    val visibleSongs = if (isExpanded) songs else songs.take(3)
 
     Column(
         modifier =
@@ -1106,13 +1053,14 @@ private fun FrequentHeroCard(
                 .fillMaxWidth()
                 .padding(horizontal = LayoutTokens.MusicHeaderHorizontalPadding)
                 .clip(Shapes.ExtraLarge1CornerBasedShape)
+                .animateContentSize()
                 .background(MaterialTheme.colorScheme.surfaceContainerLow)
                 .background(
                     Brush.verticalGradient(
                         0f to MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
                         1f to Color.Transparent,
                     ),
-                ).clickHighlight(onClick = onPlayAll)
+                ).clickHighlight(onClick = { isExpanded = !isExpanded })
                 .padding(Spacing.Large),
         verticalArrangement = Arrangement.spacedBy(Spacing.Medium),
     ) {
@@ -1122,7 +1070,7 @@ private fun FrequentHeroCard(
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
-                    text = stringResource(R.string.finder_frequent_title),
+                    text = title,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary,
@@ -1155,45 +1103,25 @@ private fun FrequentHeroCard(
                 )
             }
         }
-        Box {
-            Column(
-                modifier =
-                    Modifier.graphicsLayer {
-                        alpha = rowsReveal
+        Column {
+            visibleSongs.forEachIndexed { index, song ->
+                HeroSongRow(
+                    index = index,
+                    song = song,
+                    onClick = { onSongClick(song) },
+                    retainedPainter =
+                        remember(song.stableId) {
+                            ArtworkRenderCache.read(song.artworkUri?.toString())
+                        },
+                    onArtworkReady = {
+                        ArtworkRenderCache.write(
+                            key = song.artworkUri?.toString(),
+                            fallbackKey = song.fallbackArtworkUri?.toString(),
+                        )
                     },
-            ) {
-                previewSongs.forEachIndexed { index, song ->
-                    HeroSongRow(
-                        index = index,
-                        song = song,
-                        onClick = { onSongClick(song) },
-                        retainedPainter =
-                            if (renderCachedContentImmediately) {
-                                remember(song.stableId) {
-                                    ArtworkRenderCache.read(song.artworkUri?.toString())
-                                }
-                            } else {
-                                null
-                            },
-                        onArtworkReady = {
-                            ArtworkRenderCache.write(
-                                key = song.artworkUri?.toString(),
-                                fallbackKey = song.fallbackArtworkUri?.toString(),
-                            )
-                            resolvedArtwork[song.stableId] = true
-                        },
-                        onArtworkFailed = {
-                            resolvedArtwork[song.stableId] = true
-                        },
-                    )
-                }
+                    onArtworkFailed = {},
+                )
             }
-            FrequentHeroRowsPlaceholder(
-                modifier =
-                    Modifier.graphicsLayer {
-                        alpha = rowsLoadingReveal
-                    },
-            )
         }
         FinderActionPill(
             text = stringResource(R.string.finder_save_as_playlist),
@@ -1278,9 +1206,12 @@ private fun HeroSongRow(
 }
 
 @Composable
-private fun FrequentHeroRowsPlaceholder(modifier: Modifier = Modifier) {
+private fun FrequentHeroRowsPlaceholder(
+    rowCount: Int = 3,
+    modifier: Modifier = Modifier,
+) {
     Column(modifier = modifier) {
-        repeat(3) { index ->
+        repeat(rowCount) { index ->
             Row(
                 modifier =
                     Modifier
@@ -1507,6 +1438,36 @@ private fun PlaylistRail(
     }
 }
 
+/**
+ * Shows the last confirmed cover synchronously across process restarts, then refreshes the real
+ * image above it. A changed URL crossfades in and replaces the snapshot; an unchanged URL is not
+ * written again.
+ */
+@Composable
+private fun PersistentFinderArtwork(
+    cacheKey: String,
+    uri: Uri?,
+    modifier: Modifier = Modifier,
+    fallbackUri: Uri? = null,
+    placeHolder: @Composable () -> Unit = {},
+) {
+    val retainedPainter = remember(cacheKey) { ArtworkRenderCache.read(cacheKey) }
+    StableAudioCover(
+        uri = uri,
+        fallbackUri = fallbackUri,
+        retainedPainter = retainedPainter,
+        modifier = modifier,
+        placeHolder = placeHolder,
+        onPainterReady = {
+            ArtworkRenderCache.writeSnapshot(
+                cacheKey = cacheKey,
+                sourceKey = uri?.toString(),
+                fallbackSourceKey = fallbackUri?.toString(),
+            )
+        },
+    )
+}
+
 @Composable
 private fun CloudPlaylistRail(
     playlists: List<CloudCatalogPlaylist>,
@@ -1533,7 +1494,8 @@ private fun CloudPlaylistRail(
                         .clickHighlight(onClick = { onPlaylistClick(item) }),
                 verticalArrangement = Arrangement.spacedBy(Spacing.Small),
             ) {
-                AudioCover(
+                PersistentFinderArtwork(
+                    cacheKey = "finder_cloud_playlist:${item.stableId}",
                     uri = item.playlist.coverUrl?.let(Uri::parse),
                     modifier =
                         Modifier
@@ -1619,7 +1581,8 @@ private fun NeteaseSceneMusicRail(
                         .clickHighlight(onClick = { onSceneClick(scene) }),
                 verticalArrangement = Arrangement.spacedBy(Spacing.Small),
             ) {
-                AudioCover(
+                PersistentFinderArtwork(
+                    cacheKey = "finder_netease_scene:${scene.query}",
                     uri = scene.artworkUri,
                     modifier =
                         Modifier
@@ -1690,12 +1653,15 @@ private fun CloudUserPlaylistRail(
                         .clickHighlight(onClick = { onPlaylistClick(item) }),
                 verticalArrangement = Arrangement.spacedBy(Spacing.Small),
             ) {
-                AudioCover(
+                val artworkUri =
+                    item.songs
+                        .firstOrNull()
+                        ?.artworkUrl
+                        ?.let(Uri::parse)
+                PersistentFinderArtwork(
+                    cacheKey = "finder_user_cloud_playlist:${item.id}",
                     uri =
-                        item.songs
-                            .firstOrNull()
-                            ?.artworkUrl
-                            ?.let(Uri::parse),
+                    artworkUri,
                     modifier =
                         Modifier
                             .fillMaxWidth()
@@ -1738,6 +1704,33 @@ private fun FinderPlaylistCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val playlistCacheKey =
+        remember(item.playlist.playlistId, item.playlist.playlistName) {
+            "finder_local_playlist:${item.playlist.playlistId ?: item.playlist.playlistName}"
+        }
+    var retainedAlbumIds by remember(playlistCacheKey) {
+        mutableStateOf(PlaylistCoverSnapshotCache.read(playlistCacheKey))
+    }
+    val freshAlbumIds = item.coverAlbumIds.toList()
+    LaunchedEffect(freshAlbumIds, item.songCount, playlistCacheKey) {
+        when {
+            freshAlbumIds.isNotEmpty() -> {
+                if (freshAlbumIds != retainedAlbumIds) retainedAlbumIds = freshAlbumIds
+                PlaylistCoverSnapshotCache.write(playlistCacheKey, freshAlbumIds)
+            }
+
+            item.songCount == 0 -> {
+                retainedAlbumIds = emptyList()
+                PlaylistCoverSnapshotCache.clear(playlistCacheKey)
+            }
+        }
+    }
+    val displayedAlbumIds =
+        when {
+            freshAlbumIds.isNotEmpty() -> freshAlbumIds
+            item.songCount > 0 -> retainedAlbumIds
+            else -> emptyList()
+        }
     Column(
         modifier =
             modifier
@@ -1746,15 +1739,22 @@ private fun FinderPlaylistCard(
                 .clickHighlight(onClick = onClick),
         verticalArrangement = Arrangement.spacedBy(Spacing.Small),
     ) {
-        PlaylistCoverView(
-            albumIds = item.coverAlbumIds,
+        Crossfade(
+            targetState = displayedAlbumIds,
+            animationSpec = tween(durationMillis = 180),
+            label = "playlistCoverSnapshot",
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
                     .clip(Shapes.ExtraLargeCornerBasedShape)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-        )
+        ) { albumIds ->
+            PlaylistCoverView(
+                albumIds = albumIds,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
         Column(
             modifier = Modifier.padding(bottom = Spacing.Small),
             verticalArrangement = Arrangement.spacedBy(2.dp),

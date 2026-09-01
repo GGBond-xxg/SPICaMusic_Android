@@ -19,12 +19,14 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import me.spica27.spicamusic.R
+import me.spica27.spicamusic.common.entity.FinderHeroSource
 import me.spica27.spicamusic.common.entity.Playlist
 import me.spica27.spicamusic.common.entity.Song
 import me.spica27.spicamusic.common.entity.SongFilter
 import me.spica27.spicamusic.common.entity.SongSortOrder
 import me.spica27.spicamusic.feature.library.domain.PlaylistUseCases
 import me.spica27.spicamusic.feature.library.domain.SongUseCases
+import me.spica27.spicamusic.feature.settings.domain.SettingsUseCases
 import me.spica27.spicamusic.ui.model.PlaylistWithCover
 import timber.log.Timber
 
@@ -38,6 +40,7 @@ class HomeViewModel(
     private val app: Application,
     private val songRepository: SongUseCases,
     private val playlistRepository: PlaylistUseCases,
+    settingsUseCases: SettingsUseCases,
 ) : ViewModel() {
     private val finderRenderCache = FinderRenderCache(app)
     private val cachedFrequentSongs = finderRenderCache.getFrequentSongs()
@@ -54,9 +57,23 @@ class HomeViewModel(
     private val _currentPage = MutableStateFlow(HomePage.Finder)
     val currentPage: StateFlow<HomePage> = _currentPage
 
+    val finderHeroSource =
+        settingsUseCases
+            .getString(
+                SettingsUseCases.Keys.FINDER_HERO_SOURCE,
+                FinderHeroSource.RECENT_FREQUENT.value,
+            ).stateIn(
+                viewModelScope,
+                SharingStarted.Eagerly,
+                FinderHeroSource.RECENT_FREQUENT.value,
+            )
+
     // 播放器展开进度 0f = 最小化, 1f = 全屏
     private val _playerExpandProgress = MutableStateFlow(0f)
     val playerExpandProgress: StateFlow<Float> = _playerExpandProgress
+
+    private val _playerExpandRequested = MutableStateFlow(false)
+    val playerExpandRequested: StateFlow<Boolean> = _playerExpandRequested.asStateFlow()
 
     private val _showCreateMenu = MutableStateFlow(false)
 
@@ -246,6 +263,11 @@ class HomeViewModel(
      */
     fun expandPlayer() {
         _playerExpandProgress.value = 1f
+        _playerExpandRequested.value = true
+    }
+
+    fun consumePlayerExpandRequest() {
+        _playerExpandRequested.value = false
     }
 
     /**

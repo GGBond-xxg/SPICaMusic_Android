@@ -60,6 +60,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -574,6 +575,8 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
         }
     }
     val isPlaying by playerViewModel.isPlaying.collectAsStateWithLifecycle()
+    val playerExpandRequested by homeViewModel.playerExpandRequested.collectAsStateWithLifecycle()
+    val latestIsPlaying by rememberUpdatedState(isPlaying)
     val playerContentReady = displayedMediaItem != null || playerInitialized
 
     // 记录跳转到播放器的初始页（默认主页 or 播放列表页）
@@ -587,6 +590,20 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
             lockToTransitionShape = sheetState.artworkShapeLocked,
         )
     val artworkMorphState = rememberPlayerArtworkMorphState()
+    LaunchedEffect(playerExpandRequested, displayedMediaItem, sheetState) {
+        // A cloud queue publishes its first MediaItem asynchronously. Keep the request pending
+        // until the player has real metadata; consuming it earlier pops the playlist but leaves
+        // the user on Home instead of opening the full-screen player.
+        if (playerExpandRequested && displayedMediaItem != null) {
+            initialPage = DEFAULT_PAGE
+            // Playlist/detail screens leave the compact one-line bar active. Its branch does not
+            // compose full-screen player content, so switch layouts before starting the sheet.
+            bottomBarScrollConnection.expand()
+            artworkMorphState.freezeSourceBounds()
+            sheetState.expand(latestIsPlaying)
+            homeViewModel.consumePlayerExpandRequest()
+        }
+    }
     LaunchedEffect(sheetState, isPlaying) {
         snapshotFlow {
             sheetState.progress >= 0.999f && !sheetState.isMorphInFlight

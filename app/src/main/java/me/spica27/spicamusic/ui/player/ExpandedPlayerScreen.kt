@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
@@ -57,6 +56,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
@@ -93,6 +93,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import com.linc.amplituda.Amplituda
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.spica27.navkit.geometry.GeometryTransition
@@ -281,10 +282,16 @@ fun ExpandedPlayerScreen(
         }
 
     LaunchedEffect(initialPage, isActive) {
-        if (isActive && pagerState.currentPage != initialPage) {
+        if (!isActive) {
+            // The expanded player stays composed while collapsed. Reset its retained pager only
+            // after the sheet is fully hidden so the next expansion cannot briefly reveal the
+            // previously opened queue page before jumping back to Now Playing.
+            snapshotFlow { progressProvider() }.first { it <= 0.001f }
+        }
+        if (pagerState.currentPage != initialPage) {
             pagerState.scrollToPage(initialPage)
         }
-        if (isActive && initialPage == DEFAULT_PAGE && lyricsPagerState.currentPage != 0) {
+        if (initialPage == DEFAULT_PAGE && lyricsPagerState.currentPage != 0) {
             lyricsPagerState.scrollToPage(0)
         }
     }
@@ -337,7 +344,7 @@ fun ExpandedPlayerScreen(
             targetValue = preparedCoverColor,
             animationSpec =
                 tween(
-                    durationMillis = 420,
+                    durationMillis = 720,
                     easing = EaseOutCubic,
                 ),
             label = "PreparedPlayerBackdropColor",
@@ -565,6 +572,7 @@ fun ExpandedPlayerScreen(
                                 },
                     ) {
                         PlayerPlaybackBottomSection(
+                            progressKey = mediaId,
                             progress =
                                 if (duration > 0L) {
                                     (seekValueState.floatValue / duration).coerceIn(0f, 1f)
@@ -588,6 +596,8 @@ fun ExpandedPlayerScreen(
                                 viewModel.seekTo(seekValueState.floatValue.toLong())
                                 isSeekingState = false
                             },
+                            onAudioQualityClick = { showAudioQualitySheet = true },
+                            audioQualityActionEnabled = lyricsTransitionProgressProvider() < 0.5f,
                             onPlayPauseClick = viewModel::togglePlayPause,
                             onPreviousClick = viewModel::skipToPrevious,
                             onNextClick = viewModel::skipToNext,
@@ -607,6 +617,15 @@ fun ExpandedPlayerScreen(
                                         }
                                     },
                             controlsModifier =
+                                Modifier.graphicsLayer {
+                                    val progress = lyricsTransitionProgressProvider()
+                                    val exit = smoothStepProgress(progress)
+                                    alpha = 1f - exit
+                                    translationY = exit * SHARED_CONTROLS_EXIT_DP.dp.toPx()
+                                    scaleX = 1f - exit * 0.035f
+                                    scaleY = 1f - exit * 0.035f
+                                },
+                            audioQualityActionModifier =
                                 Modifier.graphicsLayer {
                                     val progress = lyricsTransitionProgressProvider()
                                     val exit = smoothStepProgress(progress)
@@ -818,7 +837,7 @@ private fun TopBar(
     }
 }
 
-/** 播放列表胶囊随横向 Pager 连续收束为歌词编辑圆形按钮。 */
+/** 与左上角返回键对称的圆形播放列表 / 歌词编辑按钮。 */
 @Composable
 private fun MorphingPlayerTopAction(
     transitionProgressProvider: () -> Float,
@@ -827,12 +846,10 @@ private fun MorphingPlayerTopAction(
     modifier: Modifier = Modifier,
 ) {
     val progress = smoothStepProgress(transitionProgressProvider().coerceIn(0f, 1f))
-    val width = floatLerp(104f, 42f, progress).dp
     Box(
         modifier =
             modifier
-                .width(width)
-                .height(42.dp)
+                .size(42.dp)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .clickable {
@@ -840,29 +857,17 @@ private fun MorphingPlayerTopAction(
                 },
         contentAlignment = Alignment.Center,
     ) {
-        Row(
+        Icon(
+            imageVector = Icons.AutoMirrored.Default.PlaylistPlay,
+            contentDescription = stringResource(R.string.queue),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier =
-                Modifier.graphicsLayer {
-                    alpha = (1f - progress * 1.8f).coerceIn(0f, 1f)
-                    translationX = -progress * 10.dp.toPx()
-                },
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Default.PlaylistPlay,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(26.dp),
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = stringResource(R.string.queue),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
-        }
+                Modifier
+                    .size(28.dp)
+                    .graphicsLayer {
+                        alpha = (1f - progress * 1.8f).coerceIn(0f, 1f)
+                    },
+        )
         Icon(
             imageVector = Icons.Rounded.EditNote,
             contentDescription = stringResource(R.string.lyrics_editor),
@@ -1179,34 +1184,44 @@ private fun PlayerPage(
             progressBarStyle,
             enableHeavyEffects,
         ) {
-            if (!enableHeavyEffects || progressBarStyle != ProgressBarStyle.TimeDomainWaveform) {
+            if (progressBarStyle != ProgressBarStyle.TimeDomainWaveform) {
                 ampState = emptyList()
                 return@LaunchedEffect
             }
             val mediaId = currentMediaItem.invoke()?.mediaId ?: return@LaunchedEffect
+            val immediateWaveform = createImmediateWaveform(mediaId)
+            // Cloud tracks may take seconds to download before their real waveform can be
+            // extracted. Render a deterministic, non-flat preview immediately; replace it with
+            // real samples as soon as extraction finishes.
+            ampState = immediateWaveform
 
             // 检查缓存
             if (amplitudeCache.containsKey(mediaId)) {
-                ampState = amplitudeCache[mediaId] ?: emptyList()
+                ampState = amplitudeCache[mediaId].orEmpty().ifEmpty { immediateWaveform }
                 return@LaunchedEffect
             }
-            launch(Dispatchers.IO) {
-                val data = loadAmplitudeData(currentMediaItem.invoke(), amplituda, songUseCases)
-
-                // 保存到缓存，最多保留3首歌曲的数据
-                if (amplitudeCache.size >= 3) {
-                    // 移除最旧的项
-                    amplitudeCache.remove(amplitudeCache.keys.first())
+            // Keep network/file decoding paused while the player is collapsed. The immediate
+            // waveform above remains prepared so the next expansion has no flat placeholder.
+            if (!enableHeavyEffects) return@LaunchedEffect
+            val data =
+                withContext(Dispatchers.IO) {
+                    loadAmplitudeData(currentMediaItem.invoke(), amplituda, songUseCases)
                 }
-                amplitudeCache[mediaId] = data
-                ampState = data
+
+            // 保存到缓存，最多保留3首歌曲的数据
+            if (amplitudeCache.size >= 3) {
+                // 移除最旧的项
+                amplitudeCache.remove(amplitudeCache.keys.first())
             }
+            amplitudeCache[mediaId] = data
+            ampState = data.ifEmpty { immediateWaveform }
         }
         LaunchedEffect(progressBarStyle, ampState) {
             onPlaybackVisualsChanged(progressBarStyle, ampState)
         }
         Spacer(modifier = Modifier.height(Spacing.Small))
-        // 音质标签：固定高度槽位保持版面节奏，无标签时留白而不是显示空药丸
+        // 歌曲质量标签：固定高度槽位保持版面节奏。音质与音效入口已移到时间中间，
+        // 避免把操作名称、采样率、码率和来源全部挤在同一个胶囊里。
         val qualityTags =
             buildList {
                 if (audioQualityInfo.sampleRate > 0) {
@@ -1238,41 +1253,32 @@ private fun PlayerPage(
                     },
             contentAlignment = Alignment.Center,
         ) {
-            Row(
-                modifier =
-                    Modifier
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.tertiaryContainer)
-                        .clickHighlight(onClick = onAudioQualityClick)
-                        .padding(horizontal = Spacing.Medium, vertical = 5.dp)
-                        .animateContentSize(),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.GraphicEq,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                    modifier = Modifier.size(16.dp),
-                )
-                Text(
-                    text = stringResource(R.string.player_audio_quality_and_effects),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
-                )
-                qualityTags.forEach { tag ->
-                    Text(
-                        text = "·",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.55f),
-                    )
-                    Text(
-                        text = tag,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer,
-                    )
+            if (qualityTags.isNotEmpty()) {
+                Row(
+                    modifier =
+                        Modifier
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.tertiaryContainer)
+                            .padding(horizontal = Spacing.Medium, vertical = 5.dp)
+                            .animateContentSize(),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    qualityTags.forEachIndexed { index, tag ->
+                        if (index > 0) {
+                            Text(
+                                text = "·",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.55f),
+                            )
+                        }
+                        Text(
+                            text = tag,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        )
+                    }
                 }
             }
         }
@@ -1293,8 +1299,12 @@ private fun PlayerAudioQualitySheet(
     val qqQuality by settingsViewModel.qqAudioQuality.collectAsStateWithLifecycle()
     val progressStyle by settingsViewModel.progressBarStyle.collectAsStateWithLifecycle()
     val provider = audioQualityInfo.cloudProvider?.uppercase(Locale.ROOT)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        sheetState = sheetState,
+        onDismissRequest = onDismiss,
+    ) {
         LazyColumn(
             modifier = Modifier.fillMaxWidth().height(620.dp),
         ) {
@@ -1305,9 +1315,8 @@ private fun PlayerAudioQualitySheet(
                             .fillMaxWidth()
                             .padding(horizontal = Spacing.Large, vertical = Spacing.Medium),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column {
                         Text(
                             text = stringResource(R.string.player_current_audio_quality),
                             style = MaterialTheme.typography.headlineSmall,
@@ -1324,25 +1333,67 @@ private fun PlayerAudioQualitySheet(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Text(
-                        text = stringResource(R.string.player_quality_more_adjustments),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
                 }
             }
 
             when (provider) {
                 "NETEASE" -> {
-                    NeteaseAudioQuality.entries.forEach { quality ->
+                    item(key = "netease_featured_qualities") {
+                        Row(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = Spacing.Large),
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
+                        ) {
+                            listOf(NeteaseAudioQuality.SKY, NeteaseAudioQuality.MASTER).forEach { quality ->
+                                FeaturedQualityCard(
+                                    title = quality.neteaseTitle(),
+                                    englishTitle = quality.referenceEnglishTitle(),
+                                    subtitle = quality.neteaseDescription(),
+                                    icon = quality.playerIcon(),
+                                    selected = neteaseQuality == quality.value,
+                                    membershipLabel = "SVIP",
+                                    onClick = {
+                                        playerViewModel.applyCloudQuality(
+                                            RemoteMusicProvider.NETEASE,
+                                            quality.value,
+                                        )
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
+                    }
+                    listOf(
+                        NeteaseAudioQuality.JY_EFFECT,
+                        NeteaseAudioQuality.HIRES,
+                        NeteaseAudioQuality.LOSSLESS,
+                        NeteaseAudioQuality.EXHIGH,
+                        NeteaseAudioQuality.STANDARD,
+                        NeteaseAudioQuality.AUTO,
+                    ).forEach { quality ->
                         item(key = "netease_${quality.value}") {
-                            QualityChoiceRow(
+                            ReferenceQualityRow(
                                 title = quality.neteaseTitle(),
+                                englishTitle = quality.referenceEnglishTitle(),
                                 subtitle = quality.neteaseDescription(),
                                 icon = quality.playerIcon(),
                                 selected = neteaseQuality == quality.value,
+                                membershipLabel =
+                                    when (quality) {
+                                        NeteaseAudioQuality.JY_EFFECT -> "SVIP"
+                                        NeteaseAudioQuality.HIRES,
+                                        NeteaseAudioQuality.LOSSLESS,
+                                        NeteaseAudioQuality.EXHIGH,
+                                        -> "VIP"
+                                        else -> null
+                                    },
                                 onClick = {
-                                    playerViewModel.applyCloudQuality(RemoteMusicProvider.NETEASE, quality.value)
+                                    playerViewModel.applyCloudQuality(
+                                        RemoteMusicProvider.NETEASE,
+                                        quality.value,
+                                    )
                                 },
                             )
                         }
@@ -1352,13 +1403,18 @@ private fun PlayerAudioQualitySheet(
                 "QQ_MUSIC" -> {
                     QqAudioQuality.entries.forEach { quality ->
                         item(key = "qq_${quality.value}") {
-                            QualityChoiceRow(
+                            ReferenceQualityRow(
                                 title = quality.qqTitle(),
+                                englishTitle = quality.value.uppercase(Locale.ROOT),
                                 subtitle = quality.qqDescription(),
                                 icon = quality.playerIcon(),
                                 selected = qqQuality == quality.value,
+                                membershipLabel = null,
                                 onClick = {
-                                    playerViewModel.applyCloudQuality(RemoteMusicProvider.QQ_MUSIC, quality.value)
+                                    playerViewModel.applyCloudQuality(
+                                        RemoteMusicProvider.QQ_MUSIC,
+                                        quality.value,
+                                    )
                                 },
                             )
                         }
@@ -1367,11 +1423,13 @@ private fun PlayerAudioQualitySheet(
 
                 else -> {
                     item(key = "local_quality") {
-                        QualityChoiceRow(
+                        ReferenceQualityRow(
                             title = stringResource(R.string.player_local_original_quality),
+                            englishTitle = "Original",
                             subtitle = localQualityDescription(audioQualityInfo),
                             icon = Icons.Default.MusicNote,
                             selected = true,
+                            membershipLabel = null,
                             onClick = {},
                         )
                     }
@@ -1389,8 +1447,9 @@ private fun PlayerAudioQualitySheet(
             }
             ProgressBarStyle.presets.forEach { style ->
                 item(key = "progress_${style.value}") {
-                    QualityChoiceRow(
+                    ReferenceQualityRow(
                         title = style.playerTitle(),
+                        englishTitle = "",
                         subtitle = stringResource(R.string.player_progress_style_desc),
                         icon =
                             when (style) {
@@ -1399,6 +1458,7 @@ private fun PlayerAudioQualitySheet(
                                 ProgressBarStyle.TimeDomainWaveform -> Icons.Default.SurroundSound
                             },
                         selected = progressStyle == style.value,
+                        membershipLabel = null,
                         onClick = { settingsViewModel.setProgressBarStyle(style.value) },
                     )
                 }
@@ -1409,12 +1469,15 @@ private fun PlayerAudioQualitySheet(
 }
 
 @Composable
-private fun QualityChoiceRow(
+private fun FeaturedQualityCard(
     title: String,
+    englishTitle: String,
     subtitle: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     selected: Boolean,
+    membershipLabel: String?,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Surface(
         onClick = onClick,
@@ -1422,43 +1485,156 @@ private fun QualityChoiceRow(
             if (selected) {
                 MaterialTheme.colorScheme.tertiaryContainer
             } else {
-                MaterialTheme.colorScheme.surfaceContainerLow
+                MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.48f)
             },
         shape = Shapes.LargeCornerBasedShape,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Spacing.Large, vertical = 5.dp),
+        modifier = modifier.height(174.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(Spacing.Medium),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                }
+                membershipLabel?.let { PremiumBadge(it) }
+            }
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                englishTitle,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (selected) {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                    SelectedQualityMark()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReferenceQualityRow(
+    title: String,
+    englishTitle: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    selected: Boolean,
+    membershipLabel: String?,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        color = Color.Transparent,
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier.padding(Spacing.Medium),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.Large, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
         ) {
             Box(
                 modifier =
                     Modifier
-                        .size(44.dp)
+                        .size(46.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                        .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text =
+                            buildString {
+                                append(title)
+                                if (englishTitle.isNotBlank()) append("  $englishTitle")
+                            },
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    membershipLabel?.let { PremiumBadge(it) }
+                }
                 Text(
-                    subtitle,
+                    text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            if (selected) {
-                Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            }
+            if (selected) SelectedQualityMark()
         }
+    }
+}
+
+@Composable
+private fun PremiumBadge(label: String) {
+    Surface(
+        color = MaterialTheme.colorScheme.inverseSurface,
+        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+        shape = CircleShape,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+        )
+    }
+}
+
+@Composable
+private fun SelectedQualityMark() {
+    Box(
+        modifier =
+            Modifier
+                .size(30.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Default.Check,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 
@@ -1502,6 +1678,18 @@ private fun NeteaseAudioQuality.playerIcon() =
         NeteaseAudioQuality.JY_EFFECT -> Icons.Default.GraphicEq
         NeteaseAudioQuality.SKY -> Icons.Default.Waves
         NeteaseAudioQuality.MASTER -> Icons.Default.HighQuality
+    }
+
+private fun NeteaseAudioQuality.referenceEnglishTitle(): String =
+    when (this) {
+        NeteaseAudioQuality.AUTO -> "Auto"
+        NeteaseAudioQuality.STANDARD -> ""
+        NeteaseAudioQuality.EXHIGH -> "HQ"
+        NeteaseAudioQuality.LOSSLESS -> "SQ"
+        NeteaseAudioQuality.HIRES -> "Spatial Audio"
+        NeteaseAudioQuality.JY_EFFECT -> "Audio Vivid"
+        NeteaseAudioQuality.SKY -> "Surround Audio"
+        NeteaseAudioQuality.MASTER -> "Master"
     }
 
 @Composable
@@ -1646,8 +1834,9 @@ private fun SeekBarSection(
                     onProgressChangeFinished = {
                         onValueChangeFinished.invoke()
                     },
-                    waveformBrush = SolidColor(MaterialTheme.colorScheme.surfaceContainerHighest),
-                    progressBrush = SolidColor(MaterialTheme.colorScheme.onSurface),
+                    waveformBrush =
+                        SolidColor(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f)),
+                    progressBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     modifier =
                         Modifier
                             .fillMaxWidth()
@@ -1665,8 +1854,9 @@ private fun SeekBarSection(
                     onProgressChangeFinished = {
                         onValueChangeFinished.invoke()
                     },
-                    waveformBrush = SolidColor(MaterialTheme.colorScheme.surfaceContainerHighest),
-                    progressBrush = SolidColor(MaterialTheme.colorScheme.onSurface),
+                    waveformBrush =
+                        SolidColor(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f)),
+                    progressBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     modifier =
                         Modifier
                             .fillMaxWidth()
@@ -1840,6 +2030,19 @@ private fun smoothStepProgress(progress: Float): Float {
 /**
  * 加载音频波形数据
  */
+private fun createImmediateWaveform(
+    mediaId: String,
+    sampleCount: Int = 160,
+): List<Int> {
+    var state = mediaId.hashCode().toUInt().takeIf { it != 0u } ?: 0x6D2B79F5u
+    return List(sampleCount) { index ->
+        state = state * 1664525u + 1013904223u
+        val noise = (state shr 24).toInt()
+        val rhythmicLift = ((index % 24) - 12).let { distance -> 12 - kotlin.math.abs(distance) }
+        18 + (noise * 58 / 255) + rhythmicLift * 2
+    }
+}
+
 private suspend fun loadAmplitudeData(
     mediaItem: MediaItem?,
     amplituda: Amplituda,

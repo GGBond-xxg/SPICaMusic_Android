@@ -157,6 +157,7 @@ import me.spica27.spicamusic.common.entity.getAlbumCoverUri
 import me.spica27.spicamusic.common.entity.getCoverUri
 import me.spica27.spicamusic.ui.dialog.CloudSongMenuScene
 import me.spica27.spicamusic.ui.dialog.SongMenuScene
+import me.spica27.spicamusic.ui.home.HomeViewModel
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
@@ -190,6 +191,12 @@ private val COLLAPSED_TITLE_START = COVER_COLLAPSED_START + COVER_COLLAPSED + Sp
 private val BOTTOM_PLAYER_RESERVED = 200.dp // 悬浮迷你播放器底部预留（全项目惯例值）
 private val MULTI_SELECT_BAR_RESERVED = 120.dp // 两行多选底栏出现时的额外避让
 
+private fun CatalogQueueItem.expectedMediaId(): String =
+    when (this) {
+        is CatalogQueueItem.Local -> song.mediaStoreId.toString()
+        is CatalogQueueItem.Cloud -> stableId
+    }
+
 /** 固定顶栏的三种形态：浏览 / 搜索 / 排序 */
 private enum class TopBarState { Browse, Search, Sort }
 
@@ -220,6 +227,7 @@ fun PlaylistDetailScreen(playlist: Playlist) {
             key = "PlaylistDetailViewModel_${playlist.playlistId}",
         ) { parametersOf(playlistId) }
     val cloudCatalogViewModel: CloudMusicCatalogViewModel = koinActivityViewModel()
+    val homeViewModel: HomeViewModel = koinActivityViewModel()
 
     // ── State collection ───────────────────────────────────────────────────
     val currentPlaylist by viewModel.playlist.collectAsStateWithLifecycle()
@@ -250,6 +258,19 @@ fun PlaylistDetailScreen(playlist: Playlist) {
     val playerViewModel = LocalPlayerViewModel.current
     val currentMediaItem by playerViewModel.currentMediaItem.collectAsStateWithLifecycle()
     val playingMediaId = currentMediaItem?.mediaId
+    var pendingPlayerMediaId by remember { mutableStateOf<String?>(null) }
+
+    // 播放指令由 Media3 异步提交。只有目标 MediaItem 真正成为当前歌曲后才展开，
+    // 避免详情页退出时先露出上一首的播放器，再跳成刚点击的歌曲。
+    LaunchedEffect(pendingPlayerMediaId) {
+        val expectedMediaId = pendingPlayerMediaId ?: return@LaunchedEffect
+        playerViewModel.currentMediaItem.first { it?.mediaId == expectedMediaId }
+        if (pendingPlayerMediaId == expectedMediaId) {
+            pendingPlayerMediaId = null
+            homeViewModel.expandPlayer()
+            path.popTop()
+        }
+    }
 
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
@@ -281,17 +302,29 @@ fun PlaylistDetailScreen(playlist: Playlist) {
     }
 
     val searchFocusRequester = remember { FocusRequester() }
+    var searchFocusRequestedByUser by remember(playlistId) { mutableStateOf(false) }
 
-    // 键盘与覆盖层过渡确定性错峰：面板完全展开后再唤起键盘
-    LaunchedEffect(isSearchMode) {
-        if (isSearchMode) {
-            snapshotFlow { searchTransition.isIdle && searchTransition.currentState }.first { it }
+    // PlaylistDetailViewModel 由 Activity 保存；再次进入同一歌单时可能仍保留上次的搜索态。
+    // 页面入口强制恢复浏览态，但绝不主动请求焦点或弹出输入法。
+    LaunchedEffect(playlistId) {
+        searchFocusRequestedByUser = false
+        viewModel.exitSearchMode()
+        viewModel.clearSearchKeyword()
+    }
+
+    // 只有用户主动点搜索按钮才请求焦点；恢复旧页面状态不会自动弹键盘。
+    LaunchedEffect(isSearchMode, searchFocusRequestedByUser) {
+        if (isSearchMode && searchFocusRequestedByUser) {
+            // AnimatedContent 与搜索覆盖层分别挂载，等顶栏输入框完成一次过渡后再请求焦点。
+            delay(260)
             searchFocusRequester.requestFocus()
+            delay(40)
             keyboardController?.show()
         }
     }
 
     val exitSearch = {
+        searchFocusRequestedByUser = false
         keyboardController?.hide()
         focusManager.clearFocus()
         viewModel.exitSearchMode()
@@ -418,9 +451,12 @@ fun PlaylistDetailScreen(playlist: Playlist) {
                     playEnabled = !isPlaylistEmpty,
                     onPlayAll = {
                         if (cloudSongs.isEmpty()) {
+                            pendingPlayerMediaId =
+                                allPlaylistSongs.firstOrNull()?.mediaStoreId?.toString()
                             viewModel.playAll()
                         } else {
                             combinedQueue.firstOrNull()?.let { first ->
+                                pendingPlayerMediaId = first.expectedMediaId()
                                 cloudCatalogViewModel.play(first.stableId, combinedQueue)
                             }
                         }
@@ -495,6 +531,7 @@ fun PlaylistDetailScreen(playlist: Playlist) {
                                 if (isMultiSelectMode) {
                                     viewModel.toggleSongSelection(song.mediaStoreId)
                                 } else {
+                                    pendingPlayerMediaId = song.mediaStoreId.toString()
                                     if (cloudSongs.isEmpty()) {
                                         viewModel.playSongInList(song)
                                     } else {
@@ -540,6 +577,7 @@ fun PlaylistDetailScreen(playlist: Playlist) {
                                 if (isMultiSelectMode) {
                                     viewModel.toggleCloudSongSelection(song.stableId)
                                 } else {
+                                    pendingPlayerMediaId = song.stableId
                                     cloudCatalogViewModel.play(song.stableId, combinedQueue)
                                 }
                             },
@@ -573,7 +611,10 @@ fun PlaylistDetailScreen(playlist: Playlist) {
                 viewModel = viewModel,
                 topPadding = statusBarTop + HEADER_HEIGHT,
                 playingMediaId = playingMediaId,
-                onPlay = viewModel::playSongInList,
+                onPlay = { song ->
+                    pendingPlayerMediaId = song.mediaStoreId.toString()
+                    viewModel.playSongInList(song)
+                },
                 onMore = { song -> path.push(SongMenuScene(song)) },
             )
         }
@@ -674,6 +715,10 @@ fun PlaylistDetailScreen(playlist: Playlist) {
                             isPlaylistEmpty = isPlaylistEmpty,
                             showMoreOptionsMenu = showMoreOptionsMenu,
                             onBack = { path.popTop() },
+                            onSearchClick = {
+                                searchFocusRequestedByUser = true
+                                viewModel.enterSearchMode()
+                            },
                             viewModel = viewModel,
                         )
 
@@ -784,6 +829,7 @@ private fun BrowseTopBar(
     isPlaylistEmpty: Boolean,
     showMoreOptionsMenu: Boolean,
     onBack: () -> Unit,
+    onSearchClick: () -> Unit,
     viewModel: PlaylistDetailViewModel,
 ) {
     Row(
@@ -823,7 +869,7 @@ private fun BrowseTopBar(
             label = "searchAction",
         ) { show ->
             if (show) {
-                IconButton(onClick = viewModel::enterSearchMode) {
+                IconButton(onClick = onSearchClick) {
                     Icon(
                         Icons.Default.Search,
                         contentDescription = stringResource(R.string.search),
@@ -1484,40 +1530,27 @@ private fun PlaylistSongRow(
 /** 歌曲封面（48dp，失败时渲染专辑占位） */
 @Composable
 private fun SongCoverImage(song: Song) {
-    LandscapistImage(
-        imageModel = { song.getCoverUri() },
+    AudioCover(
+        uri = song.getCoverUri(),
+        fallbackUri = song.getAlbumCoverUri(),
         modifier =
             Modifier
                 .size(48.dp)
                 .clip(Shapes.SmallCornerBasedShape),
-        success = { _, painter ->
-            Image(
-                painter = painter,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        },
-        failure = {
-            CoverFallback(
-                fallbackUri = song.getAlbumCoverUri(),
-                modifier = Modifier.fillMaxSize(),
-                placeHolder = {
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            Icons.Default.Album,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(24.dp),
-                        )
-                    }
-                },
-            )
+        placeHolder = {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Default.Album,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
         },
     )
 }

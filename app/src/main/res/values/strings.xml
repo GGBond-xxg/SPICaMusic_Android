@@ -1,4 +1,5 @@
 <resources>
+  <string name="press_back_again_to_exit">Press Back again to exit</string>
   <string name="app_name">SPICaMusic</string>
   <string name="spica_app_label">SPICaMusic</string>
   <string name="action_settings">Settings</string>
@@ -395,6 +396,9 @@
   <string name="dynamic_cover_audio_city">Audio City</string>
   <string name="dynamic_cover_off">Off</string>
   <string name="settings_progress_bar_style">Progress Bar Style</string>
+  <string name="settings_finder_source_title">Discover recommendation</string>
+  <string name="settings_finder_source_frequent">Recently played often</string>
+  <string name="settings_finder_source_daily">NetEase daily recommendations</string>
   <string name="progress_bar_style_dynamic_waveform">Dynamic Waveform</string>
   <string name="progress_bar_style_time_domain_waveform">Time-domain Waveform</string>
   <string name="progress_bar_style_expressive_wavy">Flowing Wave</string>
@@ -503,9 +507,6 @@
   <string name="finder_summary_format">%1$d frequent · %2$d favorites · %3$d playlists</string>
   <string name="finder_search_title">Search Music</string>
   <string name="finder_search_subtitle">Quick search by song, artist, or album</string>
-  <string name="finder_no_local_music_title">No local music yet</string>
-  <string name="finder_no_local_music_subtitle">Scan your device for songs to start your music journey</string>
-  <string name="finder_go_to_scan">Go to Scan</string>
   <string name="finder_library_title">My Library</string>
   <string name="finder_library_subtitle">Manage playlists, scan music, and organize sources</string>
   <string name="finder_all_music_title">All Music</string>
@@ -514,6 +515,10 @@
   <string name="finder_settings_subtitle">Theme, background, and playback preferences</string>
   <string name="finder_frequent_title">Most Played</string>
   <string name="finder_frequent_playlist_name">Most Played Songs</string>
+  <string name="finder_daily_title">Daily Recommendations</string>
+  <string name="finder_daily_playlist_name">Daily Recommendations</string>
+  <string name="finder_no_daily_title">Daily recommendations are unavailable</string>
+  <string name="finder_no_daily_subtitle">Sign in to NetEase Cloud Music, then pull to refresh and try again.</string>
   <string name="finder_no_frequent_title">No frequently played songs</string>
   <string name="finder_no_frequent_subtitle">Start playing music and your most-played songs will appear here.</string>
   <string name="finder_no_favorites_title">No favorite songs</string>
@@ -630,6 +635,10 @@
   <string name="search_your_music_title">Search local and cloud music</string>
   <string name="search_your_music_subtitle">Search your library plus uncollected songs from NetEase Cloud Music and QQ Music</string>
   <string name="search_source_netease">NetEase Cloud Music</string>
+  <string name="search_filter_all_music">All music</string>
+  <string name="search_filter_local_music">Local music</string>
+  <string name="search_recent_history">Recent searches</string>
+  <string name="search_clear_history">Clear</string>
   <string name="search_source_qq_music">QQ Music</string>
   <string name="search_source_local_library">Library and collected songs</string>
   <string name="search_remote_source_failed">Some cloud sources could not be searched. Check the network or sign in again.</string>
@@ -889,7 +898,6 @@
   <string name="player_current_audio_quality">Current audio quality</string>
   <string name="player_quality_netease_desc">NetEase online audio and device effects</string>
   <string name="player_quality_qq_desc">QQ Music online audio and device effects</string>
-  <string name="player_quality_more_adjustments">More controls</string>
   <string name="player_local_original_quality">Original local quality</string>
   <string name="player_local_quality_unknown">Follows the source file</string>
   <string name="player_progress_style_desc">Switches the player progress appearance</string>

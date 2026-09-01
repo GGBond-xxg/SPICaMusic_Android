@@ -100,6 +100,7 @@ import me.spica27.spicamusic.AppLocaleController
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.common.entity.DynamicCoverType
 import me.spica27.spicamusic.common.entity.DynamicSpectrumBackground
+import me.spica27.spicamusic.common.entity.FinderHeroSource
 import me.spica27.spicamusic.common.entity.ProgressBarStyle
 import me.spica27.spicamusic.common.entity.ThemeColorStyle
 import me.spica27.spicamusic.common.entity.ThemeMode
@@ -129,6 +130,7 @@ class SettingsScene : StackScene() {
         val spectrumValue by viewModel.dynamicSpectrumBackground.collectAsStateWithLifecycle()
         val coverTypeValue by viewModel.dynamicCoverType.collectAsStateWithLifecycle()
         val progressBarStyleValue by viewModel.progressBarStyle.collectAsStateWithLifecycle()
+        val finderHeroSourceValue by viewModel.finderHeroSource.collectAsStateWithLifecycle()
         val themeColorStyleValue by viewModel.themeColorStyle.collectAsStateWithLifecycle()
         val circularRevealEnabled by viewModel.circularRevealEnabled.collectAsStateWithLifecycle()
         val spectrumTopGlowLabel = stringResource(R.string.dynamic_spectrum_top_glow)
@@ -246,6 +248,22 @@ class SettingsScene : StackScene() {
                     ),
                 )
             }
+        val finderFrequentLabel = stringResource(R.string.settings_finder_source_frequent)
+        val finderDailyLabel = stringResource(R.string.settings_finder_source_daily)
+        val finderHeroSourceOptions =
+            remember(finderFrequentLabel, finderDailyLabel) {
+                ImmutableList.copyOf(
+                    listOf(
+                        SelectOption(FinderHeroSource.RECENT_FREQUENT.value, finderFrequentLabel),
+                        SelectOption(FinderHeroSource.NETEASE_DAILY.value, finderDailyLabel),
+                    ),
+                )
+            }
+        val finderHeroSourceName =
+            finderHeroSourceOptions
+                .firstOrNull { it.value == finderHeroSourceValue }
+                ?.label
+                ?: finderFrequentLabel
         val topDisplayOffLabel = stringResource(R.string.top_display_mode_off)
         val topDisplayLyricLabel = stringResource(R.string.top_display_mode_status_lyric)
         val topDisplayLiveLabel = stringResource(R.string.top_display_mode_live_update)
@@ -354,6 +372,18 @@ class SettingsScene : StackScene() {
                             expandedKey = expandedRowKey,
                             onExpandChange = { expandedRowKey = it },
                             onValueChange = viewModel::setThemeMode,
+                        )
+                        SettingsItemDivider()
+                        ModernSettingsSelectItem(
+                            rowKey = "finder_hero_source",
+                            title = stringResource(R.string.settings_finder_source_title),
+                            subtitle = finderHeroSourceName,
+                            icon = Icons.Default.AutoAwesome,
+                            options = finderHeroSourceOptions,
+                            currentValue = finderHeroSourceValue,
+                            expandedKey = expandedRowKey,
+                            onExpandChange = { expandedRowKey = it },
+                            onValueChange = viewModel::setFinderHeroSource,
                         )
                         SettingsItemDivider()
                         ModernSettingsSwitchItem(

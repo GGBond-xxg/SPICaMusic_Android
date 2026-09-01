@@ -20,6 +20,7 @@ import me.spica27.spicamusic.cloud.NeteaseAudioQuality
 import me.spica27.spicamusic.cloud.QqAudioQuality
 import me.spica27.spicamusic.common.entity.DynamicCoverType
 import me.spica27.spicamusic.common.entity.DynamicSpectrumBackground
+import me.spica27.spicamusic.common.entity.FinderHeroSource
 import me.spica27.spicamusic.common.entity.ProgressBarStyle
 import me.spica27.spicamusic.common.entity.ThemeColorStyle
 import me.spica27.spicamusic.common.entity.ThemeMode
@@ -321,6 +322,23 @@ class SettingsViewModel(
     fun setProgressBarStyle(value: String) {
         viewModelScope.launch {
             settingsUseCases.setString(SettingsUseCases.Keys.PROGRESS_BAR_STYLE, value)
+        }
+    }
+
+    val finderHeroSource =
+        settingsUseCases
+            .getString(
+                SettingsUseCases.Keys.FINDER_HERO_SOURCE,
+                FinderHeroSource.RECENT_FREQUENT.value,
+            ).stateIn(
+                viewModelScope,
+                SharingStarted.Eagerly,
+                FinderHeroSource.RECENT_FREQUENT.value,
+            )
+
+    fun setFinderHeroSource(value: String) {
+        viewModelScope.launch {
+            settingsUseCases.setString(SettingsUseCases.Keys.FINDER_HERO_SOURCE, value)
         }
     }
 }

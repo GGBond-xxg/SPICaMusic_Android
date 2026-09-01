@@ -1,5 +1,11 @@
 package me.spica27.spicamusic.ui.home
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.os.SystemClock
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateDpAsState
@@ -29,8 +35,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.navkit.scene.StackScene
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.ui.home.page.FinderPage
@@ -54,12 +62,30 @@ class HomeScene : StackScene() {
     @Composable
     override fun Content() {
         val homeViewModel: HomeViewModel = koinActivityViewModel()
+        val path = LocalNavigationPath.current
+        val context = LocalContext.current
 
         val currentPage by homeViewModel.currentPage.collectAsStateWithLifecycle()
+        var lastRootBackAt by rememberSaveable { mutableStateOf(0L) }
         var hasLeftInitialFinder by rememberSaveable { mutableStateOf(false) }
         LaunchedEffect(currentPage) {
             if (currentPage != HomePage.Finder) {
                 hasLeftInitialFinder = true
+            }
+        }
+
+        BackHandler(enabled = !path.canPop) {
+            if (currentPage != HomePage.Finder) {
+                homeViewModel.navigateToPage(HomePage.Finder)
+                lastRootBackAt = 0L
+            } else {
+                val now = SystemClock.elapsedRealtime()
+                if (now - lastRootBackAt <= ROOT_BACK_EXIT_WINDOW_MS) {
+                    context.findActivity()?.finish()
+                } else {
+                    lastRootBackAt = now
+                    Toast.makeText(context, R.string.press_back_again_to_exit, Toast.LENGTH_SHORT).show()
+                }
             }
         }
 
@@ -137,3 +163,12 @@ val LocalBottomBarScrollConnection =
     compositionLocalOf<BottomBarScrollConnection> {
         error("No BottomBarScrollConnection provided. This composable must be called inside a Scene's content lambda.")
     }
+
+private tailrec fun Context.findActivity(): Activity? =
+    when (this) {
+        is Activity -> this
+        is ContextWrapper -> baseContext.findActivity()
+        else -> null
+    }
+
+private const val ROOT_BACK_EXIT_WINDOW_MS = 2_000L
