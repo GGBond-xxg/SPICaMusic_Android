@@ -33,8 +33,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayInputStream
-import java.net.URL
+import me.spica27.spicamusic.utils.withArtworkInputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -184,25 +183,8 @@ private fun decodeCoverBitmap(
 ): Bitmap? {
     if (uri == null) return null
     return try {
-        val remoteBytes =
-            if (uri.scheme == "http" || uri.scheme == "https") {
-                val connection =
-                    URL(uri.toString()).openConnection().apply {
-                        connectTimeout = 8_000
-                        readTimeout = 12_000
-                        useCaches = true
-                    }
-                connection.getInputStream().use { it.readBytes() }
-            } else {
-                null
-            }
-
-        fun openCoverStream() =
-            remoteBytes?.let(::ByteArrayInputStream)
-                ?: context.contentResolver.openInputStream(uri)
-
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        openCoverStream()?.use {
+        withArtworkInputStream(context, uri) {
             BitmapFactory.decodeStream(it, null, bounds)
         }
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
@@ -216,9 +198,11 @@ private fun decodeCoverBitmap(
                 inSampleSize = sampleSize
                 inPreferredConfig = Bitmap.Config.ARGB_8888
             }
-        openCoverStream()?.use {
+        withArtworkInputStream(context, uri) {
             BitmapFactory.decodeStream(it, null, options)
         }
+    } catch (_: OutOfMemoryError) {
+        null
     } catch (_: Exception) {
         null
     }
