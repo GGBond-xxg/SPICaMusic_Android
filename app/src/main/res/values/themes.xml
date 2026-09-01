@@ -2,22 +2,16 @@
 <resources>
 
   <style name="Theme.SPICaMusic" parent="android:Theme.Material.Light.NoActionBar">
-    <!-- Keep the launcher visible until Compose has drawn its first real frame. -->
-    <item name="android:windowDisablePreview">true</item>
+    <item name="android:windowBackground">@color/app_window_background</item>
     <item name="android:windowLightStatusBar">true</item>
   </style>
 
-  <!--
-    Xiaomi OS 3 still creates an opaque Android 12+ starting card after aggressive memory
-    cleanup even when windowDisablePreview is set. Making only the manifest launch theme
-    translucent prevents that card; MainActivity switches back to Theme.SPICaMusic before its
-    real window is created.
-  -->
-  <style name="Theme.SPICaMusic.Starting" parent="Theme.SPICaMusic">
-    <item name="android:windowIsTranslucent">true</item>
-    <item name="android:windowBackground">@android:color/transparent</item>
-    <item name="android:windowDisablePreview">true</item>
-    <item name="android:backgroundDimEnabled">false</item>
+  <style name="Theme.SPICaMusic.Starting" parent="Theme.SplashScreen">
+    <item name="windowSplashScreenBackground">@color/app_window_background</item>
+    <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon_transparent</item>
+    <item name="windowSplashScreenAnimationDuration">0</item>
+    <item name="android:windowLightStatusBar">true</item>
+    <item name="postSplashScreenTheme">@style/Theme.SPICaMusic</item>
   </style>
 
   <style name="Theme.SPICaMusic.Transparent" parent="android:Theme.Material.Light.NoActionBar">

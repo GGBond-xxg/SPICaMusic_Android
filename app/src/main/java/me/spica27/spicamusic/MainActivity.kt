@@ -14,6 +14,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -51,9 +52,12 @@ class MainActivity :
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // The manifest uses a translucent theme only to prevent Xiaomi's blank starting card.
-        // Restore the normal opaque app theme before ComponentActivity creates the real window.
-        setTheme(R.style.Theme_SPICaMusic)
+        val splashScreen = installSplashScreen()
+        splashScreen.setOnExitAnimationListener { splashView ->
+            // The splash icon is transparent. Remove the system starting surface immediately
+            // after Compose has produced the first frame so it cannot flash during locale updates.
+            splashView.remove()
+        }
         super.onCreate(savedInstanceState)
 
         ContextCompat.registerReceiver(

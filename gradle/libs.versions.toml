@@ -18,6 +18,7 @@ cloudy = "0.6.1"
 koinAndroidxComposeVersion = "4.2.2"
 kotlin = "2.3.21"
 coreKtx = "1.18.0"
+coreSplashscreen = "1.0.1"
 junit = "4.13.2"
 junitVersion = "1.2.1"
 espressoCore = "3.6.1"
@@ -71,6 +72,7 @@ androidx-compose-material-icons-core = { module = "androidx.compose.material:mat
 androidx-compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIconsCoreVersion" }
 androidx-constraintlayout-compose = { module = "androidx.constraintlayout:constraintlayout-compose", version.ref = "constraintlayoutComposeVersion" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferencesVersion" }
 androidx-dynamicanimation-ktx = { module = "androidx.dynamicanimation:dynamicanimation-ktx", version.ref = "dynamicanimationKtxVersion" }
 androidx-graphics-core = { module = "androidx.graphics:graphics-core", version.ref = "graphicsCoreVersion" }
