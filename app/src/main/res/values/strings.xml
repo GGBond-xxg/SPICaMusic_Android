@@ -1,6 +1,6 @@
 <resources>
-  <string name="app_name">SPICaMusic</string>
-  <string name="spica_app_label">SPICaMusic</string>
+  <string name="app_name">Music</string>
+  <string name="spica_app_label">Music</string>
   <string name="action_settings">Settings</string>
   <string name="play_all">Play All</string>
   <string name="first_fragment_label">First Fragment</string>
@@ -401,6 +401,7 @@
   <string name="progress_bar_style_dynamic_waveform">Dynamic Waveform</string>
   <string name="progress_bar_style_time_domain_waveform">Time-domain Waveform</string>
   <string name="progress_bar_style_expressive_wavy">Flowing Wave</string>
+  <string name="progress_bar_style_song_structure_wave">Song Structure Curve</string>
   <string name="settings_theme_color_style">Color Scheme</string>
   <string name="theme_color_style_textured">Textured</string>
   <string name="theme_color_style_flat">Flat</string>
@@ -857,8 +858,8 @@
   <string name="netease_quality_exhigh">Very high</string>
   <string name="netease_quality_lossless">Lossless</string>
   <string name="netease_quality_hires">Hi-Res</string>
-  <string name="netease_quality_jy_effect">Spatial Audio</string>
-  <string name="netease_quality_sky">Immersive Audio</string>
+  <string name="netease_quality_jy_effect">True Spatial Audio</string>
+  <string name="netease_quality_sky">Dolby Spatial Audio</string>
   <string name="netease_quality_master">Master</string>
   <string name="netease_like_sync_failed">Could not update NetEase likes. Check the network or sign in again.</string>
   <string name="settings_background_playback_subtitle">Keep playing when the app is removed from Recents</string>
@@ -870,7 +871,7 @@
   <string name="settings_cloud_audio_cache">Cloud music cache</string>
   <string name="settings_cloud_audio_cache_subtitle">Keep up to %1$s for repeat and offline playback</string>
   <string name="settings_hifi">Hi-Fi mode</string>
-  <string name="settings_hifi_subtitle">Use 32-bit floating-point output; takes effect after the playback service restarts</string>
+  <string name="settings_hifi_subtitle">Use 32-bit floating-point output; switches smoothly during playback</string>
   <string name="settings_hifi_unsupported">This device does not provide a PCM float output path</string>
   <string name="settings_usb_dac">USB DAC output</string>
   <string name="settings_usb_dac_connected">Prefer %1$s for music output. Android system mixing still applies.</string>
@@ -896,6 +897,9 @@
   <string name="settings_audio_quality">Audio quality</string>
   <string name="settings_netease_quality_short">%1$s · NetEase</string>
   <string name="player_audio_quality_and_effects">Quality &amp; effects</string>
+  <string name="player_playback_source_title">Playback source</string>
+  <string name="player_playback_source_current">Current</string>
+  <string name="player_playback_source_searching">Checking available sources…</string>
   <string name="player_current_audio_quality">Current audio quality</string>
   <string name="player_quality_netease_desc">NetEase online audio and device effects</string>
   <string name="player_quality_qq_desc">QQ Music online audio and device effects</string>
@@ -907,8 +911,8 @@
   <string name="netease_quality_exhigh_desc">Up to 320 kbps</string>
   <string name="netease_quality_lossless_desc">Lossless FLAC</string>
   <string name="netease_quality_hires_desc">High-resolution audio</string>
-  <string name="netease_quality_jy_effect_desc">Spatial surround source</string>
-  <string name="netease_quality_sky_desc">Immersive surround source</string>
+  <string name="netease_quality_jy_effect_desc">Provider spatial surround stream</string>
+  <string name="netease_quality_sky_desc">Provider immersive multichannel stream</string>
   <string name="netease_quality_master_desc">Master-quality source</string>
   <string name="qq_quality_auto">Auto</string>
   <string name="qq_quality_standard">Standard</string>

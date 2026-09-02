@@ -232,19 +232,27 @@ class SettingsScene : StackScene() {
         val dynamicWaveformLabel = stringResource(R.string.progress_bar_style_dynamic_waveform)
         val timeDomainWaveformLabel = stringResource(R.string.progress_bar_style_time_domain_waveform)
         val expressiveWavyLabel = stringResource(R.string.progress_bar_style_expressive_wavy)
+        val songStructureWaveLabel = stringResource(R.string.progress_bar_style_song_structure_wave)
         val progressBarStyleName =
             when (ProgressBarStyle.fromString(progressBarStyleValue)) {
                 ProgressBarStyle.ExpressiveWavy -> expressiveWavyLabel
                 ProgressBarStyle.DynamicWaveform -> dynamicWaveformLabel
                 ProgressBarStyle.TimeDomainWaveform -> timeDomainWaveformLabel
+                ProgressBarStyle.SongStructureWave -> songStructureWaveLabel
             }
         val progressBarStyleOptions =
-            remember(expressiveWavyLabel, dynamicWaveformLabel, timeDomainWaveformLabel) {
+            remember(
+                expressiveWavyLabel,
+                dynamicWaveformLabel,
+                timeDomainWaveformLabel,
+                songStructureWaveLabel,
+            ) {
                 ImmutableList.copyOf(
                     listOf(
                         SelectOption(ProgressBarStyle.ExpressiveWavy.value, expressiveWavyLabel),
                         SelectOption(ProgressBarStyle.DynamicWaveform.value, dynamicWaveformLabel),
                         SelectOption(ProgressBarStyle.TimeDomainWaveform.value, timeDomainWaveformLabel),
+                        SelectOption(ProgressBarStyle.SongStructureWave.value, songStructureWaveLabel),
                     ),
                 )
             }
@@ -1107,6 +1115,7 @@ private fun optionIcon(
                 ProgressBarStyle.ExpressiveWavy -> Icons.Default.Waves
                 ProgressBarStyle.DynamicWaveform -> Icons.Default.GraphicEq
                 ProgressBarStyle.TimeDomainWaveform -> Icons.AutoMirrored.Filled.ShowChart
+                ProgressBarStyle.SongStructureWave -> Icons.AutoMirrored.Filled.ShowChart
             }
         "language" ->
             when (value) {

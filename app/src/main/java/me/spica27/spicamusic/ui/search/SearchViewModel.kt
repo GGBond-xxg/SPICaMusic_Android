@@ -33,8 +33,11 @@ import me.spica27.spicamusic.cloud.RemoteMusicClientRegistry
 import me.spica27.spicamusic.cloud.RemoteMusicProvider
 import me.spica27.spicamusic.cloud.toCatalogSong
 import me.spica27.spicamusic.common.entity.Song
+import me.spica27.spicamusic.common.entity.getCoverUri
 import me.spica27.spicamusic.core.preferences.PreferencesManager
 import me.spica27.spicamusic.feature.library.domain.SongUseCases
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * SearchPage 列表项的密封类：分组头 or 歌曲
@@ -55,6 +58,15 @@ data class RemoteSearchState(
     val isLoading: Boolean = false,
     val songs: List<CloudCatalogSong> = emptyList(),
     val failedProviders: Set<RemoteMusicProvider> = emptySet(),
+)
+
+/** A song the user actually chose from search results (not merely a submitted keyword). */
+data class RecentSearchSong(
+    val stableId: String,
+    val title: String,
+    val artist: String,
+    val artworkUri: String?,
+    val source: String,
 )
 
 enum class SearchSource(
@@ -88,8 +100,8 @@ class SearchViewModel(
     private val _selectedSource = MutableStateFlow(SearchSource.ALL)
     val selectedSource: StateFlow<SearchSource> = _selectedSource.asStateFlow()
 
-    private val _recentSearches = MutableStateFlow<List<String>>(emptyList())
-    val recentSearches: StateFlow<List<String>> = _recentSearches.asStateFlow()
+    private val _recentSearchSongs = MutableStateFlow<List<RecentSearchSong>>(emptyList())
+    val recentSearchSongs: StateFlow<List<RecentSearchSong>> = _recentSearchSongs.asStateFlow()
 
     private val _remoteSearchState = MutableStateFlow(RemoteSearchState())
     val remoteSearchState: StateFlow<RemoteSearchState> = _remoteSearchState.asStateFlow()
@@ -168,26 +180,49 @@ class SearchViewModel(
     }
 
     fun submitSearch() {
-        val query =
-            _searchKeyword.value
-                .trim()
-                .replace('\n', ' ')
-                .replace('\r', ' ')
-        if (query.isBlank()) return
+        // Search submission intentionally does not write history. The product history is a list
+        // of songs the user selected, so abandoned/typo queries never displace useful entries.
+    }
+
+    fun recordRecentSong(song: Song) {
+        recordRecentSong(
+            RecentSearchSong(
+                stableId = "local:${song.mediaStoreId}",
+                title = song.displayName,
+                artist = song.artist,
+                artworkUri = song.getCoverUri()?.toString(),
+                source = RECENT_SOURCE_LOCAL,
+            ),
+        )
+    }
+
+    fun recordRecentSong(song: CloudCatalogSong) {
+        recordRecentSong(
+            RecentSearchSong(
+                stableId = song.stableId,
+                title = song.title,
+                artist = song.artist,
+                artworkUri = song.artworkUri?.toString(),
+                source = song.source.name,
+            ),
+        )
+    }
+
+    private fun recordRecentSong(song: RecentSearchSong) {
         val updated =
-            (listOf(query) + _recentSearches.value.filterNot { it.equals(query, ignoreCase = true) })
+            (listOf(song) + _recentSearchSongs.value.filterNot { it.stableId == song.stableId })
                 .take(MAX_SEARCH_HISTORY)
-        _recentSearches.value = updated
+        _recentSearchSongs.value = updated
         viewModelScope.launch {
             preferencesManager.setString(
                 PreferencesManager.Keys.SEARCH_HISTORY,
-                updated.joinToString(SEARCH_HISTORY_SEPARATOR),
+                encodeRecentSongs(updated),
             )
         }
     }
 
     fun clearSearchHistory() {
-        _recentSearches.value = emptyList()
+        _recentSearchSongs.value = emptyList()
         viewModelScope.launch {
             preferencesManager.setString(PreferencesManager.Keys.SEARCH_HISTORY, "")
         }
@@ -207,16 +242,47 @@ class SearchViewModel(
             preferencesManager
                 .getString(PreferencesManager.Keys.SEARCH_HISTORY)
                 .collectLatest { stored ->
-                    _recentSearches.value =
-                        stored
-                            .split(SEARCH_HISTORY_SEPARATOR)
-                            .map(String::trim)
-                            .filter(String::isNotEmpty)
-                            .distinctBy { it.lowercase() }
-                            .take(MAX_SEARCH_HISTORY)
+                    _recentSearchSongs.value = decodeRecentSongs(stored)
                 }
         }
     }
+
+    private fun encodeRecentSongs(songs: List<RecentSearchSong>): String =
+        JSONArray()
+            .apply {
+                songs.forEach { song ->
+                    put(
+                        JSONObject()
+                            .put("id", song.stableId)
+                            .put("title", song.title)
+                            .put("artist", song.artist)
+                            .put("artwork", song.artworkUri)
+                            .put("source", song.source),
+                    )
+                }
+            }.toString()
+
+    private fun decodeRecentSongs(raw: String): List<RecentSearchSong> =
+        runCatching {
+            val array = JSONArray(raw)
+            buildList {
+                for (index in 0 until minOf(array.length(), MAX_SEARCH_HISTORY)) {
+                    val value = array.optJSONObject(index) ?: continue
+                    val stableId = value.optString("id").trim()
+                    val title = value.optString("title").trim()
+                    if (stableId.isEmpty() || title.isEmpty()) continue
+                    add(
+                        RecentSearchSong(
+                            stableId = stableId,
+                            title = title,
+                            artist = value.optString("artist"),
+                            artworkUri = value.optString("artwork").takeIf(String::isNotBlank),
+                            source = value.optString("source", RECENT_SOURCE_LOCAL),
+                        ),
+                    )
+                }
+            }.distinctBy(RecentSearchSong::stableId)
+        }.getOrDefault(emptyList())
 
     @OptIn(FlowPreview::class)
     private fun observeRemoteSearch() {
@@ -309,6 +375,6 @@ class SearchViewModel(
     private companion object {
         const val REMOTE_SEARCH_LIMIT = 30
         const val MAX_SEARCH_HISTORY = 10
-        const val SEARCH_HISTORY_SEPARATOR = "\n"
+        const val RECENT_SOURCE_LOCAL = "LOCAL"
     }
 }

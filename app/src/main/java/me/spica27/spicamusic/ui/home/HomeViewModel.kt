@@ -50,6 +50,12 @@ class HomeViewModel(
     /** True only when this process started with a previous Finder snapshot. */
     val frequentSongsRestoredFromCache: Boolean = cachedFrequentSongs != null
 
+    private val initialFinderHeroSource =
+        settingsUseCases.getInitialString(
+            SettingsUseCases.Keys.FINDER_HERO_SOURCE,
+            FinderHeroSource.RECENT_FREQUENT.value,
+        )
+
     // 排序方式
     private val _sortOrder = MutableStateFlow(SongSortOrder.DEFAULT)
     val sortOrder: StateFlow<SongSortOrder> = _sortOrder
@@ -65,7 +71,7 @@ class HomeViewModel(
             ).stateIn(
                 viewModelScope,
                 SharingStarted.Eagerly,
-                FinderHeroSource.RECENT_FREQUENT.value,
+                initialFinderHeroSource,
             )
 
     // 播放器展开进度 0f = 最小化, 1f = 全屏

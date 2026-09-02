@@ -1,5 +1,6 @@
 package me.spica27.spicamusic.ui.search
 
+import android.net.Uri
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
@@ -18,7 +19,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,17 +36,16 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.ArrowBackIosNew
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.LibraryMusic
@@ -75,6 +74,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalFocusManager
@@ -93,9 +93,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import me.spica27.navkit.geometry.GeometryTransition
+import me.spica27.navkit.geometry.geometryTarget
 import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.navkit.scene.StackScene
 import me.spica27.spicamusic.R
@@ -149,7 +153,61 @@ private enum class SearchContentState { Idle, Loading, Empty, Results }
  */
 class SearchScene(
     private val initialQuery: String = "",
+    private val transition: GeometryTransition? = null,
 ) : StackScene() {
+    override val geometryTransition: GeometryTransition? = transition
+    override val transitionShadowEnabled: Boolean = transition == null
+    override val transitionScaleEnabled: Boolean = transition == null
+    override val transitionSlideEnabled: Boolean = transition == null
+    override val transitionFadeEnabled: Boolean = transition != null
+    override val compressesPreviousScene: Boolean = transition == null
+
+    @Composable
+    override fun FloatingContent() {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .padding(horizontal = Spacing.Large),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
+        ) {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                text = stringResource(R.string.finder_search_title),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+    }
+
+    override suspend fun onPush() {
+        super.onPush()
+        geometryTransition?.reset()
+    }
+
+    override suspend fun onAppear() {
+        coroutineScope {
+            launch { super.onAppear() }
+            launch { geometryTransition?.animateForward() }
+        }
+    }
+
+    override suspend fun onDisappear() {
+        coroutineScope {
+            launch { super.onDisappear() }
+            launch { geometryTransition?.animateReverse() }
+        }
+    }
+
     @Composable
     override fun Content() {
         val path = LocalNavigationPath.current
@@ -158,7 +216,7 @@ class SearchScene(
         val searchResult = searchViewModel.searchPagingResults.collectAsLazyPagingItems()
         val remoteSearch by searchViewModel.remoteSearchState.collectAsStateWithLifecycle()
         val selectedSource by searchViewModel.selectedSource.collectAsStateWithLifecycle()
-        val recentSearches by searchViewModel.recentSearches.collectAsStateWithLifecycle()
+        val recentSearchSongs by searchViewModel.recentSearchSongs.collectAsStateWithLifecycle()
         val remoteSongs =
             remember(searchKey, remoteSearch, selectedSource) {
                 remoteSearch.songs
@@ -184,7 +242,6 @@ class SearchScene(
             if (pendingPlayerMediaId == expectedMediaId) {
                 pendingPlayerMediaId = null
                 homeViewModel.expandPlayer()
-                path.popTop()
             }
         }
 
@@ -282,6 +339,7 @@ class SearchScene(
                 },
                 focusRequester = focusRequester,
                 listState = listState,
+                geometryTransition = transition,
                 modifier = Modifier.entranceGraphics(headerEntrance),
             )
             Box(
@@ -310,9 +368,9 @@ class SearchScene(
                     when (state) {
                         SearchContentState.Idle ->
                             SearchIdleHint(
-                                recentSearches = recentSearches,
-                                onRecentSearch = { query ->
-                                    searchViewModel.updateSearchKeyword(query)
+                                recentSongs = recentSearchSongs,
+                                onRecentSong = { song ->
+                                    searchViewModel.updateSearchKeyword(song.title)
                                     searchViewModel.submitSearch()
                                 },
                                 onClearHistory = searchViewModel::clearSearchHistory,
@@ -339,12 +397,14 @@ class SearchScene(
                                 playingMediaId = currentMediaItem?.mediaId,
                                 onPlay = { song ->
                                     searchViewModel.submitSearch()
+                                    searchViewModel.recordRecentSong(song)
                                     pendingPlayerMediaId = song.mediaStoreId.toString()
                                     playerViewModel.playSong(song)
                                 },
                                 onMore = { song -> path.push(SongMenuScene(song)) },
                                 onPlayRemote = { song ->
                                     searchViewModel.submitSearch()
+                                    searchViewModel.recordRecentSong(song)
                                     pendingPlayerMediaId = song.stableId
                                     cloudCatalogViewModel.playPlaylistSongs(
                                         selectedStableId = song.stableId,
@@ -373,6 +433,7 @@ private fun SearchHeader(
     onImeSearch: () -> Unit,
     focusRequester: FocusRequester,
     listState: LazyListState,
+    geometryTransition: GeometryTransition?,
     modifier: Modifier = Modifier,
 ) {
     val hairlineColor = MaterialTheme.colorScheme.outlineVariant
@@ -409,6 +470,7 @@ private fun SearchHeader(
                 onClear = onClear,
                 onImeSearch = onImeSearch,
                 focusRequester = focusRequester,
+                geometryTransition = geometryTransition,
                 modifier = Modifier.weight(1f),
             )
             SearchProviderPicker(
@@ -469,27 +531,34 @@ private fun SearchProviderPicker(
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
+            shape = RoundedCornerShape(24.dp),
         ) {
             SearchSource.entries.forEach { source ->
                 DropdownMenuItem(
-                    leadingIcon = {
-                        Icon(
-                            imageVector = source.searchSourceIcon(),
-                            contentDescription = null,
+                    text = {
+                        Text(
+                            text = labels.getValue(source),
+                            color =
+                                if (source == selectedSource) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                            fontWeight =
+                                if (source == selectedSource) FontWeight.SemiBold else FontWeight.Normal,
                         )
                     },
-                    text = { Text(labels.getValue(source)) },
-                    trailingIcon =
-                        if (source == selectedSource) {
-                            {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = null,
-                                )
-                            }
-                        } else {
-                            null
-                        },
+                    modifier =
+                        Modifier
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                if (source == selectedSource) {
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+                                } else {
+                                    Color.Transparent
+                                },
+                            ),
                     onClick = {
                         expanded = false
                         onSourceSelected(source)
@@ -516,6 +585,7 @@ private fun SearchInputField(
     onClear: () -> Unit,
     onImeSearch: () -> Unit,
     focusRequester: FocusRequester,
+    geometryTransition: GeometryTransition?,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -523,7 +593,15 @@ private fun SearchInputField(
             modifier
                 .height(52.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .then(
+                    if (geometryTransition != null) {
+                        Modifier.geometryTarget(geometryTransition)
+                    } else {
+                        Modifier
+                    },
+                ).graphicsLayer {
+                    alpha = if (geometryTransition?.shouldShowTarget() != false) 1f else 0f
+                }.background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .padding(start = Spacing.Large, end = Spacing.Small),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
@@ -1036,8 +1114,8 @@ private fun highlightKeyword(
 /** 空关键词引导：开放排版无卡片，图标轻盈浮动（收藏页空态同款） */
 @Composable
 private fun SearchIdleHint(
-    recentSearches: List<String>,
-    onRecentSearch: (String) -> Unit,
+    recentSongs: List<RecentSearchSong>,
+    onRecentSong: (RecentSearchSong) -> Unit,
     onClearHistory: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1052,97 +1130,131 @@ private fun SearchIdleHint(
             ),
         label = "searchIdleBob",
     )
-    Column(
-        modifier =
-            modifier
-                .clickable(
-                    interactionSource =
-                        remember {
-                            androidx.compose.foundation.interaction
-                                .MutableInteractionSource()
-                        },
-                    indication = null,
-                    onClick = {},
-                ).padding(horizontal = Spacing.ExtraLarge)
-                .padding(top = 64.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Spacing.Medium),
+    LazyColumn(
+        modifier = modifier,
+        contentPadding =
+            PaddingValues(
+                start = Spacing.ExtraLarge,
+                end = Spacing.ExtraLarge,
+                top = if (recentSongs.isEmpty()) 64.dp else Spacing.Large,
+                bottom = 120.dp,
+            ),
+        verticalArrangement = Arrangement.spacedBy(Spacing.Small),
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(56.dp)
-                    .graphicsLayer {
-                        translationY = bob * 5.dp.toPx()
-                        rotationZ = bob * 6f
-                    }.clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Default.Search,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-            )
-        }
-        Text(
-            text = stringResource(R.string.search_your_music_title),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Text(
-            text = stringResource(R.string.search_your_music_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        if (recentSearches.isNotEmpty()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = Spacing.Large),
-                verticalAlignment = Alignment.CenterVertically,
+        item(key = "idle_intro") {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(Spacing.Medium),
             ) {
-                Text(
-                    text = stringResource(R.string.search_recent_history),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    text = stringResource(R.string.search_clear_history),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                Box(
                     modifier =
                         Modifier
-                            .clip(CircleShape)
-                            .clickHighlight(onClick = onClearHistory)
-                            .padding(horizontal = Spacing.Medium, vertical = Spacing.Small),
+                            .size(56.dp)
+                            .graphicsLayer {
+                                translationY = bob * 5.dp.toPx()
+                                rotationZ = bob * 6f
+                            }.clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.search_your_music_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = stringResource(R.string.search_your_music_subtitle),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
                 )
             }
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
-                contentPadding = PaddingValues(vertical = Spacing.ExtraSmall),
-            ) {
-                items(recentSearches, key = { it }) { query ->
+        }
+        if (recentSongs.isNotEmpty()) {
+            item(key = "recent_header") {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = Spacing.Large),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(
-                        text = query,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        text = stringResource(R.string.search_recent_history),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = stringResource(R.string.search_clear_history),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
                         modifier =
                             Modifier
                                 .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.secondaryContainer)
-                                .clickHighlight(onClick = { onRecentSearch(query) })
+                                .clickHighlight(onClick = onClearHistory)
                                 .padding(horizontal = Spacing.Medium, vertical = Spacing.Small),
                     )
+                }
+            }
+            items(recentSongs, key = RecentSearchSong::stableId) { song ->
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .clickHighlight(onClick = { onRecentSong(song) })
+                            .padding(vertical = Spacing.ExtraSmall),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
+                ) {
+                    AudioCover(
+                        uri = song.artworkUri?.let(Uri::parse),
+                        modifier = Modifier.size(48.dp).clip(RoundedCornerShape(16.dp)),
+                        placeHolder = { SearchCoverPlaceholder() },
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = song.title,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text =
+                                listOf(song.artist, recentSourceLabel(song.source))
+                                    .filter(String::isNotBlank)
+                                    .joinToString(" · "),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }
     }
 }
+
+@Composable
+private fun recentSourceLabel(source: String): String =
+    when (source) {
+        "LOCAL" -> stringResource(R.string.search_source_local_library)
+        CloudSongSource.NETEASE.name -> stringResource(R.string.search_source_netease)
+        CloudSongSource.QQ_MUSIC.name -> stringResource(R.string.search_source_qq_music)
+        CloudSongSource.TELEGRAM.name -> stringResource(R.string.music_source_telegram)
+        CloudSongSource.JELLYFIN.name -> stringResource(R.string.music_source_jellyfin)
+        CloudSongSource.EMBY.name -> stringResource(R.string.music_source_emby)
+        CloudSongSource.SUBSONIC.name -> stringResource(R.string.music_source_subsonic)
+        else -> source
+    }
 
 /** 无结果：与引导页同款开放排版，仅在结果确实为空时出现 */
 @Composable

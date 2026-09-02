@@ -71,7 +71,6 @@ class HomeScene : StackScene() {
                 label = "bottomControlsScrimHeight",
             )
         val pageBackground = MaterialTheme.colorScheme.background
-
         CompositionLocalProvider(
             LocalBottomBarScrollConnection provides bottomBarScrollConnection,
         ) {

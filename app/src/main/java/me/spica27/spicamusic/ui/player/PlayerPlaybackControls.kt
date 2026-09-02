@@ -78,6 +78,7 @@ import me.spica27.spicamusic.ui.theme.themeRevealOrigin
 import me.spica27.spicamusic.ui.widget.audio_seekbar.AudioDynamicWaveSlider
 import me.spica27.spicamusic.ui.widget.audio_seekbar.AudioWaveSlider
 import me.spica27.spicamusic.ui.widget.audio_seekbar.ExpressiveWavySlider
+import me.spica27.spicamusic.ui.widget.audio_seekbar.SongStructureWaveSlider
 
 private val PlayerProgressTrackHeight = 64.dp
 
@@ -109,7 +110,7 @@ fun PlayerProgressSection(
         ) {
             // 三种进度条只负责绘制；最上层统一处理点按和拖动，避免不同 Slider
             // 实现与播放器页的嵌套 Pager 争抢手势，造成某些样式无法拖动。
-            key(progressKey, progressBarStyle) {
+            key(progressBarStyle) {
                 when (progressBarStyle) {
                     ProgressBarStyle.ExpressiveWavy ->
                         ExpressiveWavySlider(
@@ -148,6 +149,16 @@ fun PlayerProgressSection(
                                 SolidColor(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f)),
                             progressBrush = SolidColor(MaterialTheme.colorScheme.primary),
                             modifier = Modifier.fillMaxSize(),
+                        )
+
+                    ProgressBarStyle.SongStructureWave ->
+                        SongStructureWaveSlider(
+                            curveKey = progressKey,
+                            progress = progress.coerceIn(0f, 1f),
+                            amplitudes = amplitudes,
+                            activeColor = MaterialTheme.colorScheme.onSurface,
+                            inactiveColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.24f),
+                            modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
                         )
                 }
             }
@@ -208,26 +219,26 @@ fun PlayerProgressSection(
                         Modifier
                             .align(Alignment.Center)
                             .then(audioQualityActionModifier)
-                            .height(36.dp)
+                            .height(30.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.tertiaryContainer)
                             .clickable(
                                 enabled = audioQualityActionEnabled,
                                 role = Role.Button,
                                 onClick = onClick,
-                            ).padding(horizontal = 14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ).padding(horizontal = 11.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.GraphicEq,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(15.dp),
                     )
                     Text(
                         text = stringResource(R.string.player_audio_quality_and_effects),
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onTertiaryContainer,
                     )
                 }
@@ -373,7 +384,7 @@ fun PlayerPlaybackBottomSection(
                     ),
         ) {
             Column {
-                Spacer(modifier = Modifier.height(Spacing.Large))
+                Spacer(modifier = Modifier.height(28.dp))
                 PlayerTransportControls(
                     modifier = controlsModifier.fillMaxWidth(),
                     isPlaying = isPlaying,

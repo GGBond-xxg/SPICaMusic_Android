@@ -104,6 +104,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.navkit.popup.PopupMenuAnchorState
@@ -410,6 +411,15 @@ fun MusicPage() {
     val cloudCatalog by cloudCatalogViewModel.state.collectAsStateWithLifecycle()
     val localScanState by mediaLibraryViewModel.scanState.collectAsStateWithLifecycle()
     val currentMediaItem by playerViewModel.currentMediaItem.collectAsStateWithLifecycle()
+    var pendingPlayerMediaId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(pendingPlayerMediaId) {
+        val expectedMediaId = pendingPlayerMediaId ?: return@LaunchedEffect
+        playerViewModel.currentMediaItem.first { it?.mediaId == expectedMediaId }
+        if (pendingPlayerMediaId == expectedMediaId) {
+            pendingPlayerMediaId = null
+            homeViewModel.expandPlayer()
+        }
+    }
     val unknownAlbum = stringResource(R.string.unknown_album)
     val unknownArtist = stringResource(R.string.unknown_artist)
 
@@ -895,6 +905,11 @@ fun MusicPage() {
                                     }
                                 },
                                 onClick = {
+                                    pendingPlayerMediaId =
+                                        when (item) {
+                                            is BrowserSongItem.Local -> item.song.mediaStoreId.toString()
+                                            is BrowserSongItem.Cloud -> item.song.stableId
+                                        }
                                     cloudCatalogViewModel.play(
                                         selectedStableId = item.stableId,
                                         visibleQueue = visibleQueue,

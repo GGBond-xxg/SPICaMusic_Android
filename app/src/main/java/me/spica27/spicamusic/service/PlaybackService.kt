@@ -49,6 +49,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.guava.future
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import me.spica27.spicamusic.BuildConfig
 import me.spica27.spicamusic.DesktopLyricsPermissionActivity
 import me.spica27.spicamusic.MainActivity
@@ -849,49 +852,85 @@ class PlaybackService : MediaLibraryService() {
             .build()
     }
 
-    private fun reconfigureAudioPipeline(enableHiFi: Boolean) {
-        if (enableHiFi == hiFiOutputEnabled) return
-        val oldPlayer = exoPlayer
-        val mediaItems = List(oldPlayer.mediaItemCount) { oldPlayer.getMediaItemAt(it) }
-        val currentIndex = oldPlayer.currentMediaItemIndex
-        val currentPosition = oldPlayer.currentPosition
-        val playWhenReady = oldPlayer.playWhenReady
-        val repeatMode = oldPlayer.repeatMode
-        val shuffleModeEnabled = oldPlayer.shuffleModeEnabled
-        val playbackParameters = oldPlayer.playbackParameters
+    private val audioPipelineMutex = Mutex()
 
-        manualFadeJob?.cancel()
-        manualFadeActive = false
-        fadeInStartedAtMs = 0L
+    private suspend fun reconfigureAudioPipeline(enableHiFi: Boolean) =
+        audioPipelineMutex.withLock {
+            if (enableHiFi == hiFiOutputEnabled) return@withLock
+            val oldPlayer = exoPlayer
+            val mediaItems = List(oldPlayer.mediaItemCount) { oldPlayer.getMediaItemAt(it) }
+            val currentIndex = oldPlayer.currentMediaItemIndex
+            val initialPosition = oldPlayer.currentPosition
+            val playWhenReady = oldPlayer.playWhenReady
+            val repeatMode = oldPlayer.repeatMode
+            val shuffleModeEnabled = oldPlayer.shuffleModeEnabled
+            val playbackParameters = oldPlayer.playbackParameters
 
-        val replacement = buildExoPlayer(enableHiFi)
-        replacement.repeatMode = repeatMode
-        replacement.shuffleModeEnabled = shuffleModeEnabled
-        replacement.playbackParameters = playbackParameters
-        replacement.addListener(playbackListener)
-        exoPlayer = replacement
-        sessionPlayer = FadeAwarePlayer(replacement)
-        mediaSession?.setPlayer(sessionPlayer)
-        oldPlayer.removeListener(playbackListener)
-        oldPlayer.release()
+            manualFadeJob?.cancel()
+            manualFadeActive = false
+            fadeInStartedAtMs = 0L
 
-        if (mediaItems.isNotEmpty()) {
-            replacement.setMediaItems(
-                mediaItems,
-                currentIndex.coerceIn(0, mediaItems.lastIndex),
-                currentPosition.coerceAtLeast(0L),
-            )
-            replacement.prepare()
+            val replacement = buildExoPlayer(enableHiFi)
+            replacement.repeatMode = repeatMode
+            replacement.shuffleModeEnabled = shuffleModeEnabled
+            replacement.playbackParameters = playbackParameters
+            if (mediaItems.isNotEmpty()) {
+                replacement.setMediaItems(
+                    mediaItems,
+                    currentIndex.coerceIn(0, mediaItems.lastIndex),
+                    initialPosition.coerceAtLeast(0L),
+                )
+                replacement.prepare()
+                val prepared =
+                    withTimeoutOrNull(8_000L) {
+                        while (
+                            replacement.playbackState != Player.STATE_READY &&
+                            replacement.playerError == null
+                        ) {
+                            delay(20L)
+                        }
+                        replacement.playbackState == Player.STATE_READY
+                    } == true
+                if (!prepared) {
+                    replacement.release()
+                    Timber.tag("PlaybackService").w("Hi-Fi pipeline warm-up failed; keeping current player")
+                    return@withLock
+                }
+            }
+
+            // Seek to the position reached while the replacement was warming, then start it at
+            // zero volume. The brief overlap masks the AudioTrack hand-off without pausing music.
+            replacement.seekTo(oldPlayer.currentPosition.coerceAtLeast(0L))
+            replacement.volume = if (playWhenReady) 0f else oldPlayer.volume
+            replacement.addListener(playbackListener)
+            replacement.playWhenReady = playWhenReady
+            if (playWhenReady && mediaItems.isNotEmpty()) {
+                withTimeoutOrNull(800L) {
+                    while (!replacement.isPlaying && replacement.playerError == null) delay(12L)
+                }
+            }
+
+            exoPlayer = replacement
+            sessionPlayer = FadeAwarePlayer(replacement)
+            mediaSession?.setPlayer(sessionPlayer)
+            oldPlayer.removeListener(playbackListener)
+            if (playWhenReady) {
+                repeat(8) { step ->
+                    val fraction = (step + 1) / 8f
+                    replacement.volume = fraction
+                    oldPlayer.volume = 1f - fraction
+                    delay(18L)
+                }
+            }
+            oldPlayer.release()
+
+            topDisplayModeController.start(replacement)
+            desktopLyricsController.start(replacement)
+            hiFiOutputEnabled = enableHiFi
+            Timber
+                .tag("PlaybackService")
+                .i("Audio pipeline warm-swapped: Hi-Fi=$enableHiFi, EQ=${!enableHiFi}")
         }
-        topDisplayModeController.start(replacement)
-        desktopLyricsController.start(replacement)
-        hiFiOutputEnabled = enableHiFi
-        replacement.playWhenReady = playWhenReady
-        if (playWhenReady && fadeEnabled && mediaItems.isNotEmpty()) beginFadeIn()
-        Timber
-            .tag("PlaybackService")
-            .i("Audio pipeline rebuilt: Hi-Fi=$enableHiFi, EQ=${!enableHiFi}")
-    }
 
     private fun handleCloudPlaybackError(error: PlaybackException) {
         val failedItem = exoPlayer.currentMediaItem ?: return

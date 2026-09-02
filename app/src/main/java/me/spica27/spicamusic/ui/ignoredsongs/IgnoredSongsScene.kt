@@ -660,7 +660,7 @@ private fun IgnoredSongRow(
             modifier =
                 Modifier
                     .size(48.dp)
-                    .clip(Shapes.MediumCornerBasedShape),
+                    .clip(Shapes.LargeCornerBasedShape),
             placeHolder = {
                 Box(
                     modifier =
@@ -774,7 +774,7 @@ private fun IgnoredSkeletonRows(
                     modifier =
                         Modifier
                             .size(48.dp)
-                            .clip(Shapes.MediumCornerBasedShape)
+                            .clip(Shapes.LargeCornerBasedShape)
                             .background(bone),
                 )
                 Column(

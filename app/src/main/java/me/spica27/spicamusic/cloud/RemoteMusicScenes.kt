@@ -10,6 +10,7 @@ import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -60,6 +61,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -71,7 +76,11 @@ import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemContentType
 import androidx.paging.compose.itemKey
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import me.spica27.navkit.geometry.GeometryTransition
+import me.spica27.navkit.geometry.geometryTarget
 import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.navkit.scene.StackScene
 import me.spica27.spicamusic.common.entity.Playlist
@@ -79,6 +88,7 @@ import me.spica27.spicamusic.ui.home.HomeViewModel
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.playlist.PlaylistViewModel
 import me.spica27.spicamusic.ui.widget.AudioCover
+import me.spica27.spicamusic.ui.widget.StableAudioCover
 import org.koin.compose.viewmodel.koinActivityViewModel
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -463,9 +473,10 @@ class RemoteMusicScene(
                                 contentType = { "netease_playlist" },
                             ) { index ->
                                 val playlist = playlists[index]
-                                NeteasePlaylistRow(playlist) {
-                                    path.push(NeteasePlaylistScene(playlist))
-                                }
+                                NeteasePlaylistRow(
+                                    value = playlist,
+                                    onClick = { path.push(NeteasePlaylistScene(playlist)) },
+                                )
                             }
                         }
                     }
@@ -612,7 +623,38 @@ class RemoteMusicScene(
 
 class NeteasePlaylistScene(
     private val value: CloudCatalogPlaylist,
+    private val transition: GeometryTransition? = null,
+    private val transitionCoverPainter: Painter? = null,
 ) : StackScene() {
+    override val geometryTransition: GeometryTransition? = transition
+    override val transitionShadowEnabled: Boolean = transition == null
+    override val transitionScaleEnabled: Boolean = transition == null
+    override val transitionSlideEnabled: Boolean = transition == null
+    override val transitionFadeEnabled: Boolean = transition != null
+    override val compressesPreviousScene: Boolean = transition == null
+
+    @Composable
+    override fun FloatingContent() {
+        if (transitionCoverPainter != null) {
+            Image(
+                painter = transitionCoverPainter,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            AudioCover(
+                uri = value.playlist.coverUrl?.let(Uri::parse),
+                modifier = Modifier.fillMaxSize(),
+                placeHolder = {
+                    Box(
+                        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    )
+                },
+            )
+        }
+    }
+
     @Composable
     override fun Content() {
         val path = LocalNavigationPath.current
@@ -626,7 +668,6 @@ class NeteasePlaylistScene(
             if (pendingPlayerMediaId == expectedMediaId) {
                 pendingPlayerMediaId = null
                 homeViewModel.expandPlayer()
-                path.popTop()
             }
         }
         val state by viewModel.state.collectAsStateWithLifecycle()
@@ -657,7 +698,12 @@ class NeteasePlaylistScene(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 item(key = "playlist_header", contentType = "header") {
-                    NeteasePlaylistRow(value, onClick = null)
+                    NeteasePlaylistRow(
+                        value = value,
+                        onClick = null,
+                        geometryTransition = transition,
+                        retainedPainter = transitionCoverPainter,
+                    )
                 }
                 items(
                     count = songs.size,
@@ -691,6 +737,25 @@ class NeteasePlaylistScene(
             }
         }
     }
+
+    override suspend fun onPush() {
+        super.onPush()
+        geometryTransition?.reset()
+    }
+
+    override suspend fun onAppear() {
+        coroutineScope {
+            launch { super.onAppear() }
+            launch { geometryTransition?.animateForward() }
+        }
+    }
+
+    override suspend fun onDisappear() {
+        coroutineScope {
+            launch { super.onDisappear() }
+            launch { geometryTransition?.animateReverse() }
+        }
+    }
 }
 
 class QqPlaylistScene(
@@ -715,7 +780,6 @@ class QqPlaylistScene(
             if (pendingPlayerMediaId == expectedMediaId) {
                 pendingPlayerMediaId = null
                 homeViewModel.expandPlayer()
-                path.popTop()
             }
         }
 
@@ -797,7 +861,42 @@ class QqPlaylistScene(
 
 class CloudUserPlaylistScene(
     private val playlist: CloudUserPlaylist,
+    private val transition: GeometryTransition? = null,
+    private val transitionCoverPainter: Painter? = null,
 ) : StackScene() {
+    override val geometryTransition: GeometryTransition? = transition
+    override val transitionShadowEnabled: Boolean = transition == null
+    override val transitionScaleEnabled: Boolean = transition == null
+    override val transitionSlideEnabled: Boolean = transition == null
+    override val transitionFadeEnabled: Boolean = transition != null
+    override val compressesPreviousScene: Boolean = transition == null
+
+    @Composable
+    override fun FloatingContent() {
+        if (transitionCoverPainter != null) {
+            Image(
+                painter = transitionCoverPainter,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            AudioCover(
+                uri =
+                    playlist.songs
+                        .firstOrNull()
+                        ?.artworkUrl
+                        ?.let(Uri::parse),
+                modifier = Modifier.fillMaxSize(),
+                placeHolder = {
+                    Box(
+                        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    )
+                },
+            )
+        }
+    }
+
     @Composable
     override fun Content() {
         val path = LocalNavigationPath.current
@@ -817,7 +916,6 @@ class CloudUserPlaylistScene(
             if (pendingPlayerMediaId == expectedMediaId) {
                 pendingPlayerMediaId = null
                 homeViewModel.expandPlayer()
-                path.popTop()
             }
         }
         if (showDeleteDialog) {
@@ -865,13 +963,22 @@ class CloudUserPlaylistScene(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        AudioCover(
+                        StableAudioCover(
                             uri =
                                 currentPlaylist.songs
                                     .firstOrNull()
                                     ?.artworkUrl
                                     ?.let(Uri::parse),
-                            modifier = Modifier.size(196.dp),
+                            retainedPainter = transitionCoverPainter,
+                            modifier =
+                                Modifier
+                                    .size(196.dp)
+                                    .clip(RoundedCornerShape(28.dp))
+                                    .then(
+                                        if (transition != null) Modifier.geometryTarget(transition) else Modifier,
+                                    ).graphicsLayer {
+                                        alpha = if (transition?.shouldShowTarget() != false) 1f else 0f
+                                    },
                             placeHolder = {
                                 Box(
                                     Modifier.fillMaxSize().background(
@@ -944,12 +1051,33 @@ class CloudUserPlaylistScene(
             }
         }
     }
+
+    override suspend fun onPush() {
+        super.onPush()
+        geometryTransition?.reset()
+    }
+
+    override suspend fun onAppear() {
+        coroutineScope {
+            launch { super.onAppear() }
+            launch { geometryTransition?.animateForward() }
+        }
+    }
+
+    override suspend fun onDisappear() {
+        coroutineScope {
+            launch { super.onDisappear() }
+            launch { geometryTransition?.animateReverse() }
+        }
+    }
 }
 
 @Composable
 private fun NeteasePlaylistRow(
     value: CloudCatalogPlaylist,
     onClick: (() -> Unit)?,
+    geometryTransition: GeometryTransition? = null,
+    retainedPainter: Painter? = null,
 ) {
     val clickableModifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
     Surface(
@@ -962,9 +1090,22 @@ private fun NeteasePlaylistRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            AudioCover(
+            StableAudioCover(
                 uri = value.playlist.coverUrl?.let(Uri::parse),
-                modifier = Modifier.size(64.dp),
+                retainedPainter = retainedPainter,
+                modifier =
+                    Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .then(
+                            if (geometryTransition != null) {
+                                Modifier.geometryTarget(geometryTransition)
+                            } else {
+                                Modifier
+                            },
+                        ).graphicsLayer {
+                            alpha = if (geometryTransition?.shouldShowTarget() != false) 1f else 0f
+                        },
                 placeHolder = {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Icon(Icons.Default.PlaylistPlay, null)
@@ -1087,7 +1228,7 @@ private fun CloudPlaylistSongRow(
     ) {
         AudioCover(
             uri = song.artworkUri,
-            modifier = Modifier.size(48.dp),
+            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(16.dp)),
             placeHolder = {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(Icons.Default.MusicNote, null)
@@ -1470,7 +1611,7 @@ private fun RemoteSongRow(
     ) {
         AudioCover(
             uri = song.artworkUrl?.let(Uri::parse),
-            modifier = Modifier.size(46.dp),
+            modifier = Modifier.size(46.dp).clip(RoundedCornerShape(16.dp)),
             placeHolder = {
                 Box(
                     modifier =

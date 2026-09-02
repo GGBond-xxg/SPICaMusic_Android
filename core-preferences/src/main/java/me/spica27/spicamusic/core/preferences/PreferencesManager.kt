@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.runBlocking
 
 class PreferencesManager(
     private val context: Context,
@@ -103,15 +102,7 @@ class PreferencesManager(
      * first-frame cache only, while DataStore remains the source of truth.
      */
     fun getInitialThemeMode(): String {
-        renderCache.getString(RENDER_CACHE_THEME_MODE, null)?.let { return it }
-        val storedMode =
-            runBlocking {
-                context.dataStore.data.first()[Keys.THEME_MODE].orEmpty()
-            }
-        if (storedMode.isNotBlank()) {
-            renderCache.edit().putString(RENDER_CACHE_THEME_MODE, storedMode).commit()
-        }
-        return storedMode
+        return renderCache.getString(RENDER_CACHE_THEME_MODE, null).orEmpty()
     }
 
     fun getBoolean(
@@ -146,7 +137,41 @@ class PreferencesManager(
     ): Flow<String> =
         context.dataStore.data.map { preferences ->
             preferences[key] ?: defaultValue
+        }.distinctUntilChanged()
+            .onEach { value ->
+                renderCache.edit().putString(STRING_CACHE_PREFIX + key.name, value).apply()
+            }
+
+    /**
+     * Returns the last persisted value before Compose produces its first frame.
+     *
+     * DataStore remains the source of truth. The small SharedPreferences mirror only prevents a
+     * cold start from first composing a default value and then replacing the whole section when
+     * DataStore emits the user's saved value.
+     */
+    fun getInitialString(
+        key: Preferences.Key<String>,
+        defaultValue: String = "",
+    ): String = renderCache.getString(STRING_CACHE_PREFIX + key.name, null) ?: defaultValue
+
+    /**
+     * Copies one DataStore snapshot into the non-authoritative first-frame cache. Call this before
+     * installing Compose content so initial state is stable without blocking composition.
+     */
+    suspend fun preloadRenderCache() {
+        val preferences = context.dataStore.data.first()
+        val editor = renderCache.edit()
+        preferences.asMap().forEach { (key, value) ->
+            when (value) {
+                is String -> editor.putString(STRING_CACHE_PREFIX + key.name, value)
+                is Boolean -> editor.putBoolean(BOOLEAN_CACHE_PREFIX + key.name, value)
+            }
         }
+        preferences[Keys.THEME_MODE]
+            ?.takeIf { it.isNotBlank() }
+            ?.let { editor.putString(RENDER_CACHE_THEME_MODE, it) }
+        editor.commit()
+    }
 
     suspend fun setString(
         key: Preferences.Key<String>,
@@ -155,9 +180,12 @@ class PreferencesManager(
         context.dataStore.edit { preferences ->
             preferences[key] = value
         }
-        if (key == Keys.THEME_MODE) {
-            renderCache.edit().putString(RENDER_CACHE_THEME_MODE, value).apply()
-        }
+        renderCache
+            .edit()
+            .putString(STRING_CACHE_PREFIX + key.name, value)
+            .apply {
+                if (key == Keys.THEME_MODE) putString(RENDER_CACHE_THEME_MODE, value)
+            }.apply()
     }
 
     fun getFloat(
@@ -204,6 +232,7 @@ class PreferencesManager(
         const val RENDER_CACHE_THEME_ARGB = "player_theme_argb"
         const val RENDER_CACHE_THEME_MODE = "theme_mode"
         const val BOOLEAN_CACHE_PREFIX = "boolean_"
+        const val STRING_CACHE_PREFIX = "string_"
         const val DEFAULT_PLAYER_THEME_ARGB = 0xFF2196F3.toInt()
     }
 }

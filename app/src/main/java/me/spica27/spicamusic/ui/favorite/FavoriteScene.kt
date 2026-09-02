@@ -105,6 +105,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.navkit.scene.StackScene
@@ -114,6 +115,8 @@ import me.spica27.spicamusic.common.entity.Song
 import me.spica27.spicamusic.common.entity.getAlbumCoverUri
 import me.spica27.spicamusic.common.entity.getCoverUri
 import me.spica27.spicamusic.ui.dialog.SongMenuScene
+import me.spica27.spicamusic.ui.home.HomeViewModel
+import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
 import me.spica27.spicamusic.ui.theme.ListItemFadeOutSpec
@@ -125,6 +128,7 @@ import me.spica27.spicamusic.ui.widget.combinedClickHighlight
 import me.spica27.spicamusic.ui.widget.materialSharedAxisZ
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
 import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.viewmodel.koinActivityViewModel
 
 /**
  * 我的收藏 独立页面（全屏）
@@ -156,6 +160,8 @@ private val MastheadCollapseDistance = 140.dp
 private fun FavoriteScreenContent() {
     val path = LocalNavigationPath.current
     val viewModel: FavoriteViewModel = koinViewModel()
+    val homeViewModel: HomeViewModel = koinActivityViewModel()
+    val playerViewModel = LocalPlayerViewModel.current
     val songs = viewModel.favoriteSongs.collectAsLazyPagingItems()
     val searchKeyword by viewModel.searchKeyword.collectAsStateWithLifecycle()
     val songCount by viewModel.songCount.collectAsStateWithLifecycle()
@@ -165,6 +171,16 @@ private fun FavoriteScreenContent() {
     val snackbarMessage by viewModel.snackbarMessage.collectAsStateWithLifecycle()
 
     var showSavePlaylistDialog by remember { mutableStateOf(false) }
+    var pendingPlayerMediaId by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(pendingPlayerMediaId) {
+        val expectedMediaId = pendingPlayerMediaId ?: return@LaunchedEffect
+        playerViewModel.currentMediaItem.first { it?.mediaId == expectedMediaId }
+        if (pendingPlayerMediaId == expectedMediaId) {
+            pendingPlayerMediaId = null
+            homeViewModel.expandPlayer()
+        }
+    }
 
     BackHandler {
         if (isMultiSelectMode) {
@@ -324,6 +340,7 @@ private fun FavoriteScreenContent() {
                                 if (isMultiSelectMode) {
                                     viewModel.toggleSongSelection(song.mediaStoreId)
                                 } else {
+                                    pendingPlayerMediaId = song.mediaStoreId.toString()
                                     viewModel.playAllSongs(song.mediaStoreId)
                                 }
                             },
@@ -889,7 +906,7 @@ private fun FavoriteSongRow(
             modifier =
                 Modifier
                     .size(48.dp)
-                    .clip(Shapes.MediumCornerBasedShape),
+                    .clip(Shapes.LargeCornerBasedShape),
             placeHolder = {
                 Box(
                     modifier =
@@ -1000,7 +1017,7 @@ private fun FavoriteSkeletonRows(
                     modifier =
                         Modifier
                             .size(48.dp)
-                            .clip(Shapes.MediumCornerBasedShape)
+                            .clip(Shapes.LargeCornerBasedShape)
                             .background(bone),
                 )
                 Column(

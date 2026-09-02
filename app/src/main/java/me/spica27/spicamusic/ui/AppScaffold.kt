@@ -53,10 +53,17 @@ fun AppScaffold() {
         }
     val isDarkMode = themeMode.resolve(systemDarkMode)
 
+    val initialThemeColorStyle =
+        remember(preferencesManager) {
+            preferencesManager.getInitialString(
+                PreferencesManager.Keys.THEME_COLOR_STYLE,
+                ThemeColorStyle.Textured.value,
+            )
+        }
     val themeColorStyleValue by
         preferencesManager
             .getString(PreferencesManager.Keys.THEME_COLOR_STYLE, ThemeColorStyle.Textured.value)
-            .collectAsStateWithLifecycle(ThemeColorStyle.Textured.value)
+            .collectAsStateWithLifecycle(initialThemeColorStyle)
     val initialCircularRevealEnabled =
         remember(preferencesManager) {
             preferencesManager.getCachedBoolean(

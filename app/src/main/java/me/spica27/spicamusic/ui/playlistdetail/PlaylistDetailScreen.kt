@@ -146,6 +146,8 @@ import com.skydoves.landscapist.image.LandscapistImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import me.spica27.navkit.geometry.GeometryTransition
+import me.spica27.navkit.geometry.geometryTarget
 import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.cloud.CatalogQueueItem
@@ -219,7 +221,10 @@ private enum class SearchContentState { Idle, Loading, Empty, Results }
  *   输入关键字不会触碰主列表的 Pager 与滚动状态。
  */
 @Composable
-fun PlaylistDetailScreen(playlist: Playlist) {
+fun PlaylistDetailScreen(
+    playlist: Playlist,
+    geometryTransition: GeometryTransition? = null,
+) {
     val path = LocalNavigationPath.current
     val playlistId = playlist.playlistId ?: return
     val viewModel =
@@ -268,7 +273,6 @@ fun PlaylistDetailScreen(playlist: Playlist) {
         if (pendingPlayerMediaId == expectedMediaId) {
             pendingPlayerMediaId = null
             homeViewModel.expandPlayer()
-            path.popTop()
         }
     }
 
@@ -646,11 +650,19 @@ fun PlaylistDetailScreen(playlist: Playlist) {
                             ((HEADER_HEIGHT - COVER_COLLAPSED) / 2 - HEADER_HEIGHT - Spacing.Small).toPx(),
                             p,
                         )
-                    alpha = coverAlpha
+                    alpha =
+                        coverAlpha *
+                        if (geometryTransition?.shouldShowTarget() != false) 1f else 0f
                     clip = true
                     // 视觉圆角全程线性 16dp → 8dp（除以缩放补偿 graphicsLayer 的整体缩放）
                     shape = RoundedCornerShape(lerp(16.dp.toPx(), 8.dp.toPx(), p) / s)
-                },
+                }.then(
+                    if (geometryTransition != null) {
+                        Modifier.geometryTarget(geometryTransition)
+                    } else {
+                        Modifier
+                    },
+                ),
         ) {
             PlaylistCoverView(
                 albumIds = coverAlbumIds,
@@ -1391,7 +1403,7 @@ private fun PlaylistCloudSongRow(
         }
         AudioCover(
             uri = song.artworkUri,
-            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(13.dp)),
+            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(16.dp)),
             placeHolder = {
                 Box(
                     modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh),
@@ -2381,7 +2393,7 @@ private fun PickerCloudSongRow(
         ) {
             AudioCover(
                 uri = song.artworkUri,
-                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)),
+                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(16.dp)),
                 placeHolder = {
                     Box(
                         Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh),
@@ -2441,7 +2453,7 @@ private fun PickerSongRow(
                 modifier =
                     Modifier
                         .size(48.dp)
-                        .clip(RoundedCornerShape(14.dp)),
+                        .clip(RoundedCornerShape(16.dp)),
                 success = { _, painter ->
                     Image(
                         painter = painter,

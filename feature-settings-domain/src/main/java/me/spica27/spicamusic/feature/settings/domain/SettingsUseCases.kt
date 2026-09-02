@@ -59,6 +59,11 @@ class SettingsUseCases(
         defaultValue: String = "",
     ): Flow<String> = preferencesManager.getString(key, defaultValue)
 
+    fun getInitialString(
+        key: Preferences.Key<String>,
+        defaultValue: String = "",
+    ): String = preferencesManager.getInitialString(key, defaultValue)
+
     suspend fun setString(
         key: Preferences.Key<String>,
         value: String,

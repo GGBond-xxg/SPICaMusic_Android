@@ -116,4 +116,10 @@ sealed class PlayerAction {
         val customCacheKey: String,
         val positionMs: Long,
     ) : PlayerAction()
+
+    /** Replace only the current queue entry, preserving the queue and current playhead. */
+    data class ReplaceCurrentMedia(
+        val item: MediaItem,
+        val positionMs: Long,
+    ) : PlayerAction()
 }

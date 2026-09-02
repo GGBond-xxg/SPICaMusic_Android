@@ -86,6 +86,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
@@ -99,6 +100,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import me.spica27.navkit.geometry.GeometryTransition
+import me.spica27.navkit.geometry.geometrySource
 import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.cloud.CloudLibraryScene
@@ -318,6 +321,15 @@ fun LibraryPage() {
                     key = { _, item -> "netease_library_${item.stableId}" },
                     contentType = { _, _ -> "netease_playlist" },
                 ) { _, item ->
+                    val transition =
+                        remember(item.stableId) {
+                            GeometryTransition(
+                                key = "library_cloud_playlist_${item.stableId}",
+                                sourceClipRadius = 20.dp,
+                                targetClipRadius = 16.dp,
+                            )
+                        }
+                    var transitionPainter by remember(item.stableId) { mutableStateOf<Painter?>(null) }
                     LibraryCloudPlaylistCard(
                         name = item.playlist.name,
                         subtitle =
@@ -330,7 +342,9 @@ fun LibraryPage() {
                                 item.playlist.songCount,
                             ),
                         coverUrl = item.playlist.coverUrl,
-                        onClick = { path.push(NeteasePlaylistScene(item)) },
+                        transition = transition,
+                        onClick = { path.push(NeteasePlaylistScene(item, transition, transitionPainter)) },
+                        onPainterReady = { transitionPainter = it },
                     )
                 }
             }
@@ -440,7 +454,23 @@ fun LibraryPage() {
                         }
                     PlaylistCard(
                         item = item,
-                        onClick = { path.push(PlaylistDetailScene(item.playlist)) },
+                        transition =
+                            remember(item.playlist.playlistId, item.playlist.playlistName) {
+                                GeometryTransition(
+                                    key = "library_playlist_${item.playlist.playlistId ?: item.playlist.playlistName}",
+                                    sourceClipRadius = 20.dp,
+                                    targetClipRadius = 16.dp,
+                                )
+                            },
+                        onClick = { transition ->
+                            path.push(
+                                PlaylistDetailScene(
+                                    playlist = item.playlist,
+                                    coverAlbumIds = item.coverAlbumIds,
+                                    transition = transition,
+                                ),
+                            )
+                        },
                         modifier = entranceModifier,
                     )
                 }
@@ -451,13 +481,24 @@ fun LibraryPage() {
                 key = { _, item -> item.stableId },
                 contentType = { _, _ -> "remote_playlist" },
             ) { _, item ->
+                val transition =
+                    remember(item.stableId) {
+                        GeometryTransition(
+                            key = "library_remote_playlist_${item.stableId}",
+                            sourceClipRadius = 20.dp,
+                            targetClipRadius = 16.dp,
+                        )
+                    }
+                var transitionPainter by remember(item.stableId) { mutableStateOf<Painter?>(null) }
                 LibraryCloudPlaylistCard(
                     name = item.playlist.name,
                     subtitle =
                         "${if (item.account.provider == RemoteMusicProvider.NETEASE) "网易云" else "QQ 音乐"} · " +
                             "${item.playlist.songCount} 首",
                     coverUrl = item.playlist.coverUrl,
-                    onClick = { path.push(NeteasePlaylistScene(item)) },
+                    transition = transition,
+                    onClick = { path.push(NeteasePlaylistScene(item, transition, transitionPainter)) },
+                    onPainterReady = { transitionPainter = it },
                 )
             }
 
@@ -466,11 +507,22 @@ fun LibraryPage() {
                 key = { _, item -> "user_cloud_${item.id}" },
                 contentType = { _, _ -> "user_cloud_playlist" },
             ) { _, item ->
+                val transition =
+                    remember(item.id) {
+                        GeometryTransition(
+                            key = "library_user_cloud_playlist_${item.id}",
+                            sourceClipRadius = 20.dp,
+                            targetClipRadius = 28.dp,
+                        )
+                    }
+                var transitionPainter by remember(item.id) { mutableStateOf<Painter?>(null) }
                 LibraryCloudPlaylistCard(
                     name = item.name,
                     subtitle = "本地云端歌单 · ${item.songs.size} 首",
                     coverUrl = item.songs.firstOrNull()?.artworkUrl,
-                    onClick = { path.push(CloudUserPlaylistScene(item)) },
+                    transition = transition,
+                    onClick = { path.push(CloudUserPlaylistScene(item, transition, transitionPainter)) },
+                    onPainterReady = { transitionPainter = it },
                 )
             }
 
@@ -1041,14 +1093,15 @@ private fun StatCell(
 @Composable
 private fun PlaylistCard(
     item: PlaylistWithCover,
-    onClick: () -> Unit,
+    transition: GeometryTransition,
+    onClick: (GeometryTransition) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier =
             modifier
                 .clip(Shapes.ExtraLargeCornerBasedShape)
-                .clickHighlight(onClick = onClick),
+                .clickHighlight(onClick = { onClick(transition) }),
         verticalArrangement = Arrangement.spacedBy(Spacing.Small),
     ) {
         PlaylistCoverView(
@@ -1057,7 +1110,11 @@ private fun PlaylistCard(
                 Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
-                    .clip(Shapes.ExtraLargeCornerBasedShape),
+                    .clip(Shapes.ExtraLargeCornerBasedShape)
+                    .geometrySource(transition)
+                    .graphicsLayer {
+                        alpha = if (transition.shouldShowSource()) 1f else 0f
+                    },
         )
         Column(
             modifier = Modifier.padding(bottom = Spacing.Small),
@@ -1087,7 +1144,9 @@ private fun LibraryCloudPlaylistCard(
     name: String,
     subtitle: String,
     coverUrl: String?,
+    transition: GeometryTransition,
     onClick: () -> Unit,
+    onPainterReady: (Painter) -> Unit,
 ) {
     Column(
         modifier =
@@ -1104,12 +1163,17 @@ private fun LibraryCloudPlaylistCard(
                     .fillMaxWidth()
                     .aspectRatio(1f)
                     .clip(Shapes.ExtraLargeCornerBasedShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .geometrySource(transition)
+                    .graphicsLayer {
+                        alpha = if (transition.shouldShowSource()) 1f else 0f
+                    },
             placeHolder = {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(Icons.Default.LibraryMusic, null, tint = MaterialTheme.colorScheme.primary)
                 }
             },
+            onPainterReady = onPainterReady,
         )
         Column(
             modifier = Modifier.padding(horizontal = Spacing.ExtraSmall, vertical = Spacing.Small),

@@ -123,7 +123,10 @@ fun NavigationStack(
 
     // 系统预测性返回：手势进度直接反向驱动栈顶页面的 enterProgress，
     // 下层页面会同时解除压缩和模糊，形成 Telegram 风格的“露出上一页”效果。
-    PredictiveBackHandler(enabled = path.canPop) { progress ->
+    val predictiveBackEnabled =
+        path.canPop &&
+            ((path.scenes.lastOrNull() as? StackScene)?.predictiveBackEnabled != false)
+    PredictiveBackHandler(enabled = predictiveBackEnabled) { progress ->
         val top = path.scenes.lastOrNull() ?: return@PredictiveBackHandler
         // Consume gestures arriving while the previous transition is still finishing. Letting
         // them mutate the disappearing scene's Animatable is what left the UI at a half-screen

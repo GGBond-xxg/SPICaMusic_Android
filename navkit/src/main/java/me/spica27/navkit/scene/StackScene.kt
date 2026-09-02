@@ -25,6 +25,15 @@ import kotlinx.coroutines.flow.first
  */
 abstract class StackScene : Scene() {
 
+    /**
+     * Whether the system edge predictive-back gesture may dismiss this scene.
+     *
+     * Scroll-heavy full-screen panels can opt out so a fast vertical fling that starts near an
+     * edge is never interpreted as navigation. Their explicit toolbar/back-button navigation is
+     * unaffected.
+     */
+    open val predictiveBackEnabled: Boolean = true
+
     /** 页面侧滑时是否绘制右侧边缘阴影；共享元素页面可关闭以避免退场闪影。 */
     open val transitionShadowEnabled: Boolean = true
 

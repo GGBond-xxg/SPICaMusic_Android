@@ -73,6 +73,8 @@ import org.koin.compose.viewmodel.koinViewModel
  * 当前项目已有的淡入淡出、Hi-Fi 与 USB DAC 能力。
  */
 class AudioEffectsScene : StackScene() {
+    override val predictiveBackEnabled: Boolean = false
+
     @Composable
     override fun Content() {
         val audioViewModel: AudioEffectsViewModel = koinViewModel()

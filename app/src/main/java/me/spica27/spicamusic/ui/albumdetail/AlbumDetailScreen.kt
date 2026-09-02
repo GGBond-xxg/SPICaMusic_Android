@@ -40,9 +40,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.skydoves.landscapist.image.LandscapistImage
+import kotlinx.coroutines.flow.first
 import me.spica27.navkit.geometry.GeometryTransition
 import me.spica27.navkit.geometry.geometryTarget
 import me.spica27.navkit.path.LocalNavigationPath
@@ -68,10 +72,13 @@ import me.spica27.spicamusic.common.entity.Song
 import me.spica27.spicamusic.common.entity.getAlbumCoverUri
 import me.spica27.spicamusic.common.entity.getCoverUri
 import me.spica27.spicamusic.ui.dialog.SongMenuScene
+import me.spica27.spicamusic.ui.home.HomeViewModel
+import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.widget.CoverFallback
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
 import me.spica27.spicamusic.utils.calculateLuminance
 import me.spica27.spicamusic.utils.rememberDominantColorFromUri
+import org.koin.compose.viewmodel.koinActivityViewModel
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 
@@ -95,6 +102,17 @@ fun AlbumDetailScreen(
     val viewModel: AlbumDetailViewModel =
         koinViewModel(key = "AlbumDetailViewModel_${album.id}") { parametersOf(album.id) }
     val songs by viewModel.songs.collectAsStateWithLifecycle()
+    val homeViewModel: HomeViewModel = koinActivityViewModel()
+    val playerViewModel = LocalPlayerViewModel.current
+    var pendingPlayerMediaId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(pendingPlayerMediaId) {
+        val expectedMediaId = pendingPlayerMediaId ?: return@LaunchedEffect
+        playerViewModel.currentMediaItem.first { it?.mediaId == expectedMediaId }
+        if (pendingPlayerMediaId == expectedMediaId) {
+            pendingPlayerMediaId = null
+            homeViewModel.expandPlayer()
+        }
+    }
 
     val coverUri = remember(album) { album.getCoverUri() }
     val dominantColor =
@@ -263,7 +281,10 @@ fun AlbumDetailScreen(
             items(songs, key = { it.mediaStoreId }) { song ->
                 SongRow(
                     song = song,
-                    onClick = { viewModel.playSongInList(song) },
+                    onClick = {
+                        pendingPlayerMediaId = song.mediaStoreId.toString()
+                        viewModel.playSongInList(song)
+                    },
                     onMore = { path.push(SongMenuScene(song)) },
                 )
             }

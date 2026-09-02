@@ -381,7 +381,7 @@ private fun OnlineSongRow(
             modifier =
                 Modifier
                     .size(54.dp)
-                    .clip(RoundedCornerShape(12.dp)),
+                    .clip(RoundedCornerShape(16.dp)),
             placeHolder = {
                 Box(
                     Modifier

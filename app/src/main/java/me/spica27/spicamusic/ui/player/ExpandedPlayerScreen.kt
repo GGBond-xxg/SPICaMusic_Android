@@ -27,14 +27,17 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
+import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.HighQuality
@@ -44,6 +47,7 @@ import androidx.compose.material.icons.filled.SurroundSound
 import androidx.compose.material.icons.filled.Waves
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -86,6 +90,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -120,6 +125,7 @@ import me.spica27.spicamusic.ui.widget.ShowOnIdleContent
 import me.spica27.spicamusic.ui.widget.StableAudioCover
 import me.spica27.spicamusic.ui.widget.audio_seekbar.AudioDynamicWaveSlider
 import me.spica27.spicamusic.ui.widget.audio_seekbar.AudioWaveSlider
+import me.spica27.spicamusic.ui.widget.audio_seekbar.SongStructureWaveSlider
 import me.spica27.spicamusic.ui.widget.clickHighlight
 import me.spica27.spicamusic.ui.widget.materialSharedAxisYIn
 import me.spica27.spicamusic.ui.widget.materialSharedAxisYOut
@@ -228,12 +234,24 @@ fun ExpandedPlayerScreen(
     var lyricsArtworkPainter by remember { mutableStateOf<Painter?>(null) }
     var showLyricsEditor by remember { mutableStateOf(false) }
     var showAudioQualitySheet by rememberSaveable(mediaId) { mutableStateOf(false) }
+    var showPlaybackSourceDialog by rememberSaveable(mediaId) { mutableStateOf(false) }
+    val playbackSourceState by viewModel.playbackSourcePickerState.collectAsStateWithLifecycle()
 
     if (showAudioQualitySheet) {
         PlayerAudioQualitySheet(
             audioQualityInfo = audioQualityInfo,
             playerViewModel = viewModel,
             onDismiss = { showAudioQualitySheet = false },
+        )
+    }
+    if (showPlaybackSourceDialog) {
+        PlaybackSourceDialog(
+            state = playbackSourceState,
+            onSelect = { option ->
+                viewModel.selectPlaybackSource(option)
+                showPlaybackSourceDialog = false
+            },
+            onDismiss = { showPlaybackSourceDialog = false },
         )
     }
 
@@ -458,6 +476,15 @@ fun ExpandedPlayerScreen(
                                         currentMediaItem = { currentMediaItem },
                                         audioQualityInfo = audioQualityInfo,
                                         onAudioQualityClick = { showAudioQualitySheet = true },
+                                        onPlaybackSourceClick =
+                                            if (audioQualityInfo.cloudProvider != null) {
+                                                {
+                                                    showPlaybackSourceDialog = true
+                                                    viewModel.refreshPlaybackSources()
+                                                }
+                                            } else {
+                                                null
+                                            },
                                         realPositionProvider = { positionState.value.toFloat() },
                                         seekPositionProvider = { seekValueState.floatValue },
                                         duration = duration,
@@ -925,6 +952,7 @@ private fun PlayerPage(
     currentMediaItem: () -> MediaItem?,
     audioQualityInfo: AudioQualityInfo,
     onAudioQualityClick: () -> Unit,
+    onPlaybackSourceClick: (() -> Unit)?,
     seekPositionProvider: () -> Float,
     realPositionProvider: () -> Float,
     duration: Long,
@@ -1184,7 +1212,10 @@ private fun PlayerPage(
             progressBarStyle,
             enableHeavyEffects,
         ) {
-            if (progressBarStyle != ProgressBarStyle.TimeDomainWaveform) {
+            if (
+                progressBarStyle != ProgressBarStyle.TimeDomainWaveform &&
+                progressBarStyle != ProgressBarStyle.SongStructureWave
+            ) {
                 ampState = emptyList()
                 return@LaunchedEffect
             }
@@ -1259,7 +1290,13 @@ private fun PlayerPage(
                         Modifier
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.tertiaryContainer)
-                            .padding(horizontal = Spacing.Medium, vertical = 5.dp)
+                            .then(
+                                if (onPlaybackSourceClick != null) {
+                                    Modifier.clickHighlight(onClick = onPlaybackSourceClick)
+                                } else {
+                                    Modifier
+                                },
+                            ).padding(horizontal = Spacing.Medium, vertical = 5.dp)
                             .animateContentSize(),
                     horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1346,7 +1383,7 @@ private fun PlayerAudioQualitySheet(
                                     .padding(horizontal = Spacing.Large),
                             horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
                         ) {
-                            listOf(NeteaseAudioQuality.SKY, NeteaseAudioQuality.MASTER).forEach { quality ->
+                            listOf(NeteaseAudioQuality.JY_EFFECT, NeteaseAudioQuality.SKY).forEach { quality ->
                                 FeaturedQualityCard(
                                     title = quality.neteaseTitle(),
                                     englishTitle = quality.referenceEnglishTitle(),
@@ -1366,7 +1403,7 @@ private fun PlayerAudioQualitySheet(
                         }
                     }
                     listOf(
-                        NeteaseAudioQuality.JY_EFFECT,
+                        NeteaseAudioQuality.MASTER,
                         NeteaseAudioQuality.HIRES,
                         NeteaseAudioQuality.LOSSLESS,
                         NeteaseAudioQuality.EXHIGH,
@@ -1382,7 +1419,7 @@ private fun PlayerAudioQualitySheet(
                                 selected = neteaseQuality == quality.value,
                                 membershipLabel =
                                     when (quality) {
-                                        NeteaseAudioQuality.JY_EFFECT -> "SVIP"
+                                        NeteaseAudioQuality.MASTER -> "SVIP"
                                         NeteaseAudioQuality.HIRES,
                                         NeteaseAudioQuality.LOSSLESS,
                                         NeteaseAudioQuality.EXHIGH,
@@ -1456,6 +1493,7 @@ private fun PlayerAudioQualitySheet(
                                 ProgressBarStyle.ExpressiveWavy -> Icons.Default.Waves
                                 ProgressBarStyle.DynamicWaveform -> Icons.Default.GraphicEq
                                 ProgressBarStyle.TimeDomainWaveform -> Icons.Default.SurroundSound
+                                ProgressBarStyle.SongStructureWave -> Icons.AutoMirrored.Filled.ShowChart
                             },
                         selected = progressStyle == style.value,
                         membershipLabel = null,
@@ -1606,8 +1644,8 @@ private fun ReferenceQualityRow(
 @Composable
 private fun PremiumBadge(label: String) {
     Surface(
-        color = MaterialTheme.colorScheme.inverseSurface,
-        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+        color = Color.Black,
+        contentColor = if (label == "SVIP") Color(0xFFFFD36A) else Color.White,
         shape = CircleShape,
     ) {
         Text(
@@ -1616,6 +1654,81 @@ private fun PremiumBadge(label: String) {
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
         )
+    }
+}
+
+@Composable
+private fun PlaybackSourceDialog(
+    state: PlaybackSourcePickerState,
+    onSelect: (PlaybackSourceOption) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val currentLabel = stringResource(R.string.player_playback_source_current)
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier.fillMaxWidth().widthIn(max = 380.dp),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 8.dp,
+        ) {
+            Column(
+                modifier = Modifier.padding(Spacing.Large),
+                verticalArrangement = Arrangement.spacedBy(Spacing.Small),
+            ) {
+                Text(
+                    text = stringResource(R.string.player_playback_source_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = Spacing.Small, vertical = Spacing.Small),
+                )
+                state.options.forEach { option ->
+                    Text(
+                        text =
+                            buildString {
+                                append(option.providerKey.cloudProviderLabel())
+                                if (option.isCurrent) {
+                                    append(" · ")
+                                    append(currentLabel)
+                                }
+                            },
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = if (option.isCurrent) FontWeight.SemiBold else FontWeight.Normal,
+                        color =
+                            if (option.isCurrent) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(
+                                    if (option.isCurrent) {
+                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                    } else {
+                                        Color.Transparent
+                                    },
+                                ).clickHighlight(onClick = { onSelect(option) })
+                                .padding(horizontal = Spacing.Large, vertical = Spacing.Medium),
+                    )
+                }
+                if (state.isLoading) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(Spacing.Small),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.Small, Alignment.CenterHorizontally),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Text(
+                            text = stringResource(R.string.player_playback_source_searching),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1729,6 +1842,7 @@ private fun ProgressBarStyle.playerTitle(): String =
             ProgressBarStyle.ExpressiveWavy -> R.string.progress_bar_style_expressive_wavy
             ProgressBarStyle.DynamicWaveform -> R.string.progress_bar_style_dynamic_waveform
             ProgressBarStyle.TimeDomainWaveform -> R.string.progress_bar_style_time_domain_waveform
+            ProgressBarStyle.SongStructureWave -> R.string.progress_bar_style_song_structure_wave
         },
     )
 
@@ -1861,6 +1975,17 @@ private fun SeekBarSection(
                         Modifier
                             .fillMaxWidth()
                             .height(80.dp),
+                )
+            }
+
+            ProgressBarStyle.SongStructureWave -> {
+                SongStructureWaveSlider(
+                    curveKey = Unit,
+                    progress = sliderProgress,
+                    amplitudes = amplitudes,
+                    activeColor = MaterialTheme.colorScheme.primary,
+                    inactiveColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f),
+                    modifier = Modifier.fillMaxWidth().height(80.dp),
                 )
             }
         }

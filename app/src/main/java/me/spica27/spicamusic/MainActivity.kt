@@ -18,11 +18,13 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import me.jessyan.autosize.internal.CustomAdapt
+import me.spica27.spicamusic.core.preferences.PreferencesManager
 import me.spica27.spicamusic.player.api.IMusicPlayer
 import me.spica27.spicamusic.player.api.PlayerAction
 import me.spica27.spicamusic.ui.AppScaffold
@@ -36,7 +38,10 @@ class MainActivity :
     ComponentActivity(),
     CustomAdapt {
     private val musicPlayer: IMusicPlayer by inject()
+    private val preferencesManager: PreferencesManager by inject()
     private var exitReceiverRegistered = false
+    private var contentInstalled = false
+
     private val exitReceiver =
         object : BroadcastReceiver() {
             override fun onReceive(
@@ -82,11 +87,15 @@ class MainActivity :
                 ),
         )
 
-        setContent {
-            AppScaffold()
+        // Match BondMail's cold-start ordering: restore the small local settings snapshot before
+        // installing Compose, then create the real UI tree exactly once. The system starting
+        // surface remains an icon-free solid app background while this short preload runs.
+        lifecycleScope.launch {
+            withTimeoutOrNull(STARTUP_PRELOAD_TIMEOUT_MS) {
+                preferencesManager.preloadRenderCache()
+            }
+            installContent()
         }
-
-        playExternalAudio(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -134,6 +143,24 @@ class MainActivity :
      * 横屏：1024dp（平板/横屏设计稿）
      */
     override fun getSizeInDp(): Float = 375f
+
+    private fun installContent() {
+        if (contentInstalled || isFinishing || isDestroyed) return
+        contentInstalled = true
+        setContent {
+            AppScaffold()
+        }
+        playExternalAudio(intent)
+        lifecycleScope.launch {
+            // SpicaPlayer already exposes the cached current item for the first frame. Connecting
+            // MediaBrowser immediately competes with Compose while the playback service loads its
+            // audio processors, so begin authoritative queue restoration just after the UI gets
+            // its first scheduling window. Any immediate playback action still initializes on
+            // demand through SpicaPlayer.ensureInitialized().
+            delay(STARTUP_PLAYER_INIT_DELAY_MS)
+            musicPlayer.init()
+        }
+    }
 
     private fun playExternalAudio(intent: Intent?) {
         val uri =
@@ -195,6 +222,8 @@ class MainActivity :
 
     companion object {
         const val ACTION_EXIT_APP = "me.spica27.spicamusic.action.EXIT_APP"
+        const val STARTUP_PRELOAD_TIMEOUT_MS = 1_500L
+        const val STARTUP_PLAYER_INIT_DELAY_MS = 2_000L
         const val EXTERNAL_PLAYBACK_READY_TIMEOUT_MS = 5_000L
     }
 }

@@ -1,5 +1,7 @@
 package me.spica27.spicamusic.ui.player
 
+import android.net.Uri
+import android.os.Bundle
 import android.os.SystemClock
 import android.widget.Toast
 import androidx.compose.runtime.Stable
@@ -12,6 +14,9 @@ import androidx.media3.common.MediaMetadata
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -39,6 +44,7 @@ import me.spica27.spicamusic.cloud.CloudAccountStore
 import me.spica27.spicamusic.cloud.RemoteMusicClientRegistry
 import me.spica27.spicamusic.cloud.RemoteMusicProvider
 import me.spica27.spicamusic.cloud.RemoteMusicStreamProxy
+import me.spica27.spicamusic.cloud.RemoteSong
 import me.spica27.spicamusic.cloud.parseCloudMediaIdentity
 import me.spica27.spicamusic.common.entity.ProgressBarStyle
 import me.spica27.spicamusic.common.entity.Song
@@ -51,6 +57,18 @@ import me.spica27.spicamusic.topdisplay.TopDisplayModeController
 import me.spica27.spicamusic.utils.albumCoverFallbackUri
 import me.spica27.spicamusic.utils.extractDominantColorFromUri
 import timber.log.Timber
+
+data class PlaybackSourceOption(
+    val id: String,
+    val providerKey: String,
+    val mediaItem: MediaItem,
+    val isCurrent: Boolean,
+)
+
+data class PlaybackSourcePickerState(
+    val isLoading: Boolean = false,
+    val options: List<PlaybackSourceOption> = emptyList(),
+)
 
 /**
  * 播放器 ViewModel
@@ -91,6 +109,11 @@ class PlayerViewModel(
      * 当前播放的媒体项
      */
     val currentMediaItem: StateFlow<MediaItem?> = player.currentMediaItem
+
+    private val _playbackSourcePickerState = MutableStateFlow(PlaybackSourcePickerState())
+    val playbackSourcePickerState: StateFlow<PlaybackSourcePickerState> =
+        _playbackSourcePickerState.asStateFlow()
+    private var playbackSourceSearchJob: Job? = null
 
     private val neteaseLikedSongIds = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
     private val loadedNeteaseLikeAccounts = mutableSetOf<String>()
@@ -178,8 +201,6 @@ class PlayerViewModel(
     // ==================== 基础播放控制 ====================
 
     init {
-        player.init()
-
         // 新波浪进度条发布时只迁移一次；之后尊重用户在设置页的手动选择。
         viewModelScope.launch {
             val migrationApplied =
@@ -331,9 +352,121 @@ class PlayerViewModel(
             val identity = parseCloudMediaIdentity(item.mediaId) ?: return@launch
             if (identity.provider != provider.name.lowercase()) return@launch
             remoteMusicStreamProxy.invalidate(identity.accountOrChatId, identity.songId)
+            // Resolve the newly selected quality while the old stream keeps playing. Reloading
+            // only after the provider URL is warm removes the multi-second silent lookup gap.
+            val account =
+                cloudAccountStore
+                    .getRemoteAccounts()
+                    .firstOrNull { it.id == identity.accountOrChatId }
+            if (account != null) {
+                runCatching { remoteMusicStreamProxy.prefetch(account, identity.songId) }
+                    .onFailure { Timber.tag("PlayerViewModel").w(it, "Quality prefetch failed") }
+            }
             player.doAction(
                 PlayerAction.ReloadCurrentMedia(
                     customCacheKey = "${item.mediaId}:quality:$value:${SystemClock.elapsedRealtime()}",
+                    positionMs = player.currentPosition,
+                ),
+            )
+        }
+    }
+
+    /** Find only provider copies that can be confirmed to represent the current recording. */
+    fun refreshPlaybackSources() {
+        playbackSourceSearchJob?.cancel()
+        val current = currentMediaItem.value ?: return
+        val currentProvider =
+            current.mediaMetadata.extras?.getString("cloudProvider")
+                ?: parseCloudMediaIdentity(current.mediaId)?.provider?.uppercase()
+                ?: "LOCAL"
+        val currentOption =
+            PlaybackSourceOption(
+                id = current.mediaId,
+                providerKey = currentProvider,
+                mediaItem = current,
+                isCurrent = true,
+            )
+        _playbackSourcePickerState.value =
+            PlaybackSourcePickerState(isLoading = true, options = listOf(currentOption))
+        playbackSourceSearchJob =
+            viewModelScope.launch {
+                val title =
+                    current.mediaMetadata.title
+                        ?.toString()
+                        .orEmpty()
+                        .trim()
+                val artist =
+                    current.mediaMetadata.artist
+                        ?.toString()
+                        .orEmpty()
+                        .trim()
+                val duration = current.mediaMetadata.durationMs ?: 0L
+                if (title.isEmpty()) {
+                    _playbackSourcePickerState.value =
+                        PlaybackSourcePickerState(options = listOf(currentOption))
+                    return@launch
+                }
+                val matches =
+                    coroutineScope {
+                        cloudAccountStore
+                            .getRemoteAccounts()
+                            .filter { account ->
+                                account.provider == RemoteMusicProvider.NETEASE ||
+                                    account.provider == RemoteMusicProvider.QQ_MUSIC ||
+                                    account.provider == RemoteMusicProvider.SUBSONIC
+                            }.map { account ->
+                                async {
+                                    val song =
+                                        runCatching {
+                                            remoteMusicClients
+                                                .listSongs(account, title, 0, SOURCE_SEARCH_LIMIT)
+                                                .songs
+                                                .firstOrNull { candidate ->
+                                                    candidate.matchesRecording(title, artist, duration)
+                                                }
+                                        }.getOrNull()
+                                    if (song == null) null else account to song
+                                }
+                            }.awaitAll()
+                            .filterNotNull()
+                    }
+                if (currentMediaItem.value?.mediaId != current.mediaId) return@launch
+                val alternatives =
+                    matches
+                        .distinctBy { (account, _) -> account.provider }
+                        .mapNotNull { (account, song) ->
+                            val mediaId =
+                                "cloud:${account.provider.name.lowercase()}:${account.id}:${song.id}"
+                            if (mediaId == current.mediaId) return@mapNotNull null
+                            val streamUrl = remoteMusicStreamProxy.streamUrl(account, song)
+                            PlaybackSourceOption(
+                                id = mediaId,
+                                providerKey = account.provider.name,
+                                mediaItem = song.toPlaybackSourceMediaItem(mediaId, streamUrl, account.id),
+                                isCurrent = false,
+                            )
+                        }.filterNot { option ->
+                            option.providerKey.equals(currentProvider, ignoreCase = true)
+                        }
+                _playbackSourcePickerState.value =
+                    PlaybackSourcePickerState(options = listOf(currentOption) + alternatives)
+            }
+    }
+
+    fun selectPlaybackSource(option: PlaybackSourceOption) {
+        if (option.isCurrent) return
+        viewModelScope.launch {
+            parseCloudMediaIdentity(option.mediaItem.mediaId)?.let { identity ->
+                cloudAccountStore
+                    .getRemoteAccounts()
+                    .firstOrNull { it.id == identity.accountOrChatId }
+                    ?.let { account ->
+                        runCatching { remoteMusicStreamProxy.prefetch(account, identity.songId) }
+                    }
+            }
+            player.doAction(
+                PlayerAction.ReplaceCurrentMedia(
+                    item = option.mediaItem,
                     positionMs = player.currentPosition,
                 ),
             )
@@ -546,5 +679,58 @@ class PlayerViewModel(
 
     private companion object {
         const val NETEASE_PROVIDER = "netease"
+        const val SOURCE_SEARCH_LIMIT = 20
     }
 }
+
+private fun RemoteSong.matchesRecording(
+    title: String,
+    artist: String,
+    durationMs: Long,
+): Boolean {
+    val titleMatches = title.normalizedRecordingText() == this.title.normalizedRecordingText()
+    val expectedArtist = artist.normalizedRecordingText()
+    val candidateArtist = this.artist.normalizedRecordingText()
+    val artistMatches =
+        expectedArtist.isEmpty() ||
+            candidateArtist.isEmpty() ||
+            expectedArtist.contains(candidateArtist) ||
+            candidateArtist.contains(expectedArtist)
+    val durationMatches =
+        durationMs <= 0L ||
+            this.durationMs <= 0L ||
+            kotlin.math.abs(durationMs - this.durationMs) <= 7_000L
+    return titleMatches && artistMatches && durationMatches
+}
+
+private fun String.normalizedRecordingText(): String = lowercase().filter(Char::isLetterOrDigit)
+
+private fun RemoteSong.toPlaybackSourceMediaItem(
+    mediaId: String,
+    streamUrl: String,
+    accountId: String,
+): MediaItem =
+    MediaItem
+        .Builder()
+        .setMediaId(mediaId)
+        .setUri(streamUrl)
+        .setMimeType(mimeType)
+        .setMediaMetadata(
+            MediaMetadata
+                .Builder()
+                .setTitle(title)
+                .setDisplayTitle(title)
+                .setArtist(artist)
+                .setAlbumTitle(album)
+                .setArtworkUri(artworkUrl?.let(Uri::parse))
+                .setDurationMs(durationMs)
+                .setIsPlayable(true)
+                .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
+                .setExtras(
+                    Bundle().apply {
+                        val provider = parseCloudMediaIdentity(mediaId)?.provider?.uppercase()
+                        putString("cloudProvider", provider)
+                        putString("cloudAccountId", accountId)
+                    },
+                ).build(),
+        ).build()

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <string name="app_name">柠檬音乐</string>
-  <string name="spica_app_label">柠檬音乐</string>
+  <string name="app_name">音乐</string>
+  <string name="spica_app_label">音乐</string>
   <string name="action_settings">Settings</string>
   <string name="first_fragment_label">First Fragment</string>
   <string name="second_fragment_label">Second Fragment</string>
@@ -402,6 +402,7 @@
   <string name="progress_bar_style_dynamic_waveform">动态波形</string>
   <string name="progress_bar_style_time_domain_waveform">时域波形</string>
   <string name="progress_bar_style_expressive_wavy">流动波浪</string>
+  <string name="progress_bar_style_song_structure_wave">歌曲结构曲线</string>
   <string name="settings_theme_color_style">配色方案</string>
   <string name="theme_color_style_textured">质感化</string>
   <string name="theme_color_style_flat">扁平化</string>
@@ -851,13 +852,16 @@
   <string name="netease_quality_exhigh">极高</string>
   <string name="netease_quality_lossless">无损</string>
   <string name="netease_quality_hires">Hi-Res</string>
-  <string name="netease_quality_jy_effect">高清环绕声</string>
-  <string name="netease_quality_sky">沉浸环绕声</string>
+  <string name="netease_quality_jy_effect">臻音全景声</string>
+  <string name="netease_quality_sky">杜比全景声</string>
   <string name="netease_quality_master">超清母带</string>
   <string name="netease_like_sync_failed">网易云喜欢状态更新失败，请检查网络或重新登录</string>
   <string name="settings_audio_quality">音质</string>
   <string name="settings_netease_quality_short">%1$s · 网易云</string>
   <string name="player_audio_quality_and_effects">音质与音效</string>
+  <string name="player_playback_source_title">切换播放源</string>
+  <string name="player_playback_source_current">当前</string>
+  <string name="player_playback_source_searching">正在检查可用播放源…</string>
   <string name="player_current_audio_quality">当前歌曲音质</string>
   <string name="player_quality_netease_desc">网易云在线音源与设备音效</string>
   <string name="player_quality_qq_desc">QQ 音乐在线音源与设备音效</string>
@@ -869,8 +873,8 @@
   <string name="netease_quality_exhigh_desc">最高 320 kbps</string>
   <string name="netease_quality_lossless_desc">无损 FLAC</string>
   <string name="netease_quality_hires_desc">高解析度音频</string>
-  <string name="netease_quality_jy_effect_desc">高清环绕声源</string>
-  <string name="netease_quality_sky_desc">沉浸式环绕声源</string>
+  <string name="netease_quality_jy_effect_desc">由音源提供的全景环绕声流</string>
+  <string name="netease_quality_sky_desc">由音源提供的沉浸式多声道音频流</string>
   <string name="netease_quality_master_desc">超清母带音源</string>
   <string name="qq_quality_auto">自动</string>
   <string name="qq_quality_standard">标准</string>

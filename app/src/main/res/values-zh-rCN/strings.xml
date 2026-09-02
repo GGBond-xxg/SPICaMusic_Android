@@ -30,8 +30,8 @@
   <string name="netease_quality_exhigh">极高</string>
   <string name="netease_quality_lossless">无损</string>
   <string name="netease_quality_hires">Hi-Res</string>
-  <string name="netease_quality_jy_effect">高清环绕声</string>
-  <string name="netease_quality_sky">沉浸环绕声</string>
+  <string name="netease_quality_jy_effect">臻音全景声</string>
+  <string name="netease_quality_sky">杜比全景声</string>
   <string name="netease_quality_master">超清母带</string>
   <string name="netease_like_sync_failed">网易云喜欢状态更新失败，请检查网络或重新登录</string>
   <string name="settings_background_playback_subtitle">从最近任务划掉应用后继续播放</string>
@@ -43,7 +43,7 @@
   <string name="settings_cloud_audio_cache">云端音乐缓存</string>
   <string name="settings_cloud_audio_cache_subtitle">最多保留 %1$s，用于重复播放和断网播放</string>
   <string name="settings_hifi">Hi-Fi 模式</string>
-  <string name="settings_hifi_subtitle">使用 32 位浮点输出；播放服务重启后生效</string>
+  <string name="settings_hifi_subtitle">使用 32 位浮点输出；播放中平滑切换</string>
   <string name="settings_hifi_unsupported">此设备没有 PCM 浮点输出路径</string>
   <string name="settings_usb_dac">USB DAC 输出</string>
   <string name="settings_usb_dac_connected">优先输出到 %1$s；仍会经过 Android 系统混音。</string>

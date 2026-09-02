@@ -388,6 +388,19 @@ class SpicaPlayer(
                         browser.playWhenReady = wasPlaying
                     }
 
+                    is PlayerAction.ReplaceCurrentMedia -> {
+                        val currentIndex = browser.currentMediaItemIndex
+                        if (currentIndex !in 0 until browser.mediaItemCount) return@launch
+                        val wasPlaying = browser.playWhenReady
+                        val items =
+                            List(browser.mediaItemCount) { index ->
+                                if (index == currentIndex) action.item else browser.getMediaItemAt(index)
+                            }
+                        browser.setMediaItems(items, currentIndex, action.positionMs.coerceAtLeast(0L))
+                        browser.prepare()
+                        browser.playWhenReady = wasPlaying
+                    }
+
                     is PlayerAction.AddToQueue -> {
                         val items = withContext(Dispatchers.IO) { MediaLibrary.mediaIdToMediaItems(action.mediaIds) }
                         browser.addMediaItems(items)

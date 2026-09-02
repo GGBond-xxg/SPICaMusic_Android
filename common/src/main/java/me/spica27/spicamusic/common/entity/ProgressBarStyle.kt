@@ -25,6 +25,11 @@ sealed class ProgressBarStyle(
         "时域波形",
     )
 
+    object SongStructureWave : ProgressBarStyle(
+        "song_structure_wave",
+        "歌曲结构曲线",
+    )
+
     override fun toString(): String = name
 
     companion object {
@@ -33,10 +38,11 @@ sealed class ProgressBarStyle(
                 ExpressiveWavy.value -> ExpressiveWavy
                 DynamicWaveform.value -> DynamicWaveform
                 TimeDomainWaveform.value -> TimeDomainWaveform
+                SongStructureWave.value -> SongStructureWave
                 else -> ExpressiveWavy
             }
 
         val presets: List<ProgressBarStyle>
-            get() = listOf(ExpressiveWavy, DynamicWaveform, TimeDomainWaveform)
+            get() = listOf(ExpressiveWavy, DynamicWaveform, TimeDomainWaveform, SongStructureWave)
     }
 }

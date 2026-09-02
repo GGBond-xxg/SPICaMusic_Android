@@ -38,7 +38,6 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalView
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.math.hypot
@@ -142,13 +141,7 @@ fun CircularRevealThemeHost(
     var displayedDarkTheme by remember { mutableStateOf(targetDarkTheme) }
     var displayedThemeColor by remember { mutableStateOf(targetThemeColor) }
     var hostOriginInWindow by remember { mutableStateOf(Offset.Zero) }
-    var waitingForInitialPalette by remember { mutableStateOf(true) }
     val isPlayerSurfaceActive = controller.isPlayerSurfaceActive
-
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        delay(AUTOMATIC_REVEAL_STARTUP_FALLBACK_MS)
-        waitingForInitialPalette = false
-    }
 
     androidx.compose.runtime.LaunchedEffect(
         enabled,
@@ -161,37 +154,24 @@ fun CircularRevealThemeHost(
         if (!darkChanged && !colorChanged) return@LaunchedEffect
 
         val armedOrigin = controller.consumeOrigin()
-        // Preference restoration and cold-start player metadata can update the target shortly
-        // after the first frame. Apply those updates directly so startup never looks like a song
-        // transition over a blank window. A real user gesture is still allowed during this grace
-        // period, and later automatic track changes reveal from the artwork area as usual.
-        val isAutomaticStartupUpdate = armedOrigin == null && waitingForInitialPalette
-        if (isAutomaticStartupUpdate) {
+        // DataStore restoration and Media3 reconnection are automatic state updates. They must
+        // never enter NativeRevealTransition because its expand path temporarily hides the root
+        // Android content view; on a cold start that is observable as a full white frame. Only an
+        // explicitly armed user gesture is allowed to run the full-window reveal.
+        if (armedOrigin == null) {
             displayedDarkTheme = targetDarkTheme
             displayedThemeColor = targetThemeColor
-            if (colorChanged) waitingForInitialPalette = false
             return@LaunchedEffect
         }
 
-        // A direct tap (row or transport control) supplies the exact reveal origin. Automatic
-        // track changes have no pointer event, so reveal from the artwork area instead. The
-        // palette is emitted only after artwork extraction finishes, which means the retained old
-        // frame stays visible until the next song's background is actually ready.
-        val revealOrigin =
-            armedOrigin
-                ?: if (colorChanged && view.width > 0 && view.height > 0) {
-                    hostOriginInWindow + Offset(view.width * 0.5f, view.height * 0.38f)
-                } else {
-                    null
-                }
+        val revealOrigin = armedOrigin
         // The player already owns its cover/palette transition. A window-wide circular reveal on
         // top of that makes previous/next look like two competing animations, so the player always
         // receives the new palette directly regardless of the preference value.
         val shouldReveal =
             enabled &&
                 !isPlayerSurfaceActive &&
-                (darkChanged || colorChanged) &&
-                revealOrigin != null
+                (darkChanged || colorChanged)
         if (!shouldReveal || view.width <= 0 || view.height <= 0) {
             displayedDarkTheme = targetDarkTheme
             displayedThemeColor = targetThemeColor
@@ -210,7 +190,6 @@ fun CircularRevealThemeHost(
             return@LaunchedEffect
         }
 
-        val resolvedRevealOrigin = requireNotNull(revealOrigin)
         val revealMode =
             if (darkChanged && !targetDarkTheme) {
                 RevealMode.Shrink
@@ -223,7 +202,7 @@ fun CircularRevealThemeHost(
                 NativeRevealTransition.attach(
                     anchor = view,
                     oldFrame = oldFrame,
-                    originInWindow = resolvedRevealOrigin,
+                    originInWindow = revealOrigin,
                     revealMode = revealMode,
                 )
             }.onFailure {
@@ -274,8 +253,6 @@ fun CircularRevealThemeHost(
         }
     }
 }
-
-private const val AUTOMATIC_REVEAL_STARTUP_FALLBACK_MS = 10_000L
 
 private const val REVEAL_LOG_TAG = "SPICaThemeReveal"
 

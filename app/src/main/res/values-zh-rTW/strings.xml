@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <string name="app_name">柠檬音乐</string>
-  <string name="spica_app_label">柠檬音乐</string>
+  <string name="app_name">音樂</string>
+  <string name="spica_app_label">音樂</string>
   <string name="action_settings">Settings</string>
   <string name="first_fragment_label">First Fragment</string>
   <string name="second_fragment_label">Second Fragment</string>
@@ -400,6 +400,7 @@
   <string name="progress_bar_style_dynamic_waveform">動態波形</string>
   <string name="progress_bar_style_time_domain_waveform">時域波形</string>
   <string name="progress_bar_style_expressive_wavy">流動波浪</string>
+  <string name="progress_bar_style_song_structure_wave">歌曲結構曲線</string>
   <string name="settings_theme_color_style">配色方案</string>
   <string name="theme_color_style_textured">質感化</string>
   <string name="theme_color_style_flat">扁平化</string>
@@ -855,8 +856,8 @@
   <string name="netease_quality_exhigh">極高</string>
   <string name="netease_quality_lossless">無損</string>
   <string name="netease_quality_hires">Hi-Res</string>
-  <string name="netease_quality_jy_effect">高清環繞聲</string>
-  <string name="netease_quality_sky">沉浸環繞聲</string>
+  <string name="netease_quality_jy_effect">臻音全景聲</string>
+  <string name="netease_quality_sky">杜比全景聲</string>
   <string name="netease_quality_master">超清母帶</string>
   <string name="netease_like_sync_failed">網易雲喜歡狀態更新失敗，請檢查網路或重新登入</string>
   <string name="settings_background_playback_subtitle">從最近使用的應用程式移除後繼續播放</string>
@@ -868,7 +869,7 @@
   <string name="settings_cloud_audio_cache">雲端音樂快取</string>
   <string name="settings_cloud_audio_cache_subtitle">最多保留 %1$s，用於重複播放與離線播放</string>
   <string name="settings_hifi">Hi-Fi 模式</string>
-  <string name="settings_hifi_subtitle">使用 32 位元浮點輸出；播放服務重啟後生效</string>
+  <string name="settings_hifi_subtitle">使用 32 位元浮點輸出；播放中平滑切換</string>
   <string name="settings_hifi_unsupported">此裝置沒有 PCM 浮點輸出路徑</string>
   <string name="settings_usb_dac">USB DAC 輸出</string>
   <string name="settings_usb_dac_connected">優先輸出到 %1$s；仍會經過 Android 系統混音。</string>
@@ -894,6 +895,9 @@
   <string name="settings_audio_quality">音質</string>
   <string name="settings_netease_quality_short">%1$s · 網易雲</string>
   <string name="player_audio_quality_and_effects">音質與音效</string>
+  <string name="player_playback_source_title">切換播放來源</string>
+  <string name="player_playback_source_current">目前</string>
+  <string name="player_playback_source_searching">正在檢查可用播放來源…</string>
   <string name="player_current_audio_quality">目前歌曲音質</string>
   <string name="player_quality_netease_desc">網易雲線上音源與裝置音效</string>
   <string name="player_quality_qq_desc">QQ 音樂線上音源與裝置音效</string>
@@ -905,8 +909,8 @@
   <string name="netease_quality_exhigh_desc">最高 320 kbps</string>
   <string name="netease_quality_lossless_desc">無損 FLAC</string>
   <string name="netease_quality_hires_desc">高解析度音訊</string>
-  <string name="netease_quality_jy_effect_desc">高清環繞聲源</string>
-  <string name="netease_quality_sky_desc">沉浸式環繞聲源</string>
+  <string name="netease_quality_jy_effect_desc">由音源提供的全景環繞聲串流</string>
+  <string name="netease_quality_sky_desc">由音源提供的沉浸式多聲道音訊串流</string>
   <string name="netease_quality_master_desc">超清母帶音源</string>
   <string name="qq_quality_auto">自動</string>
   <string name="qq_quality_standard">標準</string>

@@ -1016,8 +1016,8 @@ private fun CloudSongRow(
             modifier =
                 Modifier
                     .size(46.dp)
-                    .clip(RoundedCornerShape(13.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(13.dp)),
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(16.dp)),
             contentAlignment = Alignment.Center,
         ) {
             AudioCover(
