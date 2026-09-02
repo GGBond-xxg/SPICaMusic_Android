@@ -475,6 +475,7 @@
   <string name="music_source_selector_cd">播放列表</string>
   <string name="music_refresh_cloud_cd">刷新云端歌曲</string>
   <string name="music_refresh_local_cd">检查本地音乐是否有变化</string>
+  <string name="music_refresh_all_cd">刷新本地与云端歌曲</string>
   <string name="sort_song_title_az">标题 A–Z</string>
   <string name="sort_song_title_za">标题 Z–A</string>
   <string name="sort_song_artist_az">歌手 A–Z</string>

@@ -752,18 +752,13 @@ fun MusicPage() {
                     showSourceSelector = selectedTab == MusicBrowserTab.Songs,
                     onSourceClick = ::openSourceMenu,
                     showRefresh =
-                        (
-                            selectedTab == MusicBrowserTab.Songs &&
-                                selectedSource != SongLibrarySource.Local &&
-                                cloudCatalog.availableSources.isNotEmpty()
-                        ) ||
-                            (
-                                selectedTab == MusicBrowserTab.Songs &&
-                                    selectedSource == SongLibrarySource.Local
-                            ) ||
+                        selectedTab == MusicBrowserTab.Songs ||
                             selectedTab == MusicBrowserTab.Daily,
                     refreshing =
                         when {
+                            selectedTab == MusicBrowserTab.Songs &&
+                                selectedSource == SongLibrarySource.All ->
+                                localScanState is ScanState.Scanning || cloudCatalog.isRefreshing
                             selectedTab == MusicBrowserTab.Songs &&
                                 selectedSource == SongLibrarySource.Local ->
                                 localScanState is ScanState.Scanning
@@ -773,17 +768,23 @@ fun MusicPage() {
                         },
                     refreshContentDescription =
                         stringResource(
-                            if (
+                            when {
                                 selectedTab == MusicBrowserTab.Songs &&
-                                selectedSource == SongLibrarySource.Local
-                            ) {
-                                R.string.music_refresh_local_cd
-                            } else {
-                                R.string.music_refresh_cloud_cd
+                                    selectedSource == SongLibrarySource.All ->
+                                    R.string.music_refresh_all_cd
+                                selectedTab == MusicBrowserTab.Songs &&
+                                    selectedSource == SongLibrarySource.Local ->
+                                    R.string.music_refresh_local_cd
+                                else -> R.string.music_refresh_cloud_cd
                             },
                         ),
                     onRefresh = {
                         when {
+                            selectedTab == MusicBrowserTab.Songs &&
+                                selectedSource == SongLibrarySource.All -> {
+                                mediaLibraryViewModel.startFullScan()
+                                cloudCatalogViewModel.refreshCatalog()
+                            }
                             selectedTab == MusicBrowserTab.Songs &&
                                 selectedSource == SongLibrarySource.Local ->
                                 mediaLibraryViewModel.startFullScan()

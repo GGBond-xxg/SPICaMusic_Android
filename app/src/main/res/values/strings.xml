@@ -475,6 +475,7 @@
   <string name="music_source_selector_cd">Music source</string>
   <string name="music_refresh_cloud_cd">Refresh cloud songs</string>
   <string name="music_refresh_local_cd">Scan local music for changes</string>
+  <string name="music_refresh_all_cd">Refresh local and cloud songs</string>
   <string name="sort_song_title_az">Title A–Z</string>
   <string name="sort_song_title_za">Title Z–A</string>
   <string name="sort_song_artist_az">Artist A–Z</string>

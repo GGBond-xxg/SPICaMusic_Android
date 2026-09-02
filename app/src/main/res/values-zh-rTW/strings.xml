@@ -473,6 +473,7 @@
   <string name="music_source_selector_cd">播放清單</string>
   <string name="music_refresh_cloud_cd">重新整理雲端歌曲</string>
   <string name="music_refresh_local_cd">檢查本機音樂是否有變化</string>
+  <string name="music_refresh_all_cd">重新整理本機與雲端歌曲</string>
   <string name="sort_song_title_az">標題 A–Z</string>
   <string name="sort_song_title_za">標題 Z–A</string>
   <string name="sort_song_artist_az">歌手 A–Z</string>
