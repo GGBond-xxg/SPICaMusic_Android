@@ -121,7 +121,8 @@ class MediaLibrarySourceViewModel(
     }
 
     /**
-     * 全量扫描：MediaStore + 额外文件夹（串行）
+     * 同步本地曲库：有扫描目录时严格限定到这些目录；没有目录时扫描全部可访问音频。
+     * SAF 遍历负责把尚未被 MediaStore 收录的音频注册后再增量入库。
      */
     fun startFullScan() {
         startScan {
@@ -195,7 +196,7 @@ class MediaLibrarySourceViewModel(
     }
 
     /**
-     * 添加额外扫描文件夹（后台线程安全）
+     * 添加本地音乐扫描文件夹（后台线程安全）
      * 自动处理 SAF 权限申请 + DisplayName 解析，添加成功后自动扫描该目录
      */
     fun addExtraFolder(
@@ -224,8 +225,8 @@ class MediaLibrarySourceViewModel(
                     pathPrefix = resolvePathPrefix(uri),
                 )
 
-                // 自动扫描新目录，将其中音频注册进 MediaStore 并入库
-                startScan { scanService.scanExtraFolders() }
+                // 目录从“未指定”切换为“已指定”后需要立即重建范围，移除目录外歌曲。
+                startFullScan()
             } catch (e: Exception) {
                 // 权限申请失败或 IO 错误，静默处理
                 timber.log.Timber.w(e, "Failed to add extra folder")
@@ -257,8 +258,8 @@ class MediaLibrarySourceViewModel(
                     pathPrefix = resolvePathPrefix(uri),
                 )
 
-                // 重扫 MediaStore：全量扫描会把忽略目录下已入库的歌曲移除
-                startScan { scanService.scanMediaStore() }
+                // 重扫完整配置：MediaStore 与 SAF 目录都应用新的忽略范围。
+                startFullScan()
             } catch (e: Exception) {
                 timber.log.Timber.w(e, "Failed to add ignore folder")
             }
@@ -278,7 +279,7 @@ class MediaLibrarySourceViewModel(
                     Intent.FLAG_GRANT_READ_URI_PERMISSION,
                 )
                 folderRepository.reAuthorize(id, newUri.toString(), resolvePathPrefix(newUri))
-                startScan { scanService.scanExtraFolders() }
+                startFullScan()
             } catch (e: Exception) {
                 timber.log.Timber.w(e, "Failed to re-authorize folder")
             }
@@ -287,8 +288,8 @@ class MediaLibrarySourceViewModel(
 
     /**
      * 删除目录：
-     * - EXTRA：释放 SAF 持久权限（系统持久权限有上限），已入库歌曲保留（它们已注册进 MediaStore）
-     * - IGNORE：删除后重扫 MediaStore，让该目录下的歌曲重新入库
+     * - EXTRA：释放 SAF 持久权限并按剩余目录重建范围；删掉最后一个目录后恢复全盘扫描
+     * - IGNORE：删除后重扫，让该目录下的歌曲重新入库
      */
     fun removeFolder(
         context: Context,
@@ -307,10 +308,11 @@ class MediaLibrarySourceViewModel(
                         } catch (e: SecurityException) {
                             // 权限可能已被系统回收
                         }
+                        startFullScan()
                     }
 
                     FolderType.IGNORE -> {
-                        startScan { scanService.scanMediaStore() }
+                        startFullScan()
                     }
                 }
             } catch (e: Exception) {

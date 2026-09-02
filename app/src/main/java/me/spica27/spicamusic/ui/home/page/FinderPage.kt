@@ -326,7 +326,9 @@ fun FinderPage(playEntrance: Boolean = true) {
     val heroInitialized =
         when (finderHeroSource) {
             FinderHeroSource.RECENT_FREQUENT -> frequentSongsInitialized
-            FinderHeroSource.NETEASE_DAILY -> !cloudCatalog.isLoadingDailyRecommendations
+            FinderHeroSource.NETEASE_DAILY ->
+                cloudCatalog.dailyRecommendations.isNotEmpty() ||
+                    !cloudCatalog.isLoadingDailyRecommendations
         }
     val favoritePreviewSongs =
         remember(favoriteSongs) {

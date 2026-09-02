@@ -371,9 +371,7 @@ class MusicScanService(
             // 1. 从 DB 加载现有歌曲的摘要信息，构建 HashMap（O(1) 查找）
             val existingScanInfoMap: Map<Long, SongDao.SongScanInfo> =
                 songDao.getAllScanInfo().associateBy { it.mediaStoreId }
-            // 专辑先查询、后提交。只有歌曲快照通过完整性校验后才允许替换，
-            // 避免 MediaStore 短暂不可用时先把所有封面清空。
-            val albums = loadAlbums()
+            val scanPathScope = loadScanPathScope()
 
             // 2. 查询 MediaStore（包含 DATE_MODIFIED 用于增量判断）
             val projection = arrayOf(
@@ -389,19 +387,38 @@ class MusicScanService(
                 MediaStore.Audio.Media.DATE_MODIFIED,
             )
 
-            val selection =
-                buildString {
-                    append("${MediaStore.Audio.Media.IS_MUSIC} = 1")
-                    if (ruleMatcher.rules.minDurationMs > 0) {
-                        append(" AND ${MediaStore.Audio.Media.DURATION} >= ${ruleMatcher.rules.minDurationMs}")
-                    }
-                    if (ruleMatcher.rules.maxDurationMs > 0) {
-                        append(" AND ${MediaStore.Audio.Media.DURATION} <= ${ruleMatcher.rules.maxDurationMs}")
-                    }
-                    if (ruleMatcher.rules.minFileSizeBytes > 0) {
-                        append(" AND ${MediaStore.Audio.Media.SIZE} >= ${ruleMatcher.rules.minFileSizeBytes}")
-                    }
+            val selectionParts = mutableListOf<String>()
+            val selectionArgs = mutableListOf<String>()
+            if (ruleMatcher.rules.minDurationMs > 0) {
+                selectionParts +=
+                    "${MediaStore.Audio.Media.DURATION} >= ${ruleMatcher.rules.minDurationMs}"
+            }
+            if (ruleMatcher.rules.maxDurationMs > 0) {
+                selectionParts +=
+                    "${MediaStore.Audio.Media.DURATION} <= ${ruleMatcher.rules.maxDurationMs}"
+            }
+            if (ruleMatcher.rules.minFileSizeBytes > 0) {
+                selectionParts +=
+                    "${MediaStore.Audio.Media.SIZE} >= ${ruleMatcher.rules.minFileSizeBytes}"
+            }
+            if (scanPathScope.restricted) {
+                if (scanPathScope.pathPrefixes.isEmpty()) {
+                    // A selected SAF folder without an absolute path is imported by the tree
+                    // traversal below. Never turn that case into an accidental device-wide scan.
+                    selectionParts += "0"
+                } else {
+                    selectionParts +=
+                        scanPathScope.pathPrefixes.joinToString(
+                            prefix = "(",
+                            postfix = ")",
+                            separator = " OR ",
+                        ) {
+                            "${MediaStore.Audio.Media.DATA} LIKE ?"
+                        }
+                    selectionArgs += scanPathScope.pathPrefixes.map { "$it%" }
                 }
+            }
+            val selection = selectionParts.joinToString(" AND ").ifBlank { null }
             val sortOrder = "${MediaStore.Audio.Media.DATE_ADDED} DESC"
 
             val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -414,6 +431,8 @@ class MusicScanService(
             val songsToScan = mutableListOf<SongEntity>()
             // 本次 MediaStore 中所有可见的 mediaStoreId
             val currentMediaStoreIds = mutableSetOf<Long>()
+            // 指定目录时只加载实际使用的专辑，避免临时持有全盘专辑对象。
+            val currentAlbumIds = mutableSetOf<Long>()
             var rawMediaStoreRowCount = 0
 
             val mediaCursor =
@@ -421,7 +440,7 @@ class MusicScanService(
                     uri,
                     projection,
                     selection,
-                    null,
+                    selectionArgs.toTypedArray().takeIf { it.isNotEmpty() },
                     sortOrder,
                 ) ?: throw MediaStoreQueryUnavailableException("MediaStore audio query returned null")
 
@@ -455,12 +474,23 @@ class MusicScanService(
                     val dateModified = cursor.getLong(dateModifiedColumn)
 
                     // 按用户扫描规则过滤（格式/时长/体积），并跳过忽略文件夹中的文件
-                    if (!isMediaStoreSongEligible(ruleMatcher, mimeType, duration, size, path, ignorePrefixes)) {
+                    if (
+                        !isMediaStoreSongEligible(
+                            ruleMatcher = ruleMatcher,
+                            mimeType = mimeType,
+                            duration = duration,
+                            size = size,
+                            path = path,
+                            ignorePrefixes = ignorePrefixes,
+                            scanPathScope = scanPathScope,
+                        )
+                    ) {
                         continue
                     }
 
                     totalScanned++
                     currentMediaStoreIds.add(mediaStoreId)
+                    currentAlbumIds.add(albumId)
 
                     // 更新进度
                     _scanProgress.value = ScanProgress(
@@ -526,11 +556,12 @@ class MusicScanService(
             }
 
             val snapshotAccepted =
-                emptySnapshotGuard.shouldAccept(
-                    existingItemCount = existingScanInfoMap.size,
-                    rawSnapshotItemCount = rawMediaStoreRowCount,
-                    nowMs = android.os.SystemClock.elapsedRealtime(),
-                )
+                scanPathScope.restricted ||
+                    emptySnapshotGuard.shouldAccept(
+                        existingItemCount = existingScanInfoMap.size,
+                        rawSnapshotItemCount = rawMediaStoreRowCount,
+                        nowMs = android.os.SystemClock.elapsedRealtime(),
+                    )
             if (!snapshotAccepted) {
                 Timber.tag(TAG).w(
                     "MediaStore 暂时返回空快照，保留现有曲库并延迟复核: existing=${existingScanInfoMap.size}",
@@ -546,7 +577,14 @@ class MusicScanService(
                 return@withContext ScanResult(totalScanned, 0, 0, 0)
             }
 
-            if (albums.isNotEmpty() || currentMediaStoreIds.isEmpty()) {
+            // 专辑后查询、后提交。只有歌曲快照通过完整性校验后才允许替换，
+            // 避免 MediaStore 短暂不可用时先把所有封面清空。
+            val albums = loadAlbums(currentAlbumIds)
+            if (
+                albums.isNotEmpty() ||
+                currentMediaStoreIds.isEmpty() ||
+                currentAlbumIds.none { it > 0L }
+            ) {
                 albumDao.replaceAll(albums)
             } else {
                 Timber.tag(TAG).w(
@@ -645,6 +683,7 @@ class MusicScanService(
     private suspend fun performMediaStoreDeltaSync(
         changedMediaStoreIds: Set<Long>,
         deletedMediaStoreIds: Set<Long>,
+        enforceConfiguredFolderScope: Boolean = true,
     ): ScanResult {
         val candidateIds = (changedMediaStoreIds + deletedMediaStoreIds)
         if (candidateIds.isEmpty()) return ScanResult(0, 0, 0, 0)
@@ -654,6 +693,12 @@ class MusicScanService(
 
         val ignorePrefixes = loadIgnorePrefixes()
         val ruleMatcher = loadScanRuleMatcher()
+        val scanPathScope =
+            if (enforceConfiguredFolderScope) {
+                loadScanPathScope()
+            } else {
+                ScanPathScope(restricted = false, pathPrefixes = emptyList())
+            }
         val existingInfoMap =
                     songDao
                         .getScanInfoByMediaStoreIds(candidateIds.toList())
@@ -692,7 +737,17 @@ class MusicScanService(
                             val dateModified = cursor.getLong(dateModifiedColumn)
                             val existingInfo = existingInfoMap[mediaStoreId]
 
-                            if (!isMediaStoreSongEligible(ruleMatcher, mimeType, duration, size, path, ignorePrefixes)) {
+                            if (
+                                !isMediaStoreSongEligible(
+                                    ruleMatcher = ruleMatcher,
+                                    mimeType = mimeType,
+                                    duration = duration,
+                                    size = size,
+                                    path = path,
+                                    ignorePrefixes = ignorePrefixes,
+                                    scanPathScope = scanPathScope,
+                                )
+                            ) {
                                 existingInfo?.albumId?.let(affectedAlbumIds::add)
                                 Timber.tag(TAG).d("MediaStore 变更文件不符合条件，跳过: $displayName")
                                 continue
@@ -845,38 +900,37 @@ class MusicScanService(
         isCancelled = false
 
         try {
-            // 构建现有路径集合（避免重复注册进 MediaStore）
-            val existingPaths = buildExistingPathsSet()
+            // 只索引这些扫描目录可能命中的 MediaStore 路径，避免为一个小目录在内存中
+            // 构造整机音频路径集合；无法解析绝对路径的 SAF 目录才回退到完整索引。
+            val existingPathIndex = buildExistingMediaPathIndex(foldersToScan.map { it.pathPrefix })
 
             var totalScanned = 0
-            // 新注册进 MediaStore 的 mediaStoreId，注册后统一走 MediaStore 增量入库
-            val registeredMediaIds = mutableSetOf<Long>()
+            // 目录内已存在或新注册的 mediaStoreId，统一走增量入库。
+            val selectedMediaIds = mutableSetOf<Long>()
 
             for (folder in foldersToScan) {
                 if (isCancelled) break
                 try {
                     // 第二层防御：每个文件夹独立 try-catch
                     val treeUri = Uri.parse(folder.uriString)
-                    val audioFiles = walkDocumentTree(treeUri, ignorePrefixes, ruleMatcher)
-
-                    for (fileInfo in audioFiles) {
-                        if (isCancelled) break
+                    walkDocumentTree(treeUri, ignorePrefixes, ruleMatcher) { fileInfo ->
+                        if (isCancelled) return@walkDocumentTree
                         totalScanned++
+                        _scanProgress.value =
+                            ScanProgress(
+                                current = totalScanned,
+                                total = 0,
+                                currentFile = fileInfo.displayName,
+                            )
 
-                        // 已在 MediaStore 中则跳过注册
-                        val filePath = fileInfo.absolutePath ?: continue
-                        if (existingPaths.contains(filePath)) continue
-
-                        _scanProgress.value = ScanProgress(
-                            current = totalScanned,
-                            total = audioFiles.size,
-                            currentFile = fileInfo.displayName
-                        )
-
-                        // 注册到 MediaStore，获取 mediaId
-                        val mediaId = registerFileInMediaStore(filePath) ?: continue
-                        registeredMediaIds.add(mediaId)
-                        existingPaths.add(filePath) // 防止同次扫描重复处理
+                        val filePath = fileInfo.absolutePath ?: return@walkDocumentTree
+                        val mediaId =
+                            existingPathIndex[filePath]
+                                ?: registerFileInMediaStore(filePath)?.also { registeredId ->
+                                    existingPathIndex[filePath] = registeredId
+                                }
+                                ?: return@walkDocumentTree
+                        selectedMediaIds.add(mediaId)
                     }
                 } catch (e: SecurityException) {
                     // 第二层防御：权限在遍历中被撤销
@@ -889,8 +943,10 @@ class MusicScanService(
 
             // 注册完成后复用 MediaStore 增量入库（正确获得 albumId/专辑/标签信息）
             val deltaResult = performMediaStoreDeltaSync(
-                changedMediaStoreIds = registeredMediaIds,
+                changedMediaStoreIds = selectedMediaIds,
                 deletedMediaStoreIds = emptySet(),
+                // selectedMediaIds 全部来自配置目录，绝对路径无法解析时也必须允许导入。
+                enforceConfiguredFolderScope = false,
             )
 
             Timber.tag(TAG).i("额外文件夹扫描完成: 总计=$totalScanned, 新增=${deltaResult.newAdded}")
@@ -918,6 +974,14 @@ class MusicScanService(
         } catch (e: Exception) {
             emptyList()
         }
+
+    private suspend fun loadScanPathScope(): ScanPathScope {
+        val configuredFolders = scanFolderRepository.getExtraFoldersSync()
+        return ScanPathScope.fromConfiguredFolders(
+            configuredFolderCount = configuredFolders.size,
+            rawPathPrefixes = configuredFolders.map { it.pathPrefix },
+        )
+    }
 
     private fun queryMediaStoreByIds(
         contentResolver: ContentResolver,
@@ -959,10 +1023,12 @@ class MusicScanService(
         size: Long,
         path: String,
         ignorePrefixes: List<String>,
+        scanPathScope: ScanPathScope,
     ): Boolean {
         if (!ruleMatcher.matchesFormat(mimeType, path)) return false
         if (!ruleMatcher.matchesDuration(duration)) return false
         if (!ruleMatcher.matchesSize(size)) return false
+        if (!scanPathScope.contains(path)) return false
         if (path.isNotEmpty() && ignorePrefixes.any { path.startsWith(it) }) return false
         return true
     }
@@ -996,51 +1062,81 @@ class MusicScanService(
         albumDao.replaceByIds(albumIdStrings, albums)
     }
 
-    /** 从 MediaStore 构建现有文件路径的可变集合 */
-    private suspend fun buildExistingPathsSet(): MutableSet<String> = withContext(Dispatchers.IO) {
-        val paths = mutableSetOf<String>()
+    /**
+     * 构建 MediaStore 路径到 ID 的索引。所有目录都有绝对路径时把筛选下推到查询，
+     * 既降低游标大小，也避免把整机音频路径复制进堆内存。
+     */
+    private suspend fun buildExistingMediaPathIndex(
+        configuredPathPrefixes: List<String?>,
+    ): MutableMap<String, Long> = withContext(Dispatchers.IO) {
+        val pathIndex = mutableMapOf<String, Long>()
         val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
         } else {
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
         }
+        val allPrefixesKnown = configuredPathPrefixes.all { !it.isNullOrBlank() }
+        val normalizedPrefixes =
+            configuredPathPrefixes
+                .filterNotNull()
+                .map(String::trim)
+                .filter(String::isNotEmpty)
+                .map { path -> if (path.endsWith('/')) path else "$path/" }
+                .distinct()
+        val selection =
+            if (allPrefixesKnown && normalizedPrefixes.isNotEmpty()) {
+                normalizedPrefixes.joinToString(prefix = "(", postfix = ")", separator = " OR ") {
+                    "${MediaStore.Audio.Media.DATA} LIKE ?"
+                }
+            } else {
+                null
+            }
+        val selectionArgs =
+            normalizedPrefixes
+                .map { "$it%" }
+                .toTypedArray()
+                .takeIf { selection != null }
         context.contentResolver.query(
             uri,
-            arrayOf(MediaStore.Audio.Media.DATA),
-            null, null, null
+            arrayOf(MediaStore.Audio.Media._ID, MediaStore.Audio.Media.DATA),
+            selection,
+            selectionArgs,
+            null,
         )?.use { cursor ->
+            val idCol = cursor.getColumnIndex(MediaStore.Audio.Media._ID)
             val dataCol = cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
-            if (dataCol >= 0) {
+            if (idCol >= 0 && dataCol >= 0) {
                 while (cursor.moveToNext()) {
                     val path = cursor.getString(dataCol)
-                    if (!path.isNullOrEmpty()) paths.add(path)
+                    if (!path.isNullOrEmpty()) pathIndex[path] = cursor.getLong(idCol)
                 }
             }
         }
-        paths
+        pathIndex
     }
 
     /**
-     * 递归遍历 SAF 目录树，收集所有音频文件信息
+     * 递归遍历 SAF 目录树并逐个处理音频文件。
+     *
+     * 不再为整棵目录树构造 List，目录内有数千首歌曲时堆内存仍保持近似常量。
      * @param treeUri  SAF tree URI
      * @param ignorePrefixes 忽略文件夹的绝对路径前缀列表（以 "/" 结尾）
      * @param ruleMatcher 扫描规则匹配器（扩展名 / 最小体积过滤）
      * @param parentDocId  当前递归层级的 document ID，首次调用传 null 使用 tree root
      * @param depth  当前递归深度，超过 MAX_FOLDER_DEPTH 时停止
      */
-    private fun walkDocumentTree(
+    private suspend fun walkDocumentTree(
         treeUri: Uri,
         ignorePrefixes: List<String>,
         ruleMatcher: ScanRuleMatcher,
         parentDocId: String? = null,
         depth: Int = 0,
-    ): List<DocumentFileInfo> {
-        if (depth > MAX_FOLDER_DEPTH) return emptyList()
+        onAudioFile: suspend (DocumentFileInfo) -> Unit,
+    ) {
+        if (depth > MAX_FOLDER_DEPTH) return
 
         val docId = parentDocId ?: DocumentsContract.getTreeDocumentId(treeUri)
         val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, docId)
-
-        val results = mutableListOf<DocumentFileInfo>()
 
         context.contentResolver.query(
             childrenUri,
@@ -1077,7 +1173,14 @@ class MusicScanService(
                     if (folderPath != null && ignorePrefixes.any { folderPath.startsWith(it) }) {
                         continue // 跳过此子目录整棵树
                     }
-                    results.addAll(walkDocumentTree(treeUri, ignorePrefixes, ruleMatcher, childDocId, depth + 1))
+                    walkDocumentTree(
+                        treeUri = treeUri,
+                        ignorePrefixes = ignorePrefixes,
+                        ruleMatcher = ruleMatcher,
+                        parentDocId = childDocId,
+                        depth = depth + 1,
+                        onAudioFile = onAudioFile,
+                    )
                 } else {
                     // 是文件：按扫描规则过滤扩展名与最小体积
                     if (!ruleMatcher.matchesExtension(displayName)) continue
@@ -1086,20 +1189,15 @@ class MusicScanService(
                     // 忽略文件夹过滤
                     if (absolutePath != null && ignorePrefixes.any { absolutePath.startsWith(it) }) continue
 
-                    val ext = displayName.substringAfterLast('.', "").lowercase()
-                    results.add(
+                    onAudioFile(
                         DocumentFileInfo(
                             displayName = displayName,
-                            mimeType = if (mimeType == "application/octet-stream") "audio/$ext" else mimeType,
-                            size = size,
                             absolutePath = absolutePath,
-                            duration = 0L,
-                        )
+                        ),
                     )
                 }
             }
         }
-        return results
     }
 
     /**
@@ -1141,10 +1239,7 @@ class MusicScanService(
     /** SAF 文件信息 */
     private data class DocumentFileInfo(
         val displayName: String,
-        val mimeType: String,
-        val size: Long,
         val absolutePath: String?,
-        val duration: Long,
     )
 
     /**

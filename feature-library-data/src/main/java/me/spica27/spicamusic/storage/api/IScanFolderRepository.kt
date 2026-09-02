@@ -4,7 +4,7 @@ import kotlinx.coroutines.flow.Flow
 
 /** 文件夹用途类型 */
 enum class FolderType(val value: Int) {
-    /** 额外扫描：遍历此文件夹并注册未收录的音频 */
+    /** 扫描范围：配置至少一个此类型目录后，本地曲库严格限定在这些目录 */
     EXTRA(0),
     /** 忽略：此路径下的音频在所有扫描中均跳过 */
     IGNORE(1),

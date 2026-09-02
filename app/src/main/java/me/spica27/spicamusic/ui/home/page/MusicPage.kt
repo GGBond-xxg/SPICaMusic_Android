@@ -72,7 +72,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -93,7 +92,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -102,8 +100,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -133,6 +129,8 @@ import me.spica27.spicamusic.ui.home.HomeViewModel
 import me.spica27.spicamusic.ui.home.LocalBottomBarScrollConnection
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.scan.ScannerScene
+import me.spica27.spicamusic.ui.settings.MediaLibrarySourceViewModel
+import me.spica27.spicamusic.ui.settings.ScanState
 import me.spica27.spicamusic.ui.theme.EaseOutEmphasized
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
@@ -405,24 +403,13 @@ fun MusicPage() {
     val path = LocalNavigationPath.current
     val homeViewModel: HomeViewModel = koinActivityViewModel()
     val cloudCatalogViewModel: CloudMusicCatalogViewModel = koinActivityViewModel()
+    val mediaLibraryViewModel: MediaLibrarySourceViewModel = koinActivityViewModel()
     val playerViewModel = LocalPlayerViewModel.current
 
     val allSongs by homeViewModel.allSongs.collectAsStateWithLifecycle()
     val cloudCatalog by cloudCatalogViewModel.state.collectAsStateWithLifecycle()
+    val localScanState by mediaLibraryViewModel.scanState.collectAsStateWithLifecycle()
     val currentMediaItem by playerViewModel.currentMediaItem.collectAsStateWithLifecycle()
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    DisposableEffect(lifecycleOwner, cloudCatalogViewModel) {
-        val observer =
-            LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_RESUME) {
-                    cloudCatalogViewModel.refreshSources()
-                }
-            }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
     val unknownAlbum = stringResource(R.string.unknown_album)
     val unknownArtist = stringResource(R.string.unknown_artist)
 
@@ -764,24 +751,45 @@ fun MusicPage() {
                     sourceIcon = selectedSource.icon,
                     showSourceSelector = selectedTab == MusicBrowserTab.Songs,
                     onSourceClick = ::openSourceMenu,
-                    showCloudRefresh =
+                    showRefresh =
                         (
                             selectedTab == MusicBrowserTab.Songs &&
                                 selectedSource != SongLibrarySource.Local &&
                                 cloudCatalog.availableSources.isNotEmpty()
                         ) ||
+                            (
+                                selectedTab == MusicBrowserTab.Songs &&
+                                    selectedSource == SongLibrarySource.Local
+                            ) ||
                             selectedTab == MusicBrowserTab.Daily,
-                    cloudRefreshing =
-                        if (selectedTab == MusicBrowserTab.Daily) {
-                            cloudCatalog.isLoadingDailyRecommendations
-                        } else {
-                            cloudCatalog.isRefreshing
+                    refreshing =
+                        when {
+                            selectedTab == MusicBrowserTab.Songs &&
+                                selectedSource == SongLibrarySource.Local ->
+                                localScanState is ScanState.Scanning
+                            selectedTab == MusicBrowserTab.Daily ->
+                                cloudCatalog.isLoadingDailyRecommendations
+                            else -> cloudCatalog.isRefreshing
                         },
-                    onCloudRefresh = {
-                        if (selectedTab == MusicBrowserTab.Daily) {
-                            cloudCatalogViewModel.refreshDailyRecommendations(forceRefresh = true)
-                        } else {
-                            cloudCatalogViewModel.refreshCatalog()
+                    refreshContentDescription =
+                        stringResource(
+                            if (
+                                selectedTab == MusicBrowserTab.Songs &&
+                                selectedSource == SongLibrarySource.Local
+                            ) {
+                                R.string.music_refresh_local_cd
+                            } else {
+                                R.string.music_refresh_cloud_cd
+                            },
+                        ),
+                    onRefresh = {
+                        when {
+                            selectedTab == MusicBrowserTab.Songs &&
+                                selectedSource == SongLibrarySource.Local ->
+                                mediaLibraryViewModel.startFullScan()
+                            selectedTab == MusicBrowserTab.Daily ->
+                                cloudCatalogViewModel.refreshDailyRecommendations(forceRefresh = true)
+                            else -> cloudCatalogViewModel.refreshCatalog()
                         }
                     },
                     modifier =
@@ -1427,9 +1435,10 @@ private fun MusicSectionHeader(
     sourceIcon: ImageVector,
     showSourceSelector: Boolean,
     onSourceClick: () -> Unit,
-    showCloudRefresh: Boolean,
-    cloudRefreshing: Boolean,
-    onCloudRefresh: () -> Unit,
+    showRefresh: Boolean,
+    refreshing: Boolean,
+    refreshContentDescription: String,
+    onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -1459,21 +1468,21 @@ private fun MusicSectionHeader(
             horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (showCloudRefresh) {
+            if (showRefresh) {
                 Box(
                     modifier =
                         Modifier
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.primaryContainer)
                             .clickHighlight(
-                                onClickLabel = stringResource(R.string.music_refresh_cloud_cd),
+                                onClickLabel = refreshContentDescription,
                                 onClick = {
-                                    if (!cloudRefreshing) onCloudRefresh()
+                                    if (!refreshing) onRefresh()
                                 },
                             ).padding(Spacing.Small),
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (cloudRefreshing) {
+                    if (refreshing) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,
@@ -1482,7 +1491,7 @@ private fun MusicSectionHeader(
                     } else {
                         Icon(
                             imageVector = Icons.Default.Refresh,
-                            contentDescription = stringResource(R.string.music_refresh_cloud_cd),
+                            contentDescription = refreshContentDescription,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(18.dp),
                         )

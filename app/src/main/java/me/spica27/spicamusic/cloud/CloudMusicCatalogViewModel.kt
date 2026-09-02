@@ -135,6 +135,7 @@ class CloudMusicCatalogViewModel(
     private var catalogGeneration = 0
     private var remotePlaylistRefreshJob: Job? = null
     private var playbackQueueCompletionJob: Job? = null
+    private var dailyRecommendationsAccountId: String? = null
 
     init {
         refreshSources()
@@ -322,6 +323,7 @@ class CloudMusicCatalogViewModel(
     fun refreshDailyRecommendations(forceRefresh: Boolean = false) {
         val account = accountStore.getRemoteAccounts(RemoteMusicProvider.NETEASE).firstOrNull()
         if (account == null) {
+            dailyRecommendationsAccountId = null
             _state.update {
                 it.copy(
                     dailyRecommendations = emptyList(),
@@ -331,11 +333,23 @@ class CloudMusicCatalogViewModel(
             }
             return
         }
-        if (_state.value.isLoadingDailyRecommendations) return
+        val current = _state.value
+        if (current.isLoadingDailyRecommendations) return
+        // Page changes can ask the catalog to re-evaluate its sources. Reuse the already
+        // published recommendations for the same account instead of flashing a loading state
+        // while reading the exact same in-memory/disk cache again.
+        if (
+            !forceRefresh &&
+            dailyRecommendationsAccountId == account.id &&
+            current.dailyRecommendations.isNotEmpty()
+        ) {
+            return
+        }
         _state.update { it.copy(isLoadingDailyRecommendations = true, dailyRecommendationsError = null) }
         viewModelScope.launch {
             runCatching { remoteClients.dailyRecommendations(account, forceRefresh) }
                 .onSuccess { songs ->
+                    dailyRecommendationsAccountId = account.id
                     _state.update {
                         it.copy(
                             dailyRecommendations = songs.map { song -> account.toCatalogSong(song) },

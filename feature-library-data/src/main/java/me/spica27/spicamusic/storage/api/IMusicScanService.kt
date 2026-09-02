@@ -26,13 +26,13 @@ data class ScanProgress(
  */
 interface IMusicScanService {
     /**
-     * 扫描媒体库（默认使用 MediaStore）
+     * 扫描媒体库：配置目录时仅扫描目录内音频，未配置时扫描全部可访问音频
      * @return 扫描结果
      */
     suspend fun scanMediaStore(): ScanResult
 
     /**
-     * 扫描用户添加的所有额外文件夹（基于 SAF tree URI）
+     * 遍历用户配置的所有扫描文件夹（基于 SAF tree URI）
      * - 会自动跳过权限已失效的文件夹并标记 isAccessible=false
      * - 会跳过路径匹配"忽略文件夹"的文件
      * - 未被 MediaStore 收录的音频文件将通过 MediaScannerConnection 注册后入库

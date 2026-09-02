@@ -30,7 +30,7 @@ enum class ScanFormat(
 
 /**
  * 扫描规则：决定哪些音频会被收录进曲库。
- * 对全量扫描、MediaStore 观察者触发的局部同步和额外目录扫描统一生效。
+ * 对全量扫描、MediaStore 观察者触发的局部同步和指定目录扫描统一生效。
  */
 data class ScanRules(
     val minDurationMs: Long,
