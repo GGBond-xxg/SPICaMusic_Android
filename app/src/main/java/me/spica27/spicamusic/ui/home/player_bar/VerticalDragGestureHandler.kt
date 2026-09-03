@@ -20,6 +20,8 @@ internal class VerticalDragGestureHandler(
     private val snapSpec: AnimationSpec<Float>,
     private val onDragStarted: () -> Unit = {},
     private val onSettled: (expanded: Boolean) -> Unit = {},
+    private val isDragReady: () -> Boolean = { true },
+    private val awaitDragReady: suspend () -> Unit = {},
 ) {
     /** 收起态到展开态的总像素距离（由 Layout 在每次测量时写入）。 */
     var dragDistancePx: Float = 1f
@@ -38,6 +40,14 @@ internal class VerticalDragGestureHandler(
 
     fun onDrag(dragAmount: Float) {
         accumulatedDrag += dragAmount
+        // The full-player artwork target is lazily composed. On the first cold-start swipe,
+        // retain the complete finger distance but do not advance the sheet until that target has
+        // real coordinates; otherwise the cover is briefly interpolated toward Rect.Zero.
+        if (!isDragReady()) return
+        applyAccumulatedDrag()
+    }
+
+    private fun applyAccumulatedDrag() {
         val distance = dragDistancePx.coerceAtLeast(1f)
         // 向上拖（dragAmount < 0）使进度增大。
         val target = (startFraction - accumulatedDrag / distance).coerceIn(0f, 1f)
@@ -59,6 +69,12 @@ internal class VerticalDragGestureHandler(
         val initialFractionVelocity = (-velocity / distance).coerceIn(-8f, 8f)
         dragSnapJob =
             scope.launch {
+                if (!isDragReady()) awaitDragReady()
+                // A quick flick can finish before the cold target's first layout pass. Apply the
+                // buffered distance only after layout, then settle from the correct visual frame.
+                val draggedFraction =
+                    (startFraction - accumulatedDrag / distance).coerceIn(0f, 1f)
+                fraction.snapTo(draggedFraction)
                 fraction.animateTo(
                     targetValue = target,
                     animationSpec = snapSpec,

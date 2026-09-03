@@ -32,7 +32,6 @@ class PreferencesManager(
         val DARK_MODE = booleanPreferencesKey("dark_mode")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val THEME_COLOR_STYLE = stringPreferencesKey("theme_color_style")
-        val CIRCULAR_REVEAL_ENABLED = booleanPreferencesKey("circular_reveal_enabled")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         val BACKGROUND_PLAYBACK = booleanPreferencesKey("background_playback")
         val RESUME_ON_HEADSET = booleanPreferencesKey("resume_on_headset")

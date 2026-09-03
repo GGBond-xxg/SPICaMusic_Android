@@ -584,8 +584,8 @@ fun FinderPage(playEntrance: Boolean = true) {
                         val entrance = rememberEntrance(order = 6, play = playEntrance)
                         PlaylistRail(
                             playlists = overviewPlaylistsWithCover,
-                            onPlaylistClick = { item, albumIds, transition ->
-                                path.push(PlaylistDetailScene(item.playlist, albumIds, transition))
+                            onPlaylistClick = { item, albumIds ->
+                                path.push(PlaylistDetailScene(item.playlist, albumIds))
                             },
                             modifier =
                                 Modifier
@@ -602,8 +602,8 @@ fun FinderPage(playEntrance: Boolean = true) {
                         val entrance = rememberEntrance(order = 6, play = playEntrance)
                         CloudPlaylistRail(
                             playlists = overviewCloudPlaylists,
-                            onPlaylistClick = { item, transition, painter ->
-                                path.push(NeteasePlaylistScene(item, transition, painter))
+                            onPlaylistClick = { item ->
+                                path.push(NeteasePlaylistScene(item))
                             },
                             modifier = Modifier.entranceGraphics(entrance),
                         )
@@ -614,8 +614,8 @@ fun FinderPage(playEntrance: Boolean = true) {
                         val entrance = rememberEntrance(order = 6, play = playEntrance)
                         CloudUserPlaylistRail(
                             playlists = userCloudPlaylists,
-                            onPlaylistClick = { item, transition, painter ->
-                                path.push(CloudUserPlaylistScene(item, transition, painter))
+                            onPlaylistClick = { item ->
+                                path.push(CloudUserPlaylistScene(item))
                             },
                             modifier = Modifier.entranceGraphics(entrance),
                         )
@@ -635,8 +635,8 @@ fun FinderPage(playEntrance: Boolean = true) {
                     item(key = "netease_radar", contentType = "rail") {
                         CloudPlaylistRail(
                             playlists = radarPlaylists,
-                            onPlaylistClick = { item, transition, painter ->
-                                path.push(NeteasePlaylistScene(item, transition, painter))
+                            onPlaylistClick = { item ->
+                                path.push(NeteasePlaylistScene(item))
                             },
                             placeholderIcon = Icons.Default.Radar,
                         )
@@ -666,8 +666,8 @@ fun FinderPage(playEntrance: Boolean = true) {
                     item(key = "netease_more", contentType = "rail") {
                         CloudPlaylistRail(
                             playlists = moreNeteasePlaylists,
-                            onPlaylistClick = { item, transition, painter ->
-                                path.push(NeteasePlaylistScene(item, transition, painter))
+                            onPlaylistClick = { item ->
+                                path.push(NeteasePlaylistScene(item))
                             },
                             placeholderIcon = Icons.Default.AutoAwesome,
                         )
@@ -1488,7 +1488,7 @@ private fun FinderActionPill(
 @Composable
 private fun PlaylistRail(
     playlists: List<PlaylistWithCover>,
-    onPlaylistClick: (PlaylistWithCover, List<Long>, GeometryTransition) -> Unit,
+    onPlaylistClick: (PlaylistWithCover, List<Long>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyRow(
@@ -1506,18 +1506,9 @@ private fun PlaylistRail(
             },
             contentType = { "playlist" },
         ) { item ->
-            val transition =
-                remember(item.playlist.playlistId, item.playlist.playlistName) {
-                    GeometryTransition(
-                        key = "finder_playlist_${item.playlist.playlistId ?: item.playlist.playlistName}",
-                        sourceClipRadius = 20.dp,
-                        targetClipRadius = 16.dp,
-                    )
-                }
             FinderPlaylistCard(
                 item = item,
-                transition = transition,
-                onClick = { albumIds -> onPlaylistClick(item, albumIds, transition) },
+                onClick = { albumIds -> onPlaylistClick(item, albumIds) },
                 modifier =
                     Modifier.animateItem(
                         fadeInSpec = ListItemFadeInSpec,
@@ -1567,7 +1558,7 @@ private fun PersistentFinderArtwork(
 @Composable
 private fun CloudPlaylistRail(
     playlists: List<CloudCatalogPlaylist>,
-    onPlaylistClick: (CloudCatalogPlaylist, GeometryTransition, Painter?) -> Unit,
+    onPlaylistClick: (CloudCatalogPlaylist) -> Unit,
     modifier: Modifier = Modifier,
     placeholderIcon: ImageVector = Icons.Default.LibraryMusic,
 ) {
@@ -1582,21 +1573,12 @@ private fun CloudPlaylistRail(
             key = CloudCatalogPlaylist::stableId,
             contentType = { "cloud_playlist" },
         ) { item ->
-            val transition =
-                remember(item.stableId) {
-                    GeometryTransition(
-                        key = "finder_cloud_playlist_${item.stableId}",
-                        sourceClipRadius = 20.dp,
-                        targetClipRadius = 16.dp,
-                    )
-                }
-            var transitionPainter by remember(item.stableId) { mutableStateOf<Painter?>(null) }
             Column(
                 modifier =
                     Modifier
                         .width(148.dp)
                         .clip(Shapes.ExtraLargeCornerBasedShape)
-                        .clickHighlight(onClick = { onPlaylistClick(item, transition, transitionPainter) }),
+                        .clickHighlight(onClick = { onPlaylistClick(item) }),
                 verticalArrangement = Arrangement.spacedBy(Spacing.Small),
             ) {
                 PersistentFinderArtwork(
@@ -1607,11 +1589,7 @@ private fun CloudPlaylistRail(
                             .fillMaxWidth()
                             .aspectRatio(1f)
                             .clip(Shapes.ExtraLargeCornerBasedShape)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                            .geometrySource(transition)
-                            .graphicsLayer {
-                                alpha = if (transition.shouldShowSource()) 1f else 0f
-                            },
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                     placeHolder = {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Icon(
@@ -1621,7 +1599,6 @@ private fun CloudPlaylistRail(
                             )
                         }
                     },
-                    onPainterReady = { transitionPainter = it },
                 )
                 Column(
                     modifier = Modifier.padding(bottom = Spacing.Small),
@@ -1741,7 +1718,7 @@ private fun NeteaseSceneMusicRail(
 @Composable
 private fun CloudUserPlaylistRail(
     playlists: List<CloudUserPlaylist>,
-    onPlaylistClick: (CloudUserPlaylist, GeometryTransition, Painter?) -> Unit,
+    onPlaylistClick: (CloudUserPlaylist) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyRow(
@@ -1755,21 +1732,12 @@ private fun CloudUserPlaylistRail(
             key = CloudUserPlaylist::id,
             contentType = { "user_cloud_playlist" },
         ) { item ->
-            val transition =
-                remember(item.id) {
-                    GeometryTransition(
-                        key = "finder_user_cloud_playlist_${item.id}",
-                        sourceClipRadius = 20.dp,
-                        targetClipRadius = 28.dp,
-                    )
-                }
-            var transitionPainter by remember(item.id) { mutableStateOf<Painter?>(null) }
             Column(
                 modifier =
                     Modifier
                         .width(148.dp)
                         .clip(Shapes.ExtraLargeCornerBasedShape)
-                        .clickHighlight(onClick = { onPlaylistClick(item, transition, transitionPainter) }),
+                        .clickHighlight(onClick = { onPlaylistClick(item) }),
                 verticalArrangement = Arrangement.spacedBy(Spacing.Small),
             ) {
                 val artworkUri =
@@ -1786,17 +1754,12 @@ private fun CloudUserPlaylistRail(
                             .fillMaxWidth()
                             .aspectRatio(1f)
                             .clip(Shapes.ExtraLargeCornerBasedShape)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                            .geometrySource(transition)
-                            .graphicsLayer {
-                                alpha = if (transition.shouldShowSource()) 1f else 0f
-                            },
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                     placeHolder = {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Icon(Icons.Default.LibraryMusic, null)
                         }
                     },
-                    onPainterReady = { transitionPainter = it },
                 )
                 Column(
                     modifier = Modifier.padding(bottom = Spacing.Small),
@@ -1825,7 +1788,6 @@ private fun CloudUserPlaylistRail(
 @Composable
 private fun FinderPlaylistCard(
     item: PlaylistWithCover,
-    transition: GeometryTransition,
     onClick: (List<Long>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1873,10 +1835,7 @@ private fun FinderPlaylistCard(
                     .fillMaxWidth()
                     .aspectRatio(1f)
                     .clip(Shapes.ExtraLargeCornerBasedShape)
-                    .geometrySource(transition)
-                    .graphicsLayer {
-                        alpha = if (transition.shouldShowSource()) 1f else 0f
-                    }.background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
         ) { albumIds ->
             PlaylistCoverView(
                 albumIds = albumIds,

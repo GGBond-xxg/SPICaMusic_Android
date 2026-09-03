@@ -19,7 +19,6 @@ import me.spica27.spicamusic.core.preferences.PreferencesManager
 import me.spica27.spicamusic.ui.home.HomeScene
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.player.PlayerViewModel
-import me.spica27.spicamusic.ui.theme.CircularRevealThemeHost
 import me.spica27.spicamusic.ui.theme.SPICaMusicTheme
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinActivityViewModel
@@ -64,20 +63,6 @@ fun AppScaffold() {
         preferencesManager
             .getString(PreferencesManager.Keys.THEME_COLOR_STYLE, ThemeColorStyle.Textured.value)
             .collectAsStateWithLifecycle(initialThemeColorStyle)
-    val initialCircularRevealEnabled =
-        remember(preferencesManager) {
-            preferencesManager.getCachedBoolean(
-                PreferencesManager.Keys.CIRCULAR_REVEAL_ENABLED,
-                true,
-            )
-        }
-    val circularRevealEnabled by
-        preferencesManager
-            .getBoolean(
-                PreferencesManager.Keys.CIRCULAR_REVEAL_ENABLED,
-                true,
-            ).collectAsStateWithLifecycle(initialCircularRevealEnabled)
-
     val playerViewModel: PlayerViewModel = koinActivityViewModel()
     val color by playerViewModel.playerThemeColor.collectAsStateWithLifecycle()
     val keepScreenOn by
@@ -88,18 +73,12 @@ fun AppScaffold() {
 
     KeepScreenOnEffect(enabled = keepScreenOn && isPlaying)
 
-    CircularRevealThemeHost(
-        enabled = circularRevealEnabled,
-        targetDarkTheme = isDarkMode,
-        targetThemeColor = color,
-    ) { revealedDarkTheme, revealedThemeColor ->
-        AppThemeContent(
-            darkTheme = revealedDarkTheme,
-            themeColor = revealedThemeColor,
-            themeColorStyle = ThemeColorStyle.fromString(themeColorStyleValue),
-            playerViewModel = playerViewModel,
-        )
-    }
+    AppThemeContent(
+        darkTheme = isDarkMode,
+        themeColor = color,
+        themeColorStyle = ThemeColorStyle.fromString(themeColorStyleValue),
+        playerViewModel = playerViewModel,
+    )
 }
 
 @Composable

@@ -107,6 +107,7 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.navkit.scene.StackScene
 import me.spica27.spicamusic.App
@@ -149,6 +150,8 @@ private const val ENTRANCE_STAGGER_MILLIS = 55L
 /** 参与入场编排的最大歌曲行数（之后出现的行走 animateItem 淡入） */
 private const val ENTRANCE_MAX_ROW = 8
 
+private const val PLAYER_SWITCH_TIMEOUT_MS = 8_000L
+
 /** 首屏元素在编排中的槽位：刊头=0 操作行=1 搜索=2 歌曲行从 3 开始 */
 private const val ENTRANCE_ORDER_ROW_BASE = 3
 
@@ -175,10 +178,15 @@ private fun FavoriteScreenContent() {
 
     LaunchedEffect(pendingPlayerMediaId) {
         val expectedMediaId = pendingPlayerMediaId ?: return@LaunchedEffect
-        playerViewModel.currentMediaItem.first { it?.mediaId == expectedMediaId }
-        if (pendingPlayerMediaId == expectedMediaId) {
+        val switched =
+            withTimeoutOrNull(PLAYER_SWITCH_TIMEOUT_MS) {
+                playerViewModel.currentMediaItem.first { it?.mediaId == expectedMediaId }
+            } != null
+        if (pendingPlayerMediaId == expectedMediaId && switched) {
             pendingPlayerMediaId = null
-            homeViewModel.expandPlayer()
+            path.popToRoot { homeViewModel.expandPlayer() }
+        } else if (pendingPlayerMediaId == expectedMediaId) {
+            pendingPlayerMediaId = null
         }
     }
 
@@ -336,6 +344,7 @@ private fun FavoriteScreenContent() {
                             song = song,
                             isMultiSelectMode = isMultiSelectMode,
                             isSelected = selected,
+                            isPending = pendingPlayerMediaId == song.mediaStoreId.toString(),
                             onClick = {
                                 if (isMultiSelectMode) {
                                     viewModel.toggleSongSelection(song.mediaStoreId)
@@ -869,6 +878,7 @@ private fun FavoriteSongRow(
     song: Song,
     isMultiSelectMode: Boolean,
     isSelected: Boolean,
+    isPending: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onRemoveFavorite: () -> Unit,
@@ -882,7 +892,7 @@ private fun FavoriteSongRow(
             modifier
                 .fillMaxWidth()
                 .background(
-                    if (isSelected) {
+                    if (isSelected || isPending) {
                         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                     } else {
                         Color.Transparent
@@ -941,14 +951,21 @@ private fun FavoriteSongRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Text(
-            text = song.getFormattedDuration(),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.End,
-            maxLines = 1,
-            modifier = Modifier.widthIn(min = 36.dp),
-        )
+        if (isPending) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp,
+            )
+        } else {
+            Text(
+                text = song.getFormattedDuration(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.End,
+                maxLines = 1,
+                modifier = Modifier.widthIn(min = 36.dp),
+            )
+        }
         AnimatedVisibility(visible = !isMultiSelectMode) {
             IconButton(
                 onClick = {

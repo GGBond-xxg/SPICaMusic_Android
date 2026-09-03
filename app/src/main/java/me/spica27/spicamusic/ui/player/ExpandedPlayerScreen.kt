@@ -62,13 +62,13 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -116,7 +116,6 @@ import me.spica27.spicamusic.player.api.PlayMode
 import me.spica27.spicamusic.ui.player.pages.CurrentPlaylistPage
 import me.spica27.spicamusic.ui.player.scene.LyricsPlayerPage
 import me.spica27.spicamusic.ui.settings.SettingsViewModel
-import me.spica27.spicamusic.ui.theme.LocalThemeRevealController
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
 import me.spica27.spicamusic.ui.widget.FluidMusicBackground
@@ -186,19 +185,10 @@ fun ExpandedPlayerScreen(
     preloadContent: Boolean = false, // 首次打开后保留组合树，收起时不在动画尾帧销毁
     artworkMorphState: PlayerArtworkMorphState? = null,
     artworkMorphInFlightProvider: () -> Boolean = { false },
+    sharedArtworkPainter: Painter? = null,
+    onSharedArtworkPainterReady: (Painter) -> Unit = {},
     dragToCollapseModifier: Modifier = Modifier,
 ) {
-    val themeRevealController = LocalThemeRevealController.current
-    DisposableEffect(themeRevealController, isActive) {
-        if (isActive) themeRevealController.acquirePlayerSurface()
-        onDispose {
-            if (isActive) themeRevealController.releasePlayerSurface()
-        }
-    }
-
-    // 在播放器展开后提前启动本地歌词读取，点击歌词时无需再等待 ViewModel 初始化。
-    koinActivityViewModel<LyricsViewModel>()
-
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
     val playMode by viewModel.playMode.collectAsStateWithLifecycle()
     val currentMediaItem by viewModel.currentMediaItem.collectAsStateWithLifecycle()
@@ -226,12 +216,27 @@ fun ExpandedPlayerScreen(
     val seekValueState = remember(mediaId) { mutableFloatStateOf(0f) }
     var isSeekingState by remember(mediaId) { mutableStateOf(false) }
 
-    val positionState = viewModel.currentPosition.collectAsStateWithLifecycle()
+    // The full player stays precomposed while collapsed. Do not keep feeding its large tree a
+    // 250 ms position tick when none of that UI is visible; subscribe on expansion and seed the
+    // first frame from the StateFlow's latest value.
+    val positionState =
+        produceState(
+            initialValue = viewModel.currentPosition.value,
+            key1 = mediaId,
+            key2 = isActive,
+        ) {
+            if (isActive) {
+                viewModel.currentPosition.collect { position -> value = position }
+            }
+        }
 
     val songLikeState by viewModel.currentSongIsLike.collectAsStateWithLifecycle()
     val sleepTimerRemainingMs by viewModel.sleepTimerRemainingMs.collectAsStateWithLifecycle()
     val sleepTimerDurationMs by viewModel.sleepTimerDurationMs.collectAsStateWithLifecycle()
-    var lyricsArtworkPainter by remember { mutableStateOf<Painter?>(null) }
+    // Seed the precomposed full player with the exact painter used by the mini player. Once the
+    // full-size request completes, publish that painter back to the transition host so the mini
+    // cover, morph overlay and destination all render the same decoded image.
+    var lyricsArtworkPainter by remember { mutableStateOf(sharedArtworkPainter) }
     var showLyricsEditor by remember { mutableStateOf(false) }
     var showAudioQualitySheet by rememberSaveable(mediaId) { mutableStateOf(false) }
     var showPlaybackSourceDialog by rememberSaveable(mediaId) { mutableStateOf(false) }
@@ -265,7 +270,8 @@ fun ExpandedPlayerScreen(
 
     // 将播放位置同步到 seekbar：用 snapshotFlow 在协程中观察位置变化，
     // 避免在组合作用域读取高频 state 而导致重组。
-    LaunchedEffect(mediaId) {
+    LaunchedEffect(mediaId, isActive) {
+        if (!isActive) return@LaunchedEffect
         snapshotFlow { positionState.value }
             .collect { position ->
                 if (!isSeekingState) {
@@ -524,6 +530,7 @@ fun ExpandedPlayerScreen(
                                         },
                                         onArtworkPainterReady = { painter ->
                                             lyricsArtworkPainter = painter
+                                            onSharedArtworkPainterReady(painter)
                                         },
                                         onArtworkPainterFailed = {
                                             lyricsArtworkPainter = null
@@ -609,6 +616,8 @@ fun ExpandedPlayerScreen(
                             currentPosition = positionState.value,
                             duration = duration,
                             isPlaying = isPlaying,
+                            progressAnimationActive =
+                                isPlaying && dynamicEffectsActive && isAppInForeground,
                             isSeeking = isSeekingState,
                             playMode = playMode,
                             isLike = songLikeState,
@@ -873,6 +882,11 @@ private fun MorphingPlayerTopAction(
     modifier: Modifier = Modifier,
 ) {
     val progress = smoothStepProgress(transitionProgressProvider().coerceIn(0f, 1f))
+    // Fade-through keeps the action anchored while the page follows the finger. Rotating the
+    // edit glyph made the button look as if it wobbled independently from the horizontal pager.
+    val playlistAlpha = (1f - progress / 0.44f).coerceIn(0f, 1f)
+    val editorAlpha = ((progress - 0.56f) / 0.44f).coerceIn(0f, 1f)
+    val showsEditor = progress >= 0.5f
     Box(
         modifier =
             modifier
@@ -880,33 +894,38 @@ private fun MorphingPlayerTopAction(
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .clickable {
-                    if (progress >= 0.5f) onLyricsEditorClick() else onPlaylistClick()
+                    if (showsEditor) onLyricsEditorClick() else onPlaylistClick()
                 },
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = Icons.AutoMirrored.Default.PlaylistPlay,
-            contentDescription = stringResource(R.string.queue),
+            contentDescription = if (showsEditor) null else stringResource(R.string.queue),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier =
                 Modifier
                     .size(28.dp)
                     .graphicsLayer {
-                        alpha = (1f - progress * 1.8f).coerceIn(0f, 1f)
+                        alpha = playlistAlpha
+                        translationY = -5f * progress
+                        val iconScale = 0.92f + 0.08f * playlistAlpha
+                        scaleX = iconScale
+                        scaleY = iconScale
                     },
         )
         Icon(
             imageVector = Icons.Rounded.EditNote,
-            contentDescription = stringResource(R.string.lyrics_editor),
+            contentDescription = if (showsEditor) stringResource(R.string.lyrics_editor) else null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier =
                 Modifier
                     .size(28.dp)
                     .graphicsLayer {
-                        alpha = ((progress - 0.42f) / 0.58f).coerceIn(0f, 1f)
-                        rotationZ = (1f - progress) * -24f
-                        scaleX = 0.72f + progress * 0.28f
-                        scaleY = 0.72f + progress * 0.28f
+                        alpha = editorAlpha
+                        translationY = 5f * (1f - progress)
+                        val iconScale = 0.92f + 0.08f * editorAlpha
+                        scaleX = iconScale
+                        scaleY = iconScale
                     },
         )
     }
@@ -1169,6 +1188,7 @@ private fun PlayerPage(
 
         // mini 歌词：点击跳转全屏歌词页面
         MiniLyric(
+            active = isAppInForeground && enableHeavyEffects,
             onClick = {
                 onOpenLyrics()
                 /*

@@ -126,7 +126,19 @@ class CloudMusicCatalogViewModel(
     private val playlistEntryStore: CloudPlaylistEntryStore,
     private val recentStore: CloudRecentStore,
 ) : ViewModel() {
-    private val _state = MutableStateFlow(CloudMusicCatalogState())
+    private val initialNeteaseAccount =
+        accountStore.getRemoteAccounts(RemoteMusicProvider.NETEASE).firstOrNull()
+    private val initialDailyRecommendations =
+        initialNeteaseAccount
+            ?.let { account ->
+                remoteClients.cachedDailyRecommendations(account).map { song ->
+                    account.toCatalogSong(song)
+                }
+            }.orEmpty()
+    private val _state =
+        MutableStateFlow(
+            CloudMusicCatalogState(dailyRecommendations = initialDailyRecommendations),
+        )
     val state = _state.asStateFlow()
 
     private val endpoints = linkedMapOf<String, CatalogEndpoint>()
@@ -135,7 +147,8 @@ class CloudMusicCatalogViewModel(
     private var catalogGeneration = 0
     private var remotePlaylistRefreshJob: Job? = null
     private var playbackQueueCompletionJob: Job? = null
-    private var dailyRecommendationsAccountId: String? = null
+    private var dailyRecommendationsAccountId: String? =
+        initialNeteaseAccount?.id.takeIf { initialDailyRecommendations.isNotEmpty() }
 
     init {
         refreshSources()
@@ -164,6 +177,13 @@ class CloudMusicCatalogViewModel(
                     telegramReady = ready
                 }
             }
+        }
+    }
+
+    /** Telegram is optional and TDLib is expensive to load; connect only when Music is opened. */
+    fun connectTelegramIfConfigured() {
+        if (telegramRepository.hasConfig() && !telegramReady) {
+            telegramRepository.initializeAsync()
         }
     }
 

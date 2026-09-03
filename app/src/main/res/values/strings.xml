@@ -669,8 +669,6 @@
   <string name="settings_appearance_subtitle">Shape the visual atmosphere of the player</string>
   <string name="settings_theme_mode_title">Theme mode</string>
   <string name="settings_theme_mode_subtitle">Follow system, light, or dark</string>
-  <string name="settings_circular_reveal_title">Circular Reveal</string>
-  <string name="settings_circular_reveal_subtitle">Reveal theme and song color changes with a circular transition</string>
   <string name="settings_theme_mode_system">Follow</string>
   <string name="settings_theme_mode_light">Light</string>
   <string name="settings_theme_mode_dark">Dark</string>

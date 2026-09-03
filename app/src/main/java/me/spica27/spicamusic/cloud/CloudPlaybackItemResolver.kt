@@ -28,6 +28,18 @@ class CloudPlaybackItemResolver(
         return remoteProxy.isExplicitPreview(identity.accountOrChatId, identity.songId)
     }
 
+    /** Discards a short-lived provider URL before retrying a stalled authenticated stream. */
+    fun invalidateStream(item: MediaItem) {
+        val identity = parseCloudMediaIdentity(item.mediaId) ?: return
+        if (
+            identity.provider == NETEASE_PROVIDER ||
+            identity.provider == QQ_MUSIC_PROVIDER ||
+            identity.provider == SUBSONIC_PROVIDER
+        ) {
+            remoteProxy.invalidate(identity.accountOrChatId, identity.songId)
+        }
+    }
+
     /** Warm the next authenticated cloud stream without downloading its audio body. */
     suspend fun prefetch(item: MediaItem) {
         if (!item.mediaId.startsWith(CLOUD_ID_PREFIX)) return
@@ -232,7 +244,12 @@ class CloudPlaybackItemResolver(
 internal fun resolvedCloudCacheKey(
     mediaId: String,
     customCacheKey: String?,
-): String = customCacheKey ?: CloudAudioCache.cacheKey(mediaId)
+): String =
+    customCacheKey
+        ?.takeUnless {
+            it.startsWith("spica-cloud:") &&
+                !it.startsWith(CloudAudioCache.CACHE_KEY_PREFIX)
+        } ?: CloudAudioCache.cacheKey(mediaId)
 
 internal data class CloudMediaIdentity(
     val provider: String,

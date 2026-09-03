@@ -63,8 +63,15 @@ class NavigationPath(
     internal val viewModelStore = ViewModelStore()
 
     init {
-        // 初始场景走完整 push 流程，保证 StackScene.enterProgress 动画到 1f 后可见
-        initialScenes.forEach { push(it) }
+        // The root must exist during the very first composition. Scheduling it through push()
+        // leaves the stack empty for at least one frame, exposing the plain window background on
+        // every cold start. Root scenes do not need a navigation entrance animation.
+        initialScenes.forEach { scene ->
+            scene.id = nextId++
+            scene.isRoot = true
+            scene.stage.value = SceneStage.Appeared
+            scenes.add(scene)
+        }
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -88,8 +95,10 @@ class NavigationPath(
                 scene.withStageLock {
                     scene.id = nextId++
                     scene.stage.value = SceneStage.Appearing
-                    scenes.add(scene)
                     scene.onPush()
+                    // Prepare animation state before composition can draw the new scene. This also
+                    // prevents a reused scene from flashing at its previous fully-visible value.
+                    scenes.add(scene)
                     scene.waitAppear()
                     scene.stage.value = SceneStage.Appeared
                     scene.onAppear()
@@ -142,6 +151,38 @@ class NavigationPath(
         if (scenes.size <= 1) return false
         pop(top)
         return true
+    }
+
+    /**
+     * Return to the root scene, then run [onComplete].
+     *
+     * This is used when a detail page hands control to UI owned by the root scene (for example
+     * the full-screen player). Expanding that UI while leaving the detail scene in the stack makes
+     * Back reveal the detail first and requires a second press to reach Home.
+     */
+    fun popToRoot(onComplete: () -> Unit = {}) {
+        if (scenes.size <= 1) {
+            onComplete()
+            return
+        }
+        animationScope.launch {
+            navigationMutex.withLock {
+                while (scenes.size > 1) {
+                    val scene = scenes.last()
+                    scene.withStageLock {
+                        if (scene.stage.value != SceneStage.Disappeared) {
+                            scene.stage.value = SceneStage.Disappearing
+                            scene.waitDisappear()
+                            scene.onDisappear()
+                            scene.stage.value = SceneStage.Disappeared
+                            scenes.remove(scene)
+                            scene.onPop()
+                        }
+                    }
+                }
+                onComplete()
+            }
+        }
     }
 
     /** 栈内是否有可以弹出的场景（scene 数量 > 1） */

@@ -1,6 +1,8 @@
 package me.spica27.spicamusic.cloud
 
 import androidx.media3.common.Player
+import me.spica27.spicamusic.service.CloudAudioUnderrunAction
+import me.spica27.spicamusic.service.cloudAudioUnderrunAction
 import me.spica27.spicamusic.service.isRestrictedCloudHttpStatus
 import me.spica27.spicamusic.service.shouldHandleCloudAudioUnderrun
 import org.junit.Assert.assertEquals
@@ -131,6 +133,43 @@ class CloudPlaybackFallbackTest {
     }
 
     @Test
+    fun `authenticated cloud stream with an empty audio sink is restarted instead of left silently playing`() {
+        assertEquals(
+            CloudAudioUnderrunAction.RESTART_STREAM,
+            cloudAudioUnderrunAction(
+                isCloudItem = true,
+                explicitPreview = false,
+                stillSameItem = true,
+                isPlaying = true,
+                playbackState = Player.STATE_READY,
+                sinkHasPendingData = false,
+            ),
+        )
+        assertEquals(
+            CloudAudioUnderrunAction.SKIP_PREVIEW,
+            cloudAudioUnderrunAction(
+                isCloudItem = true,
+                explicitPreview = true,
+                stillSameItem = true,
+                isPlaying = true,
+                playbackState = Player.STATE_READY,
+                sinkHasPendingData = false,
+            ),
+        )
+        assertEquals(
+            CloudAudioUnderrunAction.NONE,
+            cloudAudioUnderrunAction(
+                isCloudItem = true,
+                explicitPreview = false,
+                stillSameItem = true,
+                isPlaying = true,
+                playbackState = Player.STATE_BUFFERING,
+                sinkHasPendingData = false,
+            ),
+        )
+    }
+
+    @Test
     fun `qq requested quality falls back without losing automatic compatibility`() {
         assertEquals(
             listOf(
@@ -150,6 +189,17 @@ class CloudPlaybackFallbackTest {
             resolvedCloudCacheKey(
                 mediaId = "cloud:netease:account:song",
                 customCacheKey = "quality:lossless:123",
+            ),
+        )
+    }
+
+    @Test
+    fun `legacy provider cache key is rotated instead of mixing old and fresh audio formats`() {
+        assertEquals(
+            "spica-cloud:v4:cloud:netease:account:song",
+            resolvedCloudCacheKey(
+                mediaId = "cloud:netease:account:song",
+                customCacheKey = "spica-cloud:v3:cloud:netease:account:song",
             ),
         )
     }

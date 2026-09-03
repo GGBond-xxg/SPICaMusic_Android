@@ -11,7 +11,6 @@ class SettingsUseCases(
         val DARK_MODE = PreferencesManager.Keys.DARK_MODE
         val THEME_MODE = PreferencesManager.Keys.THEME_MODE
         val THEME_COLOR_STYLE = PreferencesManager.Keys.THEME_COLOR_STYLE
-        val CIRCULAR_REVEAL_ENABLED = PreferencesManager.Keys.CIRCULAR_REVEAL_ENABLED
         val KEEP_SCREEN_ON = PreferencesManager.Keys.KEEP_SCREEN_ON
         val BACKGROUND_PLAYBACK = PreferencesManager.Keys.BACKGROUND_PLAYBACK
         val RESUME_ON_HEADSET = PreferencesManager.Keys.RESUME_ON_HEADSET

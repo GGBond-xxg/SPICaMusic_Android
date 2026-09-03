@@ -239,7 +239,7 @@ private fun SceneContainer(
             }
             .graphicsLayer {
                 // 在 Draw 阶段读取进度值（不触发重组）
-                val enter = scene.enterProgress.value
+                val enter = if (scene.isRoot) 1f else scene.enterProgress.value
                 val ahead = scene.aheadEnterProgress(path.scenes)
                 val fgProgress = scene.dialogForegroundProgress(path.scenes)
 

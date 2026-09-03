@@ -138,8 +138,6 @@ import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
 import me.spica27.spicamusic.ui.theme.ListItemFadeOutSpec
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
-import me.spica27.spicamusic.ui.theme.rememberThemeRevealOriginState
-import me.spica27.spicamusic.ui.theme.themeRevealOrigin
 import me.spica27.spicamusic.ui.widget.AudioCover
 import me.spica27.spicamusic.ui.widget.clickHighlight
 import me.spica27.spicamusic.ui.widget.combinedClickHighlight
@@ -404,6 +402,9 @@ fun MusicPage() {
     val path = LocalNavigationPath.current
     val homeViewModel: HomeViewModel = koinActivityViewModel()
     val cloudCatalogViewModel: CloudMusicCatalogViewModel = koinActivityViewModel()
+    LaunchedEffect(cloudCatalogViewModel) {
+        cloudCatalogViewModel.connectTelegramIfConfigured()
+    }
     val mediaLibraryViewModel: MediaLibrarySourceViewModel = koinActivityViewModel()
     val playerViewModel = LocalPlayerViewModel.current
 
@@ -1572,7 +1573,6 @@ private fun MusicSongRow(
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
 ) {
-    val revealOrigin = rememberThemeRevealOriginState()
     val song =
         remember(artist, album) {
             SongRowSubtitle(
@@ -1585,7 +1585,6 @@ private fun MusicSongRow(
             modifier
                 .fillMaxWidth()
                 .padding(horizontal = LayoutTokens.MusicHeaderHorizontalPadding)
-                .themeRevealOrigin(revealOrigin)
                 .clip(Shapes.ExtraLargeCornerBasedShape)
                 .background(
                     if (isPlaying) {
@@ -1595,7 +1594,6 @@ private fun MusicSongRow(
                     },
                 ).combinedClickHighlight(
                     onClick = {
-                        revealOrigin.armFromCenter()
                         onClick()
                     },
                     onLongClick = onLongClick,

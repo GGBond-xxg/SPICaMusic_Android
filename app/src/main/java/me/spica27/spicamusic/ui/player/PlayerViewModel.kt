@@ -262,6 +262,11 @@ class PlayerViewModel(
      */
     val fftDrawData: StateFlow<FloatArray> = fftInterpolator.interpolatedData
 
+    /** 仅在频谱可视化实际可见时采样，避免列表页播放也持续占用 CPU。 */
+    fun setFftSamplingEnabled(enabled: Boolean) {
+        if (enabled) player.fftProcessor.enable() else player.fftProcessor.disable()
+    }
+
     /**
      * 播放
      */

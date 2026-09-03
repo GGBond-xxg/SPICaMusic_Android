@@ -26,6 +26,9 @@ abstract class Scene {
     var id: Int = 0
         internal set
 
+    /** Root scenes are installed synchronously and never play a push animation. */
+    internal var isRoot: Boolean = false
+
     /** 当前生命周期阶段，Compose 可观察 */
     val stage: MutableState<SceneStage> = mutableStateOf(SceneStage.Uninitialized)
 

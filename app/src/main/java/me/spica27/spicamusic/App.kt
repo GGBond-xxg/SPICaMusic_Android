@@ -72,22 +72,20 @@ class App : Application() {
 
         // 启动 MediaStore 变更监听
         setupMediaStoreObserver()
-        // FFT 采样跟随应用前后台状态
+        // FFT 采样由实际可见的播放器动态效果按需开启；这里负责后台兜底关闭。
         setupFftLifecycle()
         CrashHandler.init(this)
     }
 
     /**
-     * FFT 频谱采样跟随应用前后台切换：
-     * 前台开启采样供可视化使用，后台停止采样以降低功耗。
-     * 处理器默认关闭，进程在后台被拉起（如媒体恢复）时不会采样。
+     * 后台强制停止 FFT 频谱采样。
+     * 前台不再无条件开启，避免只在列表听歌时仍持续做频谱计算；播放器动态背景
+     * 真正可见时会通过 PlayerViewModel 按需启用。
      */
     private fun setupFftLifecycle() {
         ProcessLifecycleOwner.get().lifecycle.addObserver(
             object : DefaultLifecycleObserver {
                 override fun onStart(owner: LifecycleOwner) {
-                    musicPlayer.fftProcessor.enable()
-                    Timber.d("应用进入前台，FFT 采样已开启")
                     DiagnosticLog.writeProcessSnapshot(this@App, "process-foreground")
                 }
 

@@ -189,9 +189,6 @@ cd SPICaMusic_Android
   [yangSpica27/SPICaMusic_Android](https://github.com/yangSpica27/SPICaMusic_Android)
 - 云端串流产品与交互参考：
   [r3n011/XiangsuPlayerHQ](https://github.com/r3n011/XiangsuPlayerHQ)
-- 圆形揭示动画参考：
-  [YenalyLiew/CircularRevealSwitch](https://github.com/YenalyLiew/CircularRevealSwitch)
-
 本仓库继续遵循 [MIT License](LICENSE)。第三方依赖、参考项目及适配实现的许可说明见
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 和应用内“开源许可”页面。
 

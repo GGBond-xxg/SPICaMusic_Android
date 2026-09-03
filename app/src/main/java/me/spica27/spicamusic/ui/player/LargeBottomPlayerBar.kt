@@ -46,8 +46,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
 import me.spica27.spicamusic.R
-import me.spica27.spicamusic.ui.theme.rememberThemeRevealOriginState
-import me.spica27.spicamusic.ui.theme.themeRevealOrigin
 import me.spica27.spicamusic.ui.widget.MusicCoverPlaceholder
 import me.spica27.spicamusic.ui.widget.StableAudioCover
 import me.spica27.spicamusic.utils.albumCoverFallbackUri
@@ -97,7 +95,6 @@ fun LargeBottomPlayerBar(
         animationSpec = tween(durationMillis = 90),
         label = "bottomPlayerLoadingReveal",
     )
-    val nextRevealOrigin = rememberThemeRevealOriginState()
     Box(
         modifier =
             modifier
@@ -248,15 +245,13 @@ fun LargeBottomPlayerBar(
                 // 下一首
                 IconButton(
                     onClick = {
-                        nextRevealOrigin.armFromCenter()
                         onNext()
                     },
                     enabled = hasMediaItem && contentReady && controlsReady,
                     modifier =
                         nextButtonModifier
                             .size(40.dp)
-                            .graphicsLayer { alpha = 0.22f + 0.78f * contentReveal }
-                            .themeRevealOrigin(nextRevealOrigin),
+                            .graphicsLayer { alpha = 0.22f + 0.78f * contentReveal },
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.SkipNext,

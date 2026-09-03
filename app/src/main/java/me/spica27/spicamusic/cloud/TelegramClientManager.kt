@@ -1,12 +1,19 @@
 package me.spica27.spicamusic.cloud
 
 import android.content.Context
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import me.spica27.spicamusic.BuildConfig
 import org.drinkless.tdlib.Client
@@ -33,15 +40,22 @@ class TelegramClientManager(
     private var client: Client? = null
 
     @Volatile
+    private var nativeLoadComplete = false
+
+    @Volatile
+    private var nativeLoadSucceeded = false
+
+    private val initializationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val initializationMutex = Mutex()
+
+    @Volatile
     private var config: TelegramConfig? =
         accountStore.getTelegramConfig()
             ?: BundledTelegramCredentials.load(context)
 
-    init {
-        if (nativeLibraryAvailable) {
-            Client.execute(TdApi.SetLogVerbosityLevel(if (BuildConfig.DEBUG) 1 else 0))
-            client = Client.create(::handleUpdate, null, null)
-        }
+    /** Starts the optional Telegram runtime without blocking the caller. */
+    fun initializeAsync() {
+        initializationScope.launch { ensureInitialized() }
     }
 
     fun configure(newConfig: TelegramConfig) {
@@ -52,13 +66,14 @@ class TelegramClientManager(
         }
     }
 
-    fun isAvailable(): Boolean = nativeLibraryAvailable
+    fun isAvailable(): Boolean = nativeLoadComplete && nativeLoadSucceeded
 
     fun hasConfig(): Boolean = config != null
 
     fun isReady(): Boolean = _authorizationState.value is TdApi.AuthorizationStateReady
 
     suspend fun awaitReady(timeoutMs: Long = 20_000L): Boolean {
+        ensureInitialized()
         if (isReady()) return true
         return withTimeoutOrNull(timeoutMs) {
             authorizationState.first {
@@ -67,8 +82,9 @@ class TelegramClientManager(
         } is TdApi.AuthorizationStateReady
     }
 
-    suspend fun <T : TdApi.Object> sendRequest(function: TdApi.Function<*>): T =
-        suspendCancellableCoroutine { continuation ->
+    suspend fun <T : TdApi.Object> sendRequest(function: TdApi.Function<*>): T {
+        ensureInitialized()
+        return suspendCancellableCoroutine { continuation ->
             val current = client
             if (current == null) {
                 continuation.resumeWithException(
@@ -91,6 +107,7 @@ class TelegramClientManager(
                 }
             }
         }
+    }
 
     fun logout() {
         client?.send(TdApi.LogOut()) { result ->
@@ -112,6 +129,21 @@ class TelegramClientManager(
             }
             is TdApi.UpdateFile -> _fileUpdates.tryEmit(update.file)
             is TdApi.Error -> _errors.tryEmit(update)
+        }
+    }
+
+    private suspend fun ensureInitialized() {
+        withContext(Dispatchers.IO) {
+            if (nativeLoadComplete) return@withContext
+            initializationMutex.withLock {
+                if (nativeLoadComplete) return@withLock
+                nativeLoadSucceeded = nativeLibraryAvailable
+                if (nativeLoadSucceeded) {
+                    Client.execute(TdApi.SetLogVerbosityLevel(if (BuildConfig.DEBUG) 1 else 0))
+                    client = Client.create(::handleUpdate, null, null)
+                }
+                nativeLoadComplete = true
+            }
         }
     }
 
@@ -144,7 +176,7 @@ class TelegramClientManager(
     }
 
     companion object {
-        val nativeLibraryAvailable: Boolean =
+        val nativeLibraryAvailable: Boolean by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
             runCatching {
                 System.loadLibrary("tdjni")
                 true
@@ -152,6 +184,7 @@ class TelegramClientManager(
                 Timber.e(it, "TDLib native library is unavailable")
                 false
             }
+        }
     }
 }
 

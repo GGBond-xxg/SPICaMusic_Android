@@ -16,6 +16,7 @@ class PlaylistDetailScene(
     private val coverAlbumIds: List<Long> = emptyList(),
     private val transition: GeometryTransition? = null,
 ) : StackScene() {
+    private var skipGeometryOnExit = false
     override val geometryTransition: GeometryTransition? = transition
     override val transitionShadowEnabled: Boolean = transition == null
     override val transitionScaleEnabled: Boolean = transition == null
@@ -30,7 +31,11 @@ class PlaylistDetailScene(
 
     @Composable
     override fun Content() {
-        PlaylistDetailScreen(playlist = playlist, geometryTransition = transition)
+        PlaylistDetailScreen(
+            playlist = playlist,
+            geometryTransition = transition,
+            onPlaylistDeleted = { skipGeometryOnExit = true },
+        )
     }
 
     override suspend fun onPush() {
@@ -41,14 +46,16 @@ class PlaylistDetailScene(
     override suspend fun onAppear() {
         coroutineScope {
             launch { super.onAppear() }
-            launch { geometryTransition?.animateForward() }
+            launch { geometryTransition?.animateForwardWhenTargetReady() }
         }
     }
 
     override suspend fun onDisappear() {
         coroutineScope {
             launch { super.onDisappear() }
-            launch { geometryTransition?.animateReverse() }
+            if (!skipGeometryOnExit) {
+                launch { geometryTransition?.animateReverse() }
+            }
         }
     }
 }

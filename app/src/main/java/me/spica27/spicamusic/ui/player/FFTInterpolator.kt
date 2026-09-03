@@ -15,7 +15,7 @@ import me.spica27.spicamusic.player.api.IFFTProcessor
 /**
  * FFT 数据插值器
  *
- * 将低刷新率的 FFT 原始数据平滑插值为约120fps 的绘制数据。
+ * 将低刷新率的 FFT 原始数据平滑插值为约60fps 的绘制数据。
  *
  * 生命周期完全由 Flow 订阅驱动，无需手动订阅/解绑：
  * - UI 通过 collectAsStateWithLifecycle 收集 [interpolatedData] 时自动开始计算
@@ -27,8 +27,8 @@ class FFTInterpolator(
     scope: CoroutineScope,
 ) {
     companion object {
-        // 绘制帧间隔（约 60fps）
-        private const val FRAME_INTERVAL_MS = 8L
+        // 绘制帧间隔（约 60fps）；跟随屏幕常见刷新率，避免 120fps 空转。
+        private const val FRAME_INTERVAL_MS = 16L
 
         // FFT 帧间隔的插值时长上下限
         private const val MIN_TRANSITION_MS = 8L

@@ -56,6 +56,12 @@ class CloudAudioCache(
     }
 
     @Synchronized
+    fun removeResource(cacheKey: String?) {
+        if (cacheKey.isNullOrBlank()) return
+        runCatching { cache.removeResource(cacheKey) }
+    }
+
+    @Synchronized
     fun release() = cache.release()
 
     private class CloudOnlyDataSource(
@@ -93,10 +99,10 @@ class CloudAudioCache(
     }
 
     companion object {
-        // v3 stops reusing preview spans cached before the account gained membership. Preview
-        // bytes and full-member bytes can share a provider song id, so a generation change is
-        // required when authenticated full-length resolution is introduced.
-        const val CACHE_KEY_PREFIX = "spica-cloud:v3:"
+        // v4 also stops reusing spans produced by an older provider URL or quality. A provider can
+        // return MP3 and FLAC for the same song id; mixing those bytes under one legacy cache key
+        // makes playback continue on the timeline after decoded audio has already run dry.
+        const val CACHE_KEY_PREFIX = "spica-cloud:v4:"
         const val DEFAULT_MAX_MIB = 1024
         private const val CACHE_DIRECTORY = "cloud_audio"
 

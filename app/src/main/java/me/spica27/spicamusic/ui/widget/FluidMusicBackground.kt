@@ -103,6 +103,9 @@ fun FluidMusicBackground(
         active &&
             backgroundMode != DynamicSpectrumBackground.OFF &&
             backgroundMode != DynamicSpectrumBackground.BlurCover
+    LaunchedEffect(enableFft) {
+        playerViewModel.setFftSamplingEnabled(enableFft)
+    }
     val fftSnapshot =
         if (enableFft) {
             val fftDrawData by playerViewModel.fftDrawData.collectAsStateWithLifecycle()
@@ -382,7 +385,7 @@ private fun StaticPlayerBackdrop(
     )
 }
 
-private const val RENDER_FRAME_DELAY_MS = 8L
+private const val RENDER_FRAME_DELAY_MS = 16L
 
 private class TextureViewRenderLoop(
     threadName: String,

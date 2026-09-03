@@ -124,9 +124,12 @@ class PlaybackService : MediaLibraryService() {
     private var trackChangeFadePending = false
     private var cloudErrorSkipJob: Job? = null
     private var cloudPrefetchJob: Job? = null
+    private var cloudSinkRecoveryJob: Job? = null
     private var diagnosticMonitorJob: Job? = null
     private var cloudPreviewHandledMediaId: String? = null
     private var cloudSinkEmptySinceMs = 0L
+    private var cloudRecoveryMediaId: String? = null
+    private var cloudRecoveryAttempts = 0
     private var cloudRecentCandidateMediaId: String? = null
     private var cloudRecentListeningSinceMs = 0L
     private var cloudRecentRecorded = false
@@ -189,6 +192,11 @@ class PlaybackService : MediaLibraryService() {
                 cloudErrorSkipJob?.cancel()
                 cloudPreviewHandledMediaId = null
                 cloudSinkEmptySinceMs = 0L
+                if (cloudSinkRecoveryJob?.isActive != true || cloudRecoveryMediaId != mediaItem?.mediaId) {
+                    cloudSinkRecoveryJob?.cancel()
+                    cloudRecoveryMediaId = null
+                    cloudRecoveryAttempts = 0
+                }
                 cloudRecentCandidateMediaId = null
                 cloudRecentListeningSinceMs = 0L
                 cloudRecentRecorded = false
@@ -1191,7 +1199,8 @@ class PlaybackService : MediaLibraryService() {
                             "isPlaying=${exoPlayer.isPlaying} suppression=${exoPlayer.playbackSuppressionReason} " +
                             "volume=${exoPlayer.volume} repeat=${exoPlayer.repeatMode} " +
                             "shuffle=${exoPlayer.shuffleModeEnabled} hiFi=$hiFiOutputEnabled " +
-                            "usbDac=$usbDacOutputEnabled fade=$fadeEnabled background=$backgroundPlaybackEnabled",
+                            "usbDac=$usbDacOutputEnabled fade=$fadeEnabled background=$backgroundPlaybackEnabled " +
+                            "sinkPending=${runCatching { audioSink?.hasPendingData() }.getOrNull()}",
                     )
                     DiagnosticLog.writeRuntimeSnapshot(this@PlaybackService, "playback-heartbeat")
                 }
@@ -1241,8 +1250,9 @@ class PlaybackService : MediaLibraryService() {
         val duration = exoPlayer.duration
         val remaining = duration - exoPlayer.currentPosition
         val sinkHasAudio = runCatching { audioSink?.hasPendingData() == true }.getOrDefault(true)
-        val stalled =
-            shouldHandleCloudAudioUnderrun(
+        val action =
+            cloudAudioUnderrunAction(
+                isCloudItem = item?.mediaId?.startsWith(CLOUD_MEDIA_ID_PREFIX) == true,
                 explicitPreview = item?.let(cloudPlaybackItemResolver::isExplicitPreview) == true,
                 stillSameItem =
                     item != null &&
@@ -1251,7 +1261,9 @@ class PlaybackService : MediaLibraryService() {
                 isPlaying = exoPlayer.isPlaying,
                 playbackState = exoPlayer.playbackState,
                 sinkHasPendingData = sinkHasAudio,
-            ) &&
+            )
+        val stalled =
+            action != CloudAudioUnderrunAction.NONE &&
                 (duration <= 0L || remaining > CLOUD_NATURAL_END_GUARD_MS) &&
                 item != null
         if (!stalled) {
@@ -1264,8 +1276,60 @@ class PlaybackService : MediaLibraryService() {
         }
         if (nowMs - cloudSinkEmptySinceMs >= CLOUD_UNDERRUN_CONFIRM_MS) {
             cloudSinkEmptySinceMs = 0L
-            handleCloudPreviewEnded(item)
+            when (action) {
+                CloudAudioUnderrunAction.SKIP_PREVIEW -> handleCloudPreviewEnded(item)
+                CloudAudioUnderrunAction.RESTART_STREAM -> recoverSilentCloudStream(item)
+                CloudAudioUnderrunAction.NONE -> Unit
+            }
         }
+    }
+
+    private fun recoverSilentCloudStream(item: MediaItem) {
+        if (cloudSinkRecoveryJob?.isActive == true) return
+        val mediaId = item.mediaId
+        if (cloudRecoveryMediaId != mediaId) {
+            cloudRecoveryMediaId = mediaId
+            cloudRecoveryAttempts = 0
+        }
+        cloudRecoveryAttempts += 1
+        val attempt = cloudRecoveryAttempts
+        val index = exoPlayer.currentMediaItemIndex
+        val positionMs = exoPlayer.currentPosition.coerceAtLeast(0L)
+        Timber.tag("PlaybackService").w(
+            "Cloud audio sink stayed empty while playback advanced; restarting stream: " +
+                "mediaId=$mediaId position=$positionMs attempt=$attempt",
+        )
+        cloudSinkRecoveryJob =
+            playerScope.launch {
+                if (exoPlayer.currentMediaItem?.mediaId != mediaId) return@launch
+                exoPlayer.pause()
+                exoPlayer.stop()
+                cloudPlaybackItemResolver.invalidateStream(item)
+                cloudAudioCache.removeResource(item.localConfiguration?.customCacheKey)
+                if (exoPlayer.currentMediaItem?.mediaId != mediaId || index !in 0 until exoPlayer.mediaItemCount) {
+                    return@launch
+                }
+                // Reopen from byte zero so FLAC and other container extractors see a clean header.
+                // Seeking directly into a damaged cached span can otherwise surface a malformed
+                // source error before the provider gets a chance to serve fresh bytes.
+                exoPlayer.seekTo(index, 0L)
+                exoPlayer.prepare()
+                val ready =
+                    withTimeoutOrNull(CLOUD_RECOVERY_PREPARE_TIMEOUT_MS) {
+                        while (
+                            exoPlayer.currentMediaItem?.mediaId == mediaId &&
+                            exoPlayer.playbackState != Player.STATE_READY &&
+                            exoPlayer.playerError == null
+                        ) {
+                            delay(20L)
+                        }
+                        exoPlayer.currentMediaItem?.mediaId == mediaId &&
+                            exoPlayer.playbackState == Player.STATE_READY
+                    } == true
+                if (!ready) return@launch
+                exoPlayer.seekTo(index, (positionMs - CLOUD_RECOVERY_REWIND_MS).coerceAtLeast(0L))
+                exoPlayer.play()
+            }
     }
 
     private fun recordCloudRecentWhenEligible(
@@ -1442,6 +1506,8 @@ class PlaybackService : MediaLibraryService() {
         const val STREAM_REBUFFER_START_BUFFER_MS = 1_500
         const val CLOUD_UNDERRUN_CONFIRM_MS = 3_000L
         const val CLOUD_NATURAL_END_GUARD_MS = 5_000L
+        const val CLOUD_RECOVERY_REWIND_MS = 300L
+        const val CLOUD_RECOVERY_PREPARE_TIMEOUT_MS = 8_000L
         const val CLOUD_RECENT_MIN_LISTEN_MS = 10_000L
         const val PROCESS_EXIT_DELAY_MS = 500L
     }
@@ -1470,3 +1536,33 @@ internal fun shouldHandleCloudAudioUnderrun(
         // buffered duration while staying READY and advancing the full-song timeline. The
         // sustained empty audio sink is the reliable signal here; the caller confirms it for 3s.
         !sinkHasPendingData
+
+internal enum class CloudAudioUnderrunAction {
+    NONE,
+    SKIP_PREVIEW,
+    RESTART_STREAM,
+}
+
+internal fun cloudAudioUnderrunAction(
+    isCloudItem: Boolean,
+    explicitPreview: Boolean,
+    stillSameItem: Boolean,
+    isPlaying: Boolean,
+    playbackState: Int,
+    sinkHasPendingData: Boolean,
+): CloudAudioUnderrunAction {
+    if (
+        !isCloudItem ||
+        !stillSameItem ||
+        !isPlaying ||
+        playbackState != Player.STATE_READY ||
+        sinkHasPendingData
+    ) {
+        return CloudAudioUnderrunAction.NONE
+    }
+    return if (explicitPreview) {
+        CloudAudioUnderrunAction.SKIP_PREVIEW
+    } else {
+        CloudAudioUnderrunAction.RESTART_STREAM
+    }
+}

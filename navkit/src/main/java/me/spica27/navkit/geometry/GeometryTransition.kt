@@ -5,9 +5,12 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * 几何过渡动画的状态容器，用于实现"共享元素"式的位置/尺寸过渡。
@@ -88,6 +91,28 @@ class GeometryTransition(
     }
 
     /**
+     * Starts the forward flight only after the destination has completed a real layout pass.
+     * Starting against [Rect.Zero] makes the artwork disappear on push while reverse appears to
+     * work later because the destination has been measured by then.
+     */
+    suspend fun animateForwardWhenTargetReady(timeoutMillis: Long = TARGET_LAYOUT_TIMEOUT_MS) {
+        val targetReady =
+            targetRect.value.hasRenderableSize() ||
+                withTimeoutOrNull(timeoutMillis) {
+                    snapshotFlow { targetRect.value }.first(Rect::hasRenderableSize)
+                    true
+                } == true
+        if (targetReady) {
+            animateForward()
+        } else {
+            // A destination without a geometry target must still become visible; never fly to the
+            // window origin or leave both endpoint nodes hidden.
+            progress.snapTo(1f)
+            phase.value = GeometryPhase.Target
+        }
+    }
+
+    /**
      * 反向动画从当前进度回到 0f（用于 pop 时复原）。
      */
     suspend fun animateReverse() {
@@ -107,6 +132,8 @@ class GeometryTransition(
     suspend fun reset() {
         phase.value = GeometryPhase.Source
         progress.snapTo(0f)
+        targetRect.value = Rect.Zero
+        targetVisibleRect.value = Rect.Zero
     }
 
     /**
@@ -119,7 +146,8 @@ class GeometryTransition(
         when (phase.value) {
             GeometryPhase.Source -> true
             GeometryPhase.Forward -> progress.value <= SOURCE_HANDOFF_PROGRESS
-            GeometryPhase.Target, GeometryPhase.Reverse -> false
+            GeometryPhase.Reverse -> false
+            GeometryPhase.Target -> false
         }
 
     /**
@@ -163,15 +191,21 @@ class GeometryTransition(
      */
     fun getClipBounds(sourceOcclusions: List<Rect> = emptyList()): Rect {
         val t = progress.value
-        var src = sourceVisibleRect.value.takeIf { it != Rect.Zero } ?: sourceRect.value
-        sourceOcclusions.forEach { src = src.subtractOccluder(it) }
+        val src = sourceVisibleRect.value.takeIf { it != Rect.Zero } ?: sourceRect.value
         val dst = targetVisibleRect.value.takeIf { it != Rect.Zero } ?: targetRect.value
-        return Rect(
-            left = lerp(src.left, dst.left, t),
-            top = lerp(src.top, dst.top, t),
-            right = lerp(src.right, dst.right, t),
-            bottom = lerp(src.bottom, dst.bottom, t)
-        )
+        var currentClip =
+            Rect(
+                left = lerp(src.left, dst.left, t),
+                top = lerp(src.top, dst.top, t),
+                right = lerp(src.right, dst.right, t),
+                bottom = lerp(src.bottom, dst.bottom, t),
+            )
+        // The floating controls stay at a fixed window position. Subtract them from the current
+        // frame, not just from the source endpoint and then interpolate that cut-out toward the
+        // target. Endpoint interpolation made the cover start painting over the controls halfway
+        // through the flight.
+        sourceOcclusions.forEach { currentClip = currentClip.subtractOccluder(it) }
+        return currentClip
     }
 
     /**
@@ -187,8 +221,11 @@ class GeometryTransition(
             coversHorizontally -> when {
                 o.top <= top && o.bottom >= bottom -> Rect(left, top, left, top)
                 o.top <= top -> copy(top = o.bottom)
-                o.bottom >= bottom -> copy(bottom = o.top)
-                else -> this // 遮挡物嵌在中间，无法用单矩形表达，保持原样
+                // A floating player is a horizontal layer boundary. Even when the moving cover
+                // extends below both edges of that bar, keep only its upper segment in the global
+                // overlay. The source underlay supplies the portion seen through the translucent
+                // bar, while the bar and its controls remain painted above it.
+                else -> copy(bottom = o.top)
             }
             coversVertically -> when {
                 o.left <= left && o.right >= right -> Rect(left, top, left, top)
@@ -222,5 +259,8 @@ class GeometryTransition(
          * 让 overlay 有一两个绘制帧完成图片接管，避免点击瞬间闪烁。
          */
         private const val SOURCE_HANDOFF_PROGRESS = 0.08f
+        private const val TARGET_LAYOUT_TIMEOUT_MS = 500L
     }
 }
+
+private fun Rect.hasRenderableSize(): Boolean = width > 1f && height > 1f

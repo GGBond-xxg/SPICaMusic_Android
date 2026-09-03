@@ -23,6 +23,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -47,6 +48,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
+import me.spica27.navkit.geometry.geometryOccluder
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import kotlin.math.roundToInt
 import androidx.compose.ui.util.lerp as floatLerp
@@ -64,13 +66,13 @@ class BottomBarV2State internal constructor(
     val progress: Float get() = fraction.value
 
     /**
-     * 全屏播放器内容常驻组合树，收起时仅暂停动态效果。
+     * 全屏播放器第一次展开前不参与冷启动组合；准备后保持在组合树中复用。
      *
-     * 若等到上滑越过触摸阈值后才创建内容，首个拖动帧会先露出纯色容器；点击路径则必须
-     * 额外等待预组合。常驻后两种入口都能立即复用同一帧内容，模糊背景在 progress=0 时
-     * 仍由下方绘制层完全隐藏，不会重新出现胶囊外沿光晕。
+     * 首次点击会先提交播放器子树一帧再开始形变，避免封面在动画末尾突然替换；此后点击
+     * 与拖动都复用同一份内容。收起时仅暂停动态效果，避免重复创建造成闪烁。
      */
-    val contentPrepared: Boolean = true
+    var contentPrepared by mutableStateOf(false)
+        private set
 
     /** 播放器内容是否处于可交互状态。 */
     var contentActive by mutableStateOf(false)
@@ -78,10 +80,6 @@ class BottomBarV2State internal constructor(
 
     /** FFT、TextureView 动态背景和波形分析是否允许运行。 */
     var dynamicEffectsActive by mutableStateOf(false)
-        private set
-
-    /** 关闭形变期间把迷你封面冻结到浮层使用的四角星，保证末帧轮廓可无缝交接。 */
-    var artworkShapeLocked by mutableStateOf(false)
         private set
 
     /** 返回键拦截只依赖形变进度，不等待重内容显示。 */
@@ -97,13 +95,22 @@ class BottomBarV2State internal constructor(
      * 打开分两段：先只让轻量背景胶囊无卡顿地铺满屏幕，再组合并淡入播放器内容。
      * 这样封面、Pager、波形与动态背景不会参与几何形变的每一帧。
      */
-    fun expand(isPlaying: Boolean) {
+    fun expand(awaitContentLayout: suspend () -> Unit = {}) {
         transitionJob?.cancel()
+        contentPrepared = true
         transitionJob =
             scope.launch {
-                artworkShapeLocked = isPlaying
                 contentActive = false
                 dynamicEffectsActive = false
+
+                // Commit the retained full-player subtree before the container starts growing.
+                // The first cold tap therefore gets the same artwork/control ownership as later
+                // taps, without making that heavy subtree part of the app's launch frame.
+                withFrameNanos { }
+                // A frame boundary only schedules composition; it does not guarantee that the
+                // lazily mounted artwork target has been measured. The caller waits on the real
+                // target coordinates so a cold expansion cannot begin with a missing overlay.
+                awaitContentLayout()
 
                 if (fraction.value < 0.999f) {
                     fraction.animateTo(1f, expandMorphSpec())
@@ -129,24 +136,14 @@ class BottomBarV2State internal constructor(
                 if (fraction.value > 0.001f) {
                     fraction.animateTo(0f, collapseMorphSpec())
                 }
-                artworkShapeLocked = false
             }
     }
 
-    internal fun syncExpandedArtworkShape(isPlaying: Boolean) {
-        if (fraction.value >= 0.999f && !fraction.isRunning) {
-            artworkShapeLocked = isPlaying
-        }
-    }
-
-    internal fun onInteractiveDragStart(isPlaying: Boolean) {
+    internal fun onInteractiveDragStart() {
         transitionJob?.cancel()
+        contentPrepared = true
         transitionJob =
             scope.launch {
-                // 上滑展开与点击展开必须走同一套封面交接：
-                // 手势一开始就把正在循环的多边形平滑收束到圆角十字，
-                // 并在整个展开/关闭过程中保持该形状，避免返回胶囊时跳回任意动态帧。
-                artworkShapeLocked = isPlaying
                 contentActive = false
                 dynamicEffectsActive = false
             }
@@ -161,7 +158,6 @@ class BottomBarV2State internal constructor(
                     delay(DYNAMIC_EFFECTS_SETTLE_DELAY_MS)
                     dynamicEffectsActive = true
                 } else {
-                    artworkShapeLocked = false
                     contentActive = false
                     dynamicEffectsActive = false
                 }
@@ -233,6 +229,8 @@ fun BottomBarV2(
     collapsedContainerColor: Color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.80f),
     expandedContainerColor: Color = MaterialTheme.colorScheme.surface,
     onMorphStart: () -> Unit = {},
+    isMorphTargetReady: () -> Boolean = { true },
+    awaitMorphTarget: suspend () -> Unit = {},
     onCollapsed: () -> Unit = {},
     navigationBar: @Composable () -> Unit,
     playBar: @Composable () -> Unit,
@@ -254,7 +252,6 @@ fun BottomBarV2(
     val fractionProvider = remember(state) { { state.fraction.value } }
     val inFlightProvider = remember(state) { { state.isMorphInFlight } }
     val currentOnCollapsed by rememberUpdatedState(onCollapsed)
-    val currentIsPlaying by rememberUpdatedState(isPlaying)
     val metrics = remember { SheetMetrics() }
 
     val handler =
@@ -265,9 +262,15 @@ fun BottomBarV2(
                 snapSpec = BottomBarV2State.dragSnapSpec(),
                 onDragStarted = {
                     onMorphStart()
-                    state.onInteractiveDragStart(currentIsPlaying)
+                    state.onInteractiveDragStart()
                 },
                 onSettled = state::onInteractiveSettle,
+                isDragReady = {
+                    // Collapse gestures already have a mounted target. Gate only the first
+                    // expansion from the fully collapsed state.
+                    state.fraction.value > 0.001f || isMorphTargetReady()
+                },
+                awaitDragReady = awaitMorphTarget,
             )
         }
 
@@ -470,6 +473,11 @@ fun BottomBarV2(
                     modifier =
                         Modifier
                             .zIndex(if (fullOnTop) 0f else 1f)
+                            // The bar is a sibling of the scrolling page, so boundsInWindow on a
+                            // playlist cover cannot see that its lower edge is hidden here. Keep
+                            // shared-element overlays behind the same visible boundary on both
+                            // forward and reverse flights.
+                            .geometryOccluder("bottom_media_bar_v2")
                             .graphicsLayer {
                                 val f = fractionProvider()
                                 alpha = (1f - f / 0.42f).coerceIn(0f, 1f)

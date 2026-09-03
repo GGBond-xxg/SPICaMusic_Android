@@ -241,12 +241,6 @@ val ossLibraries: List<OssLibrary> =
             "https://github.com/jordond/MaterialKolor",
         ),
         OssLibrary(
-            "CircularRevealSwitch",
-            "Compose-native adaptation of the reveal transition concept",
-            "MIT",
-            "https://github.com/YenalyLiew/CircularRevealSwitch",
-        ),
-        OssLibrary(
             "Reorderable",
             "sh.calvin.reorderable:reorderable",
             "Apache-2.0",

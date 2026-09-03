@@ -13,18 +13,17 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
@@ -34,21 +33,15 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.zIndex
-import androidx.graphics.shapes.CornerRounding
-import androidx.graphics.shapes.Morph
-import androidx.graphics.shapes.RoundedPolygon
-import androidx.graphics.shapes.circle
-import androidx.graphics.shapes.rectangle
-import androidx.graphics.shapes.star
-import androidx.graphics.shapes.toPath
-import androidx.graphics.shapes.transformed
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import me.spica27.spicamusic.ui.widget.AudioCover
 import me.spica27.spicamusic.ui.widget.MusicCoverPlaceholder
 import kotlin.math.abs
 import kotlin.math.roundToInt
-import android.graphics.Matrix as AndroidMatrix
 import androidx.compose.ui.util.lerp as floatLerp
 
 /**
@@ -103,6 +96,47 @@ class PlayerArtworkMorphState internal constructor() {
         recalculateSourceBounds()
     }
 
+    /**
+     * Wait until the compact artwork has reached a stable, attached layout position.
+     *
+     * The bottom bar itself uses shared-element motion when switching out of detail-page inline
+     * mode. Querying the live LayoutCoordinates for consecutive frames avoids freezing either an
+     * outgoing node or the final intermediate frame on slower cold starts.
+     */
+    suspend fun awaitStableSourceBounds(timeoutMillis: Long = SOURCE_LAYOUT_TIMEOUT_MS) {
+        var previous = Rect.Zero
+        var stableFrames = 0
+        withTimeoutOrNull(timeoutMillis) {
+            while (stableFrames < REQUIRED_STABLE_SOURCE_FRAMES) {
+                withFrameNanos { }
+                recalculateSourceBounds()
+                val current = sourceBounds
+                stableFrames =
+                    if (current.isUsable() && current.approximatelyEquals(previous)) {
+                        stableFrames + 1
+                    } else {
+                        0
+                    }
+                previous = current
+            }
+        }
+    }
+
+    /**
+     * Wait for the lazily composed full-player artwork to complete a real layout pass.
+     *
+     * On the first expansion after a cold start the target does not exist yet. Starting the
+     * progress animation after an arbitrary single frame lets progress advance before targetBounds
+     * becomes usable: the compact artwork disappears first, then the overlay mounts partway along
+     * the path at a wrong position. Waiting on the actual geometry makes ownership atomic.
+     */
+    suspend fun awaitUsableBounds(timeoutMillis: Long = TARGET_LAYOUT_TIMEOUT_MS) {
+        if (hasUsableBounds) return
+        withTimeoutOrNull(timeoutMillis) {
+            snapshotFlow { hasUsableBounds }.first { it }
+        }
+    }
+
     private fun recalculateSourceBounds() {
         if (!sourceCaptureEnabled) return
         val host = hostCoordinates?.takeIf { it.isAttached } ?: return
@@ -148,8 +182,9 @@ fun Modifier.playerArtworkMorphTarget(state: PlayerArtworkMorphState): Modifier 
 /**
  * M3 风格的共享封面浮层。
  *
- * 过渡期间中段只绘制这一份封面，并在源/目标矩形间连续插值。
- * 源端保留一个很短的形状交接区；目标端采用原子接管，不让目标封面和浮层重叠。
+ * 过渡期间只绘制这一份封面，并在源/目标矩形间连续插值。
+ * 源封面、共享浮层和目标封面使用互斥可见性，在几何完全一致的端点同帧交接，
+ * 避免两张不同采样清晰度的封面交叉淡化形成重影。
  * 浮层不参与触摸命中。
  */
 @Composable
@@ -157,8 +192,6 @@ fun PlayerArtworkMorphOverlay(
     state: PlayerArtworkMorphState,
     artworkUri: Uri?,
     artworkPainter: Painter?,
-    sourceShape: Shape,
-    isPlaying: Boolean,
     progressProvider: () -> Float,
     inFlightProvider: () -> Boolean,
     modifier: Modifier = Modifier,
@@ -183,21 +216,16 @@ fun PlayerArtworkMorphOverlay(
         } else {
             MaterialTheme.colorScheme.onTertiaryContainer
         }
-    val currentSourceShape by rememberUpdatedState(sourceShape)
-    val transitionShape =
-        remember(isPlaying, progressProvider) {
-            UnifiedArtworkShape(
-                isPlaying = isPlaying,
-                progressProvider = progressProvider,
-                sourceShapeProvider = { currentSourceShape },
-            )
-        }
     val renderScaleProvider = {
         val progress = progressProvider().coerceIn(0f, 1f)
         val currentWidth = floatLerp(source.width, target.width, progress)
         val currentHeight = floatLerp(source.height, target.height, progress)
         minOf(currentWidth / targetWidth, currentHeight / targetHeight).coerceAtLeast(0.01f)
     }
+    val transitionShape =
+        remember(progressProvider) {
+            PlayerArtworkTransitionShape(progressProvider)
+        }
 
     val artwork: @Composable () -> Unit = {
         if (artworkPainter != null) {
@@ -263,6 +291,9 @@ fun PlayerArtworkMorphOverlay(
                         .fillMaxSize()
                         .graphicsLayer {
                             compositingStrategy = CompositingStrategy.Offscreen
+                            // The compact cover is circular and the full player cover is a rounded
+                            // square. One outline follows the same geometric progress in both
+                            // directions, so neither endpoint flashes a mismatched corner radius.
                             shape = transitionShape
                             clip = true
                         }.background(artworkContainerColor),
@@ -276,8 +307,8 @@ fun PlayerArtworkMorphOverlay(
 /**
  * 迷你封面的可见度。
  *
- * 源端只在过渡开始的一小段与共享浮层交叉接管，用来保留播放时的动态多边形封面；
- * 中段不会再与浮层重复绘制。
+ * 有可用的共享元素坐标时，形变开始后立即由共享浮层独占绘制；只有完全收起的
+ * 稳定帧才显示源封面。
  */
 fun sourceArtworkAlpha(
     progress: Float,
@@ -285,15 +316,13 @@ fun sourceArtworkAlpha(
     hasUsableBounds: Boolean,
 ): Float {
     if (!hasUsableBounds) return 1f
-    if (!inFlight) return if (progress <= STABLE_COLLAPSED_EPSILON) 1f else 0f
-    return 0f
+    return if (!inFlight && progress <= STABLE_COLLAPSED_EPSILON) 1f else 0f
 }
 
 /**
  * 全屏目标封面的可见度。
  *
- * 共享浮层飞行期间始终为 0；只有形变完全结束后才一次性交给目标封面。
- * 这样不会出现浮层封面和播放器原封面叠在一起的“双封面”帧。
+ * 共享浮层飞行期间始终为 0；只有形变完全结束后才在同一位置一次性交给目标封面。
  */
 fun targetArtworkAlpha(
     progress: Float,
@@ -306,71 +335,6 @@ fun targetArtworkAlpha(
 
 private fun artworkOverlayAlpha(inFlight: Boolean): Float = if (inFlight) 1f else 0f
 
-private class UnifiedArtworkShape(
-    isPlaying: Boolean,
-    private val progressProvider: () -> Float,
-    private val sourceShapeProvider: () -> Shape,
-) : Shape {
-    private val matrix = Matrix()
-    private val morph =
-        Morph(
-            start =
-                if (isPlaying) {
-                    RoundedPolygon
-                        .star(
-                            numVerticesPerRadius = 3,
-                            rounding = CornerRounding(radius = 0.20f, smoothing = 0.30f),
-                        ).transformed(
-                            AndroidMatrix().apply {
-                                setRotate(DIAGONAL_TRIANGLE_DEGREES)
-                            },
-                        )
-                } else {
-                    RoundedPolygon.circle(numVertices = 16)
-                },
-            end =
-                RoundedPolygon.rectangle(
-                    width = 2f,
-                    height = 2f,
-                    rounding = CornerRounding(radius = 0.12f, smoothing = 0.15f),
-                ),
-        )
-
-    override fun createOutline(
-        size: Size,
-        layoutDirection: LayoutDirection,
-        density: Density,
-    ): Outline {
-        val rawProgress = progressProvider().coerceIn(0f, 1f)
-        if (rawProgress <= SOURCE_SHAPE_HANDOFF_PROGRESS) {
-            // 手势刚开始及关闭末段沿用真实迷你封面形状。
-            // 这样动态图形收束为固定斜三角的动画不会因为浮层接管而被跳过。
-            return sourceShapeProvider().createOutline(size, layoutDirection, density)
-        }
-
-        matrix.reset()
-        matrix.scale(size.width / 2f, size.height / 2f)
-        matrix.translate(1f, 1f)
-
-        val morphProgress =
-            (
-                (rawProgress - SOURCE_SHAPE_HANDOFF_PROGRESS) /
-                    (1f - SOURCE_SHAPE_HANDOFF_PROGRESS)
-            ).coerceIn(0f, 1f)
-        val path =
-            morph
-                .toPath(progress = smoothStep(morphProgress))
-                .asComposePath()
-        path.transform(matrix)
-        return Outline.Generic(path)
-    }
-}
-
-private fun smoothStep(value: Float): Float {
-    val t = value.coerceIn(0f, 1f)
-    return t * t * (3f - 2f * t)
-}
-
 private fun Rect.isUsable(): Boolean = this != Rect.Zero && left.isFinite() && top.isFinite() && width > 1f && height > 1f
 
 private fun Rect.approximatelyEquals(other: Rect): Boolean =
@@ -379,7 +343,39 @@ private fun Rect.approximatelyEquals(other: Rect): Boolean =
         abs(right - other.right) < 0.5f &&
         abs(bottom - other.bottom) < 0.5f
 
+private class PlayerArtworkTransitionShape(
+    private val progressProvider: () -> Float,
+) : Shape {
+    override fun createOutline(
+        size: androidx.compose.ui.geometry.Size,
+        layoutDirection: LayoutDirection,
+        density: Density,
+    ): Outline {
+        val progress = progressProvider().coerceIn(0f, 1f)
+        val circleRadius = minOf(size.width, size.height) / 2f
+        val roundedSquareRadius = with(density) { PLAYER_ARTWORK_CORNER_RADIUS.toPx() }
+        val radius =
+            floatLerp(circleRadius, roundedSquareRadius, progress)
+                .coerceIn(0f, circleRadius)
+        return Outline.Rounded(
+            RoundRect(
+                left = 0f,
+                top = 0f,
+                right = size.width,
+                bottom = size.height,
+                radiusX = radius,
+                radiusY = radius,
+            ),
+        )
+    }
+}
+
 private const val STABLE_COLLAPSED_EPSILON = 0.001f
 private const val STABLE_EXPANDED_THRESHOLD = 0.999f
-private const val SOURCE_SHAPE_HANDOFF_PROGRESS = 0.22f
-private const val DIAGONAL_TRIANGLE_DEGREES = 15f
+private const val TARGET_LAYOUT_TIMEOUT_MS = 750L
+private const val SOURCE_LAYOUT_TIMEOUT_MS = 750L
+private const val REQUIRED_STABLE_SOURCE_FRAMES = 3
+
+// ExpandedPlayerScreen clips the real target with Shapes.LargeCornerBasedShape (16.dp).
+// Keeping the overlay endpoint identical prevents a one-frame corner snap at hand-off.
+private val PLAYER_ARTWORK_CORNER_RADIUS = 16.dp

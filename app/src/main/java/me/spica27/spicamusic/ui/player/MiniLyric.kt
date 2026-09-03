@@ -49,6 +49,7 @@ private const val LOADING_PLACEHOLDER = "· · ·"
 fun MiniLyric(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    active: Boolean = true,
 ) {
     // Activity 作用域共享实例：与全屏歌词页同源，
     // 全屏页内切换歌词源 / 调整偏移量后 mini 歌词同步生效
@@ -65,8 +66,8 @@ fun MiniLyric(
 
     // 当前播放时间（帧级更新）；行索引经 derivedStateOf 收敛，仅切行时触发重组
     val currentTimeState = remember { mutableLongStateOf(0L) }
-    LaunchedEffect(isAppInForeground) {
-        if (!isAppInForeground) return@LaunchedEffect
+    LaunchedEffect(isAppInForeground, active) {
+        if (!isAppInForeground || !active) return@LaunchedEffect
         while (true) {
             awaitFrame()
             currentTimeState.longValue = viewModel.getCurrentPositionMs()

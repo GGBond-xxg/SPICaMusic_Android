@@ -99,6 +99,14 @@ class RemoteMusicClientRegistry(
         return netease.dailyRecommendations(account, forceRefresh)
     }
 
+    /** Returns the last disk-backed recommendations without starting network work. */
+    fun cachedDailyRecommendations(account: RemoteMusicAccount): List<RemoteSong> {
+        require(account.provider == RemoteMusicProvider.NETEASE) {
+            "Daily recommendations are only available for NetEase accounts"
+        }
+        return netease.cachedDailyRecommendations(account.id)
+    }
+
     suspend fun neteaseLikedSongIds(
         account: RemoteMusicAccount,
         forceRefresh: Boolean = false,
@@ -345,6 +353,12 @@ class NeteaseClient(
     private val likedSongCache = ConcurrentHashMap<String, Set<String>>()
     private val playlistLocks = ConcurrentHashMap<String, Mutex>()
     private val playlistSongLocks = ConcurrentHashMap<String, Mutex>()
+
+    fun cachedDailyRecommendations(accountId: String): List<RemoteSong> =
+        dailyRecommendationCache[accountId]
+            ?: libraryStore.readDailyRecommendations(accountId).also { cached ->
+                if (cached.isNotEmpty()) dailyRecommendationCache[accountId] = cached
+            }
 
     suspend fun authenticate(cookieHeader: String): Result<RemoteMusicAccount> =
         withContext(Dispatchers.IO) {

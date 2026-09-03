@@ -16,6 +16,8 @@ class TelegramRepository(
 
     fun hasConfig(): Boolean = client.hasConfig()
 
+    fun initializeAsync() = client.initializeAsync()
+
     suspend fun awaitReady(timeoutMs: Long = 20_000L): Boolean = client.awaitReady(timeoutMs)
 
     fun savedChannels(): List<TelegramChannel> = accountStore.getTelegramChannels()

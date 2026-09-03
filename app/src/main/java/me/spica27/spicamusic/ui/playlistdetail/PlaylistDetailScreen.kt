@@ -146,6 +146,7 @@ import com.skydoves.landscapist.image.LandscapistImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import me.spica27.navkit.geometry.GeometryTransition
 import me.spica27.navkit.geometry.geometryTarget
 import me.spica27.navkit.path.LocalNavigationPath
@@ -192,6 +193,7 @@ private val COLLAPSED_TITLE_START = COVER_COLLAPSED_START + COVER_COLLAPSED + Sp
 
 private val BOTTOM_PLAYER_RESERVED = 200.dp // 悬浮迷你播放器底部预留（全项目惯例值）
 private val MULTI_SELECT_BAR_RESERVED = 120.dp // 两行多选底栏出现时的额外避让
+private const val PLAYER_SWITCH_TIMEOUT_MS = 8_000L
 
 private fun CatalogQueueItem.expectedMediaId(): String =
     when (this) {
@@ -224,6 +226,7 @@ private enum class SearchContentState { Idle, Loading, Empty, Results }
 fun PlaylistDetailScreen(
     playlist: Playlist,
     geometryTransition: GeometryTransition? = null,
+    onPlaylistDeleted: () -> Unit = {},
 ) {
     val path = LocalNavigationPath.current
     val playlistId = playlist.playlistId ?: return
@@ -269,10 +272,15 @@ fun PlaylistDetailScreen(
     // 避免详情页退出时先露出上一首的播放器，再跳成刚点击的歌曲。
     LaunchedEffect(pendingPlayerMediaId) {
         val expectedMediaId = pendingPlayerMediaId ?: return@LaunchedEffect
-        playerViewModel.currentMediaItem.first { it?.mediaId == expectedMediaId }
-        if (pendingPlayerMediaId == expectedMediaId) {
+        val switched =
+            withTimeoutOrNull(PLAYER_SWITCH_TIMEOUT_MS) {
+                playerViewModel.currentMediaItem.first { it?.mediaId == expectedMediaId }
+            } != null
+        if (pendingPlayerMediaId == expectedMediaId && switched) {
             pendingPlayerMediaId = null
-            homeViewModel.expandPlayer()
+            path.popToRoot { homeViewModel.expandPlayer() }
+        } else if (pendingPlayerMediaId == expectedMediaId) {
+            pendingPlayerMediaId = null
         }
     }
 
@@ -290,7 +298,13 @@ fun PlaylistDetailScreen(
 
     // 歌单被删除时返回上一页
     LaunchedEffect(playlistDeleted) {
-        if (playlistDeleted) path.popTop()
+        if (playlistDeleted) {
+            // The source card is removed from the previous page at the same time. A reverse
+            // shared-element flight would therefore land on stale coordinates and then jump as
+            // the grid closes the gap; use the scene's ordinary fade for this destructive exit.
+            onPlaylistDeleted()
+            path.popTop()
+        }
     }
 
     // ── 搜索覆盖层过渡（hoisted：键盘时序与关键字清理都依赖它）─────────────────
@@ -526,6 +540,7 @@ fun PlaylistDetailScreen(
                         PlaylistSongRow(
                             song = song,
                             isPlaying = playingMediaId == song.mediaStoreId.toString(),
+                            isPending = pendingPlayerMediaId == song.mediaStoreId.toString(),
                             isMultiSelectMode = isMultiSelectMode,
                             isSelected = selectedSongs.contains(song.mediaStoreId),
                             isDragging = false,
@@ -575,6 +590,7 @@ fun PlaylistDetailScreen(
                         PlaylistCloudSongRow(
                             song = song,
                             isPlaying = playingMediaId == song.stableId,
+                            isPending = pendingPlayerMediaId == song.stableId,
                             isMultiSelectMode = isMultiSelectMode,
                             isSelected = song.stableId in selectedCloudSongs,
                             onClick = {
@@ -1373,6 +1389,7 @@ private fun FloatingHintIcon(
 private fun PlaylistCloudSongRow(
     song: CloudCatalogSong,
     isPlaying: Boolean,
+    isPending: Boolean = false,
     isMultiSelectMode: Boolean,
     isSelected: Boolean,
     onClick: () -> Unit,
@@ -1383,7 +1400,7 @@ private fun PlaylistCloudSongRow(
     val rowBackground =
         when {
             isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
-            isPlaying -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.30f)
+            isPlaying || isPending -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.30f)
             else -> Color.Transparent
         }
     Row(
@@ -1430,8 +1447,12 @@ private fun PlaylistCloudSongRow(
             )
         }
         if (!isMultiSelectMode) {
-            IconButton(onClick = onMore) {
-                Icon(Icons.Default.MoreVert, "更多")
+            if (isPending) {
+                CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+            } else {
+                IconButton(onClick = onMore) {
+                    Icon(Icons.Default.MoreVert, stringResource(R.string.more))
+                }
             }
         }
     }
@@ -1441,6 +1462,7 @@ private fun PlaylistCloudSongRow(
 private fun PlaylistSongRow(
     song: Song,
     isPlaying: Boolean,
+    isPending: Boolean = false,
     isMultiSelectMode: Boolean,
     isSelected: Boolean,
     isDragging: Boolean,
@@ -1456,7 +1478,7 @@ private fun PlaylistSongRow(
         when {
             isDragging -> MaterialTheme.colorScheme.surfaceContainerHighest
             isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
-            isPlaying -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.30f)
+            isPlaying || isPending -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.30f)
             else -> Color.Transparent
         }
     val dragElevation by animateDpAsState(
@@ -1526,6 +1548,8 @@ private fun PlaylistSongRow(
                             .padding(Spacing.Medium)
                             .size(22.dp),
                 )
+            } else if (isPending) {
+                CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
             } else {
                 IconButton(onClick = onMore) {
                     Icon(

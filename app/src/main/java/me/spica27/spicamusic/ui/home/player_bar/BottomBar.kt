@@ -13,6 +13,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -60,7 +61,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -95,8 +95,7 @@ import com.skydoves.landscapist.components.rememberImageComponent
 import com.skydoves.landscapist.crossfade.CrossfadePlugin
 import com.skydoves.landscapist.image.LandscapistImage
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import me.spica27.navkit.geometry.geometryOccluder
 import me.spica27.navkit.path.LocalNavigationPath
@@ -119,7 +118,6 @@ import me.spica27.spicamusic.ui.search.SearchScene
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.widget.MusicCoverPlaceholder
 import me.spica27.spicamusic.ui.widget.StableAudioCover
-import me.spica27.spicamusic.ui.widget.rememberPlayingCoverShape
 import me.spica27.spicamusic.utils.albumCoverFallbackUri
 import org.koin.compose.viewmodel.koinActivityViewModel
 import kotlin.math.roundToInt
@@ -160,7 +158,7 @@ fun BottomMediaBar(bottomBarScrollConnection: BottomBarScrollConnection = LocalB
     val artist = metadata?.artist?.toString() ?: stringResource(R.string.unknown_artist)
     val artworkUri = metadata?.artworkUri ?: metadata?.albumCoverFallbackUri()
     val isPlaying by playerViewModel.isPlaying.collectAsStateWithLifecycle()
-    val coverShape = rememberPlayingCoverShape(isPlaying)
+    val coverShape = CircleShape
 
     // 可拖拽锚点状态
     val draggableState =
@@ -561,22 +559,42 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
     val metadata = displayedMediaItem?.mediaMetadata
     val title = metadata?.title?.toString() ?: stringResource(R.string.unknown_song)
     val artworkUri = metadata?.artworkUri ?: metadata?.albumCoverFallbackUri()
-    val firstFrameCoverPainter =
+    val artworkKey = artworkUri?.toString()
+    var stableCoverSnapshot by
         remember {
-            ArtworkRenderCache.read(artworkUri?.toString())
+            mutableStateOf(
+                ArtworkPainterSnapshot(
+                    key = artworkKey,
+                    painter = ArtworkRenderCache.read(artworkKey),
+                ),
+            )
         }
-    var stableCoverPainter by remember { mutableStateOf(firstFrameCoverPainter) }
-    LaunchedEffect(artworkUri) {
-        if (artworkUri == null) {
+    // Never lend the previous song's painter to a new song's shared overlay. On a cold adjacent
+    // switch that old bitmap used to stay visible until the new decode completed, then the new
+    // circular bitmap appeared as a separate object near the bottom navigation.
+    val stableCoverPainter =
+        stableCoverSnapshot
+            .takeIf { it.key == artworkKey }
+            ?.painter
+    LaunchedEffect(artworkKey) {
+        if (stableCoverSnapshot.key != artworkKey) {
+            stableCoverSnapshot =
+                ArtworkPainterSnapshot(
+                    key = artworkKey,
+                    painter = ArtworkRenderCache.read(artworkKey),
+                )
+        }
+        if (artworkKey == null) {
             // Media3 may briefly publish a null item while seeking to an adjacent queue entry.
             // Keep the decoded cover through that hand-off and clear it only for a real empty queue.
             delay(COVER_CLEAR_GRACE_PERIOD_MS)
-            stableCoverPainter = null
+            if (stableCoverSnapshot.key == null) {
+                stableCoverSnapshot = ArtworkPainterSnapshot(key = null, painter = null)
+            }
         }
     }
     val isPlaying by playerViewModel.isPlaying.collectAsStateWithLifecycle()
     val playerExpandRequested by homeViewModel.playerExpandRequested.collectAsStateWithLifecycle()
-    val latestIsPlaying by rememberUpdatedState(isPlaying)
     val playerContentReady = displayedMediaItem != null || playerInitialized
 
     // 记录跳转到播放器的初始页（默认主页 or 播放列表页）
@@ -584,12 +602,18 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
 
     // 全屏展开进度状态（由 BottomBarV2 驱动）
     val sheetState = rememberBottomBarV2State()
-    val coverShape =
-        rememberPlayingCoverShape(
-            isPlaying = isPlaying,
-            lockToTransitionShape = sheetState.artworkShapeLocked,
-        )
+    val coverShape = CircleShape
     val artworkMorphState = rememberPlayerArtworkMorphState()
+
+    // Keep the real AnimatedContent transition observable. A fixed delay is unreliable on a
+    // cold start: navigation can request the player while the compact one-line bar is still
+    // transforming into the normal bottom bar, which freezes an intermediate cover position.
+    val isSingleLineMode = bottomBarScrollConnection.isInline
+    val bottomBarModeTransition =
+        updateTransition(
+            targetState = isSingleLineMode,
+            label = "bottom_bar_line_mode",
+        )
     LaunchedEffect(playerExpandRequested, displayedMediaItem, sheetState) {
         // A cloud queue publishes its first MediaItem asynchronously. Keep the request pending
         // until the player has real metadata; consuming it earlier pops the playlist but leaves
@@ -597,30 +621,24 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
         if (playerExpandRequested && displayedMediaItem != null) {
             initialPage = DEFAULT_PAGE
             // Playlist/detail screens leave the compact one-line bar active. Its branch does not
-            // compose full-screen player content, so switch layouts before starting the sheet.
+            // compose full-screen player content. Wait for the actual shared-layout transition,
+            // including a transition that navigation already started before this effect ran.
             bottomBarScrollConnection.expand()
+            snapshotFlow {
+                bottomBarModeTransition.currentState == false &&
+                    bottomBarModeTransition.targetState == false &&
+                    !bottomBarModeTransition.isRunning
+            }.first { it }
+            artworkMorphState.resumeSourceCapture()
+            artworkMorphState.awaitStableSourceBounds()
             artworkMorphState.freezeSourceBounds()
-            sheetState.expand(latestIsPlaying)
+            sheetState.expand { artworkMorphState.awaitUsableBounds() }
             homeViewModel.consumePlayerExpandRequest()
         }
     }
-    LaunchedEffect(sheetState, isPlaying) {
-        snapshotFlow {
-            sheetState.progress >= 0.999f && !sheetState.isMorphInFlight
-        }.distinctUntilChanged()
-            .filter { it }
-            .collect {
-                sheetState.syncExpandedArtworkShape(isPlaying)
-            }
-    }
-
-    // 是否是单列模式
-    // The scroll connection is the single source of truth for this transition.
-    // Mirroring it through LaunchedEffect lets stale effects race an interrupted transition.
-    val isSingleLineMode = bottomBarScrollConnection.isInline
 
     SharedTransitionLayout {
-        AnimatedContent(isSingleLineMode) { lineMode ->
+        bottomBarModeTransition.AnimatedContent { lineMode ->
             if (!lineMode) {
                 BottomBarV2(
                     modifier =
@@ -630,6 +648,8 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                     state = sheetState,
                     isPlaying = isPlaying,
                     onMorphStart = artworkMorphState::freezeSourceBounds,
+                    isMorphTargetReady = { artworkMorphState.hasUsableBounds },
+                    awaitMorphTarget = artworkMorphState::awaitUsableBounds,
                     onCollapsed = artworkMorphState::resumeSourceCapture,
                     navigationBar = {
                         Row(
@@ -738,17 +758,23 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                                     ),
                                 coverPainter = stableCoverPainter,
                                 onCoverPainterReady = { painter ->
-                                    stableCoverPainter = painter
-                                    ArtworkRenderCache.write(artworkUri?.toString())
+                                    if (stableCoverSnapshot.key == artworkKey) {
+                                        stableCoverSnapshot = ArtworkPainterSnapshot(artworkKey, painter)
+                                        ArtworkRenderCache.write(artworkKey)
+                                    }
                                 },
-                                onCoverPainterFailed = { stableCoverPainter = null },
+                                onCoverPainterFailed = {
+                                    if (stableCoverSnapshot.key == artworkKey) {
+                                        stableCoverSnapshot = ArtworkPainterSnapshot(artworkKey, null)
+                                    }
+                                },
                                 contentReady = playerContentReady,
                                 controlsReady = playerInitialized,
                                 modifier = Modifier.fillMaxWidth(),
                                 onExpand = {
                                     initialPage = DEFAULT_PAGE
                                     artworkMorphState.freezeSourceBounds()
-                                    sheetState.expand(isPlaying)
+                                    sheetState.expand { artworkMorphState.awaitUsableBounds() }
                                 },
                                 onNext = playerViewModel::skipToNext,
                             )
@@ -795,6 +821,12 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                             preloadContent = true,
                             artworkMorphState = artworkMorphState,
                             artworkMorphInFlightProvider = morphInFlight,
+                            sharedArtworkPainter = stableCoverPainter,
+                            onSharedArtworkPainterReady = { painter ->
+                                if (stableCoverSnapshot.key == artworkKey) {
+                                    stableCoverSnapshot = ArtworkPainterSnapshot(artworkKey, painter)
+                                }
+                            },
                             modifier =
                                 Modifier
                                     .fillMaxSize(),
@@ -805,8 +837,6 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                             state = artworkMorphState,
                             artworkUri = artworkUri,
                             artworkPainter = stableCoverPainter,
-                            sourceShape = coverShape,
-                            isPlaying = isPlaying,
                             progressProvider = morphProgress,
                             inFlightProvider = inFlight,
                         )
@@ -890,10 +920,16 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                                 uri = artworkUri,
                                 painter = stableCoverPainter,
                                 onPainterReady = { painter ->
-                                    stableCoverPainter = painter
-                                    ArtworkRenderCache.write(artworkUri?.toString())
+                                    if (stableCoverSnapshot.key == artworkKey) {
+                                        stableCoverSnapshot = ArtworkPainterSnapshot(artworkKey, painter)
+                                        ArtworkRenderCache.write(artworkKey)
+                                    }
                                 },
-                                onPainterFailed = { stableCoverPainter = null },
+                                onPainterFailed = {
+                                    if (stableCoverSnapshot.key == artworkKey) {
+                                        stableCoverSnapshot = ArtworkPainterSnapshot(artworkKey, null)
+                                    }
+                                },
                                 modifier =
                                     Modifier
                                         .sharedElement(
@@ -1019,6 +1055,11 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
     }
 }
 
+private data class ArtworkPainterSnapshot(
+    val key: String?,
+    val painter: Painter?,
+)
+
 @Composable
 private fun rememberRetainedMediaItem(currentMediaItem: MediaItem?): MediaItem? {
     val usableCurrent = currentMediaItem?.takeIf { it.hasReadableMetadata() }
@@ -1048,14 +1089,27 @@ private fun StableHeroCover(
     modifier: Modifier,
     placeHolder: @Composable () -> Unit,
 ) {
-    StableAudioCover(
-        uri = uri,
-        retainedPainter = painter,
-        modifier = modifier,
-        onPainterReady = onPainterReady,
-        onPainterFailed = onPainterFailed,
-        placeHolder = placeHolder,
-    )
+    Box(modifier = modifier) {
+        StableAudioCover(
+            uri = uri,
+            retainedPainter = painter,
+            modifier = Modifier.fillMaxSize(),
+            onPainterReady = onPainterReady,
+            onPainterFailed = onPainterFailed,
+            placeHolder = placeHolder,
+        )
+        // Always draw the shared painter last. StableAudioCover may retain its own thumbnail from
+        // an earlier constraint; this layer lets the full player's predecoded painter replace it
+        // before the morph starts, rather than swapping from a soft mini bitmap at either endpoint.
+        painter?.let { sharedPainter ->
+            Image(
+                painter = sharedPainter,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
 }
 
 @Composable

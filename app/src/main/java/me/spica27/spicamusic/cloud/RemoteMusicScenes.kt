@@ -667,7 +667,7 @@ class NeteasePlaylistScene(
             playerViewModel.currentMediaItem.first { it?.mediaId == expectedMediaId }
             if (pendingPlayerMediaId == expectedMediaId) {
                 pendingPlayerMediaId = null
-                homeViewModel.expandPlayer()
+                path.popToRoot { homeViewModel.expandPlayer() }
             }
         }
         val state by viewModel.state.collectAsStateWithLifecycle()
@@ -746,7 +746,7 @@ class NeteasePlaylistScene(
     override suspend fun onAppear() {
         coroutineScope {
             launch { super.onAppear() }
-            launch { geometryTransition?.animateForward() }
+            launch { geometryTransition?.animateForwardWhenTargetReady() }
         }
     }
 
@@ -779,7 +779,7 @@ class QqPlaylistScene(
             playerViewModel.currentMediaItem.first { it?.mediaId == expectedMediaId }
             if (pendingPlayerMediaId == expectedMediaId) {
                 pendingPlayerMediaId = null
-                homeViewModel.expandPlayer()
+                path.popToRoot { homeViewModel.expandPlayer() }
             }
         }
 
@@ -864,6 +864,7 @@ class CloudUserPlaylistScene(
     private val transition: GeometryTransition? = null,
     private val transitionCoverPainter: Painter? = null,
 ) : StackScene() {
+    private var skipGeometryOnExit = false
     override val geometryTransition: GeometryTransition? = transition
     override val transitionShadowEnabled: Boolean = transition == null
     override val transitionScaleEnabled: Boolean = transition == null
@@ -915,7 +916,7 @@ class CloudUserPlaylistScene(
             playerViewModel.currentMediaItem.first { it?.mediaId == expectedMediaId }
             if (pendingPlayerMediaId == expectedMediaId) {
                 pendingPlayerMediaId = null
-                homeViewModel.expandPlayer()
+                path.popToRoot { homeViewModel.expandPlayer() }
             }
         }
         if (showDeleteDialog) {
@@ -927,6 +928,9 @@ class CloudUserPlaylistScene(
                     TextButton(
                         onClick = {
                             showDeleteDialog = false
+                            // The source card disappears as soon as the store publishes deletion,
+                            // so there is no valid shared-element destination to fly back to.
+                            skipGeometryOnExit = true
                             viewModel.deleteLocalPlaylist(currentPlaylist.accountId, currentPlaylist.id)
                             path.popTop()
                         },
@@ -1060,14 +1064,16 @@ class CloudUserPlaylistScene(
     override suspend fun onAppear() {
         coroutineScope {
             launch { super.onAppear() }
-            launch { geometryTransition?.animateForward() }
+            launch { geometryTransition?.animateForwardWhenTargetReady() }
         }
     }
 
     override suspend fun onDisappear() {
         coroutineScope {
             launch { super.onDisappear() }
-            launch { geometryTransition?.animateReverse() }
+            if (!skipGeometryOnExit) {
+                launch { geometryTransition?.animateReverse() }
+            }
         }
     }
 }

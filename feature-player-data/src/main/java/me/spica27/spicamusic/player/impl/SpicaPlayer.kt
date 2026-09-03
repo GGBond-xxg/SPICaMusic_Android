@@ -19,6 +19,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
@@ -145,6 +146,7 @@ class SpicaPlayer(
      * 仅在需要时才创建 MediaBrowser 连接，减少应用启动时间
      */
     override fun init() {
+        if (_initializing.get()) return
         if (browserInstance != null) {
             _isInitialized.value = true
             return
@@ -195,12 +197,18 @@ class SpicaPlayer(
      * 在执行播放操作前调用，实现懒加载
      */
     private suspend fun ensureInitialized(): MediaBrowser? {
-        if (browserInstance == null) {
+        if (!_isInitialized.value) {
             init()
+            // The browser future completes as soon as Media3 connects, but init() still has to
+            // restore the saved queue and explicitly set playWhenReady=false. Letting a playback
+            // action run in that window means init() can immediately overwrite the first cold
+            // tap's queue and pause it. Wait for the whole initialization transaction instead.
+            return withTimeoutOrNull(10_000L) {
+                _isInitialized.first { it }
+                browserInstance
+            }
         }
-        // 10-second timeout prevents doAction from hanging forever if PlaybackService
-        // fails to start (process death, system kill, manifest misconfiguration).
-        return withTimeoutOrNull(10_000L) { getOrCreateBrowserFuture().await() }
+        return browserInstance
     }
 
     override fun doAction(action: PlayerAction) {

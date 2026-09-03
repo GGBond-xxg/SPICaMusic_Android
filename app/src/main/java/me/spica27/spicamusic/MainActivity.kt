@@ -12,13 +12,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.SideEffect
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -42,6 +42,9 @@ class MainActivity :
     private var exitReceiverRegistered = false
     private var contentInstalled = false
 
+    @Volatile
+    private var firstComposeFrameReady = false
+
     private val exitReceiver =
         object : BroadcastReceiver() {
             override fun onReceive(
@@ -58,6 +61,11 @@ class MainActivity :
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
+        // Do not let Android remove the icon-free starting surface while the Activity still has
+        // no Compose content. Without this guard the system reports the blank post-splash window
+        // as "displayed", producing the visible skeleton -> white -> content sequence on a cold
+        // process start. SideEffect below releases it only after the whole root tree composed.
+        splashScreen.setKeepOnScreenCondition { !firstComposeFrameReady }
         splashScreen.setOnExitAnimationListener { splashView ->
             // The splash icon is transparent. Remove the system starting surface immediately
             // after Compose has produced the first frame so it cannot flash during locale updates.
@@ -87,9 +95,10 @@ class MainActivity :
                 ),
         )
 
-        // Match BondMail's cold-start ordering: restore the small local settings snapshot before
-        // installing Compose, then create the real UI tree exactly once. The system starting
-        // surface remains an icon-free solid app background while this short preload runs.
+        // Match BondMail's launch ordering: keep the icon-free system starting surface until the
+        // small settings mirror is authoritative, then construct the Compose tree exactly once.
+        // In particular this prevents Finder from first composing the default hero and replacing
+        // the whole first screen when DataStore publishes the saved hero source a frame later.
         lifecycleScope.launch {
             withTimeoutOrNull(STARTUP_PRELOAD_TIMEOUT_MS) {
                 preferencesManager.preloadRenderCache()
@@ -149,17 +158,15 @@ class MainActivity :
         contentInstalled = true
         setContent {
             AppScaffold()
+            SideEffect {
+                firstComposeFrameReady = true
+            }
         }
         playExternalAudio(intent)
-        lifecycleScope.launch {
-            // SpicaPlayer already exposes the cached current item for the first frame. Connecting
-            // MediaBrowser immediately competes with Compose while the playback service loads its
-            // audio processors, so begin authoritative queue restoration just after the UI gets
-            // its first scheduling window. Any immediate playback action still initializes on
-            // demand through SpicaPlayer.ensureInitialized().
-            delay(STARTUP_PLAYER_INIT_DELAY_MS)
-            musicPlayer.init()
-        }
+        // SpicaPlayer exposes the cached item before MediaBrowser exists and every playback action
+        // initializes on demand. Avoid eagerly starting PlaybackService here: on a cold launch it
+        // restores and prepares the previous remote stream, doing several seconds of main-thread
+        // Media3 work even when the user only wants to browse the library.
     }
 
     private fun playExternalAudio(intent: Intent?) {
@@ -223,7 +230,6 @@ class MainActivity :
     companion object {
         const val ACTION_EXIT_APP = "me.spica27.spicamusic.action.EXIT_APP"
         const val STARTUP_PRELOAD_TIMEOUT_MS = 1_500L
-        const val STARTUP_PLAYER_INIT_DELAY_MS = 2_000L
         const val EXTERNAL_PLAYBACK_READY_TIMEOUT_MS = 5_000L
     }
 }
