@@ -62,6 +62,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -92,6 +93,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
@@ -198,15 +200,22 @@ fun ExpandedPlayerScreen(
             currentMediaItem.toAudioQualityInfo()
         }
 
-    // 监听应用生命周期状态
     val lifecycleOwner = LocalLifecycleOwner.current
-    val lifecycleState by lifecycleOwner.lifecycle.currentStateFlow.collectAsStateWithLifecycle()
-
-    // 判断应用是否在前台（可见状态）
-    val isAppInForeground =
-        remember(lifecycleState) {
-            lifecycleState.isAtLeast(Lifecycle.State.STARTED)
+    var isAppInForeground by
+        remember(lifecycleOwner) {
+            mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
         }
+    DisposableEffect(lifecycleOwner) {
+        val observer =
+            LifecycleEventObserver { _, _ ->
+                isAppInForeground =
+                    lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     // 当前播放位置（定时更新）
     // 使用 currentMediaItem?.mediaId 作为 key，切歌时自动重置 seek 状态

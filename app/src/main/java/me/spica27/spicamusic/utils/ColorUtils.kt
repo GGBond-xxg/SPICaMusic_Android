@@ -110,7 +110,7 @@ fun rememberDominantColorFromUri(
             mutableStateOf(getCachedDominantColorFromUri(uri) ?: fallbackColor)
         }
 
-    LaunchedEffect(uri) {
+    LaunchedEffect(uri, fallbackColor) {
         dominantColor = extractDominantColorFromUri(context, uri, fallbackColor)
     }
 

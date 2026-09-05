@@ -631,7 +631,8 @@ private fun LyricLine(
     style: LyricsUIStyle,
     textAlignment: LyricsTextAlignment,
 ) {
-    val inactiveTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
+    // 行整体透明度已由下方 graphicsLayer 应用，这里不再重复相乘。
+    val inactiveTextColor = MaterialTheme.colorScheme.onSurface
     val activeTextColor = MaterialTheme.colorScheme.onSurface
     val scaleStartGutter =
         if (textAlignment == LyricsTextAlignment.End) style.scaleSafetyGutter else 0.dp
@@ -774,9 +775,9 @@ private fun WordsLyricLine(
     measureCache: MutableMap<String, List<MeasuredWord>>,
 ) {
     val activeTextColor = MaterialTheme.colorScheme.onSurface
-    val baseTextColor = activeTextColor.copy(alpha = LyricUIConstants.BASE_TEXT_ALPHA * alpha)
+    val baseTextColor = activeTextColor.copy(alpha = LyricUIConstants.BASE_TEXT_ALPHA)
     val translationColor =
-        activeTextColor.copy(alpha = LyricUIConstants.TRANSLATION_TEXT_ALPHA * alpha)
+        activeTextColor.copy(alpha = LyricUIConstants.TRANSLATION_TEXT_ALPHA)
     val scaleStartGutter =
         if (textAlignment == LyricsTextAlignment.End) style.scaleSafetyGutter else 0.dp
     val scaleEndGutter =

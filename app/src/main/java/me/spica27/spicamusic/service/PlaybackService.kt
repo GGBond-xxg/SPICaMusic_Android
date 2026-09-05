@@ -15,6 +15,7 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
@@ -505,7 +506,15 @@ class PlaybackService : MediaLibraryService() {
                                     MediaItem
                                         .Builder()
                                         .setMediaId(MediaLibrary.ROOT)
-                                        .build(),
+                                        .setMediaMetadata(
+                                            MediaMetadata
+                                                .Builder()
+                                                .setTitle("SPICaMusic")
+                                                .setIsBrowsable(true)
+                                                .setIsPlayable(false)
+                                                .setMediaType(MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
+                                                .build(),
+                                        ).build(),
                                     params,
                                 ),
                             )

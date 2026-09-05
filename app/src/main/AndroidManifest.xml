@@ -66,6 +66,10 @@
         tools:targetApi="33">
 
         <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+
+        <meta-data
             android:name="lyricon_module"
             android:value="true" />
         <meta-data

@@ -22,6 +22,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -33,8 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.google.common.collect.ImmutableList
-import kotlinx.coroutines.android.awaitFrame
 import kotlinx.coroutines.launch
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.core.preferences.PreferencesManager
@@ -135,20 +136,15 @@ fun LyricsPanel(
             }
         }
 
+    // repeatOnLifecycle 会在退到后台时真正取消帧循环，回到前台再恢复。
     val lifecycleOwner = LocalLifecycleOwner.current
-    val lifecycleState by lifecycleOwner.lifecycle.currentStateFlow.collectAsStateWithLifecycle()
-    val isAppInForeground =
-        remember(lifecycleState) {
-            lifecycleState.isAtLeast(Lifecycle.State.STARTED)
-        }
-
-    // 当前播放时间（帧级更新，保留在 Composable 中因为依赖 awaitFrame）
     var currentTime by remember { mutableLongStateOf(viewModel.getCurrentPositionMs()) }
-    LaunchedEffect(isAppInForeground) {
-        if (!isAppInForeground) return@LaunchedEffect
-        while (isAppInForeground) {
-            awaitFrame()
-            currentTime = viewModel.getCurrentPositionMs()
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                withFrameNanos { }
+                currentTime = viewModel.getCurrentPositionMs()
+            }
         }
     }
 

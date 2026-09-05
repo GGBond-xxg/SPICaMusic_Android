@@ -46,6 +46,9 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.skydoves.landscapist.components.rememberImageComponent
 import com.skydoves.landscapist.image.LandscapistImage
@@ -58,6 +61,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import me.spica27.spicamusic.common.entity.DynamicSpectrumBackground
 import me.spica27.spicamusic.player.api.IFFTProcessor
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
@@ -391,6 +395,7 @@ private class TextureViewRenderLoop(
     threadName: String,
 ) {
     private val surfaceActive = AtomicBoolean(false)
+    private val paused = AtomicBoolean(false)
     private val generation = AtomicInteger(0)
     private val stateLock = Any()
     private val renderDispatcher: ExecutorCoroutineDispatcher =
@@ -402,12 +407,29 @@ private class TextureViewRenderLoop(
             }.asCoroutineDispatcher()
     private val renderScope = CoroutineScope(renderDispatcher + SupervisorJob())
     private var drawJob: Job? = null
+    private var textureView: TextureView? = null
+    private var drawFrame: ((android.graphics.Canvas) -> Unit)? = null
 
     fun start(
         textureView: TextureView,
         drawFrame: (android.graphics.Canvas) -> Unit,
     ) {
+        synchronized(stateLock) {
+            this.textureView = textureView
+            this.drawFrame = drawFrame
+        }
+        launchLoop()
+    }
+
+    private fun launchLoop() {
         stop()
+        if (paused.get()) return
+        val targetView: TextureView
+        val targetDraw: (android.graphics.Canvas) -> Unit
+        synchronized(stateLock) {
+            targetView = textureView ?: return
+            targetDraw = drawFrame ?: return
+        }
         surfaceActive.set(true)
         val token = generation.incrementAndGet()
 
@@ -417,7 +439,7 @@ private class TextureViewRenderLoop(
                     while (isActive && surfaceActive.get() && generation.get() == token) {
                         val canvas =
                             try {
-                                textureView.lockCanvas(null)
+                                targetView.lockCanvas(null)
                             } catch (e: IllegalStateException) {
                                 Timber
                                     .tag("FluidMusicBackground")
@@ -435,11 +457,11 @@ private class TextureViewRenderLoop(
                             if (!surfaceActive.get() || generation.get() != token) {
                                 shouldContinue = false
                             } else {
-                                drawFrame(canvas)
+                                targetDraw(canvas)
                             }
                         } finally {
                             try {
-                                textureView.unlockCanvasAndPost(canvas)
+                                targetView.unlockCanvasAndPost(canvas)
                             } catch (e: IllegalStateException) {
                                 Timber
                                     .tag("FluidMusicBackground")
@@ -469,8 +491,39 @@ private class TextureViewRenderLoop(
         }?.cancel()
     }
 
+    fun pause() {
+        paused.set(true)
+        stop()
+    }
+
+    fun resume() {
+        if (!paused.getAndSet(false)) return
+        launchLoop()
+    }
+
+    fun onSurfaceDestroyed() {
+        val job =
+            synchronized(stateLock) {
+                surfaceActive.set(false)
+                generation.incrementAndGet()
+                val currentJob = drawJob
+                drawJob = null
+                textureView = null
+                drawFrame = null
+                currentJob
+            }
+        job?.cancel()
+        if (job != null) {
+            runBlocking { job.join() }
+        }
+    }
+
     fun release() {
         stop()
+        synchronized(stateLock) {
+            textureView = null
+            drawFrame = null
+        }
         renderScope.coroutineContext.cancel()
         renderDispatcher.close()
     }
@@ -512,8 +565,19 @@ private fun TopGlowBackground(
         holder.colorB = shiftHue(coverColor, hueShift * 1.6f).copy(alpha = 0.2f).toArgb()
     }
 
-    DisposableEffect(renderLoop) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, renderLoop) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_STOP -> renderLoop.pause()
+                    Lifecycle.Event.ON_START -> renderLoop.resume()
+                    else -> Unit
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
             renderLoop.release()
         }
     }
@@ -577,7 +641,7 @@ private fun TopGlowBackground(
                         }
 
                         override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
-                            renderLoop.stop()
+                            renderLoop.onSurfaceDestroyed()
                             return true
                         }
 
