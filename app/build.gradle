@@ -218,6 +218,7 @@ ktlint {
 tasks.getByPath("preBuild").dependsOn("ktlintFormat")
 
 dependencies {
+  implementation 'com.google.zxing:core:3.5.3'
   implementation "io.github.proify.lyricon:provider:0.1.70"
 
   // 模块依赖

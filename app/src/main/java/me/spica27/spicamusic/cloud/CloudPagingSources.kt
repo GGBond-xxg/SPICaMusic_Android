@@ -2,6 +2,7 @@ package me.spica27.spicamusic.cloud
 
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
+import kotlinx.coroutines.CancellationException
 
 class RemoteMusicPagingSource(
     private val clients: RemoteMusicClientRegistry,
@@ -24,6 +25,7 @@ class RemoteMusicPagingSource(
                 nextKey = page.nextOffset,
             )
         } catch (error: Throwable) {
+            if (error is CancellationException) throw error
             LoadResult.Error(error)
         }
 
@@ -57,7 +59,10 @@ class MediaServerPagingSource(
                         itemsAfter = (page.totalCount - start - page.songs.size).coerceAtLeast(0),
                     )
                 },
-                onFailure = { error -> LoadResult.Error<Int, CloudSong>(error) },
+                onFailure = { error ->
+                    if (error is CancellationException) throw error
+                    LoadResult.Error<Int, CloudSong>(error)
+                },
             )
     }
 
@@ -81,7 +86,10 @@ class TelegramPagingSource(
                 prevKey = null,
                 nextKey = page.nextFromMessageId,
             )
-        }.getOrElse { error -> LoadResult.Error<Long, TelegramSong>(error) }
+        }.getOrElse { error ->
+            if (error is CancellationException) throw error
+            LoadResult.Error<Long, TelegramSong>(error)
+        }
 
     override fun getRefreshKey(state: PagingState<Long, TelegramSong>): Long? = null
 }

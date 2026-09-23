@@ -246,6 +246,8 @@ class CloudSongMenuScene(
         val density = LocalDensity.current
         val slideOffsetPx = with(density) { 72.dp.toPx() }
         val viewModel: CloudMusicCatalogViewModel = koinActivityViewModel()
+        val offline: me.spica27.spicamusic.offline.OfflineStore = org.koin.compose.koinInject()
+        val context = androidx.compose.ui.platform.LocalContext.current
         val catalogState by viewModel.state.collectAsStateWithLifecycle()
         val playlistViewModel: PlaylistViewModel = koinActivityViewModel()
         val playlists by playlistViewModel.playlists.collectAsStateWithLifecycle()
@@ -329,6 +331,25 @@ class CloudSongMenuScene(
                         closeAndNavigate { path.push(SongInfoScene(song)) }
                     },
                     onIgnoreSong = null,
+                    onDownload = {
+                        scope.launch {
+                            try {
+                                viewModel.offlineMediaItem(song)?.let(offline::enqueue)
+                                closeAndNavigate {
+                                    path.push(
+                                        me.spica27.spicamusic.ui.settings
+                                            .OfflineScene(),
+                                    )
+                                }
+                            } catch (error: kotlinx.coroutines.CancellationException) {
+                                throw error
+                            } catch (_: Exception) {
+                                android.widget.Toast
+                                    .makeText(context, R.string.offline_failed, android.widget.Toast.LENGTH_SHORT)
+                                    .show()
+                            }
+                        }
+                    },
                 )
             }
         }
@@ -386,6 +407,7 @@ private fun SongMenuContent(
     onOpenArtist: (() -> Unit)?,
     onOpenSongInfo: () -> Unit,
     onIgnoreSong: (() -> Unit)?,
+    onDownload: (() -> Unit)? = null,
 ) {
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -545,6 +567,14 @@ private fun SongMenuContent(
                     title = stringResource(R.string.add_to_playlist),
                     subtitle = stringResource(R.string.add_to_playlist_subtitle_menu),
                     icon = Icons.AutoMirrored.Default.PlaylistAdd,
+                    onClick = action,
+                )
+            }
+            onDownload?.let { action ->
+                ControlItem(
+                    title = stringResource(R.string.offline_download),
+                    subtitle = stringResource(R.string.offline_short),
+                    icon = Icons.Default.PlaylistPlay,
                     onClick = action,
                 )
             }

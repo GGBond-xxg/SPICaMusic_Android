@@ -43,11 +43,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.ArrowBackIosNew
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Info
@@ -486,6 +488,30 @@ class SettingsScene : StackScene() {
                     }
                 }
 
+                item {
+                    SettingsSectionCard(
+                        title = stringResource(R.string.settings_data),
+                        subtitle = stringResource(R.string.settings_data_subtitle),
+                    ) {
+                        SettingsRow(
+                            title = stringResource(R.string.backup_title),
+                            subtitle = stringResource(R.string.backup_short),
+                            icon = Icons.Default.Backup,
+                            selected = false,
+                            onClick = { path.push(BackupScene()) },
+                            trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null) },
+                        )
+                        SettingsItemDivider()
+                        SettingsRow(
+                            title = stringResource(R.string.offline_title),
+                            subtitle = stringResource(R.string.offline_short),
+                            icon = Icons.Default.Download,
+                            selected = false,
+                            onClick = { path.push(OfflineScene()) },
+                            trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null) },
+                        )
+                    }
+                }
                 item {
                     SettingsSectionCard(
                         title = stringResource(R.string.settings_about),

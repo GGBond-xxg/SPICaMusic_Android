@@ -88,6 +88,14 @@ object AppModule {
         module {
             // PreferencesManager
             single { PreferencesManager(androidContext()) }
+            single {
+                me.spica27.spicamusic.offline
+                    .OfflineStore(androidContext())
+            }
+            single {
+                me.spica27.spicamusic.backup
+                    .LibraryBackup(androidContext(), get(), get(), get(), get(), get())
+            }
             single { CloudAccountStore(androidContext()) }
             single { CloudCatalogCountStore(androidContext()) }
             single { NeteaseLibraryStore(androidContext()) }
@@ -156,7 +164,7 @@ object AppModule {
             single { TelegramClientManager(androidContext(), get()) }
             single { TelegramRepository(get(), get()) }
             single { TelegramStreamProxy(get()) }
-            single { CloudPlaybackItemResolver(get(), get(), get(), get(), get()) }
+            single { CloudPlaybackItemResolver(get(), get(), get(), get(), get(), get()) }
 
             viewModel { parameters ->
                 MediaServerViewModel(

@@ -21,6 +21,7 @@ class CloudPlaybackItemResolver(
     private val telegramProxy: TelegramStreamProxy,
     private val remoteProxy: RemoteMusicStreamProxy,
     private val onlineSourceProxy: OnlineSourceStreamProxy,
+    private val offlineStore: me.spica27.spicamusic.offline.OfflineStore? = null,
 ) {
     fun isExplicitPreview(item: MediaItem): Boolean {
         val identity = parseCloudMediaIdentity(item.mediaId) ?: return false
@@ -42,6 +43,7 @@ class CloudPlaybackItemResolver(
 
     /** Warm the next authenticated cloud stream without downloading its audio body. */
     suspend fun prefetch(item: MediaItem) {
+        if (offlineStore?.fileFor(item.mediaId) != null) return
         if (!item.mediaId.startsWith(CLOUD_ID_PREFIX)) return
         val identity = parseCloudMediaIdentity(item.mediaId) ?: return
         if (
@@ -60,6 +62,13 @@ class CloudPlaybackItemResolver(
     }
 
     suspend fun resolve(item: MediaItem): MediaItem {
+        offlineStore?.fileFor(item.mediaId)?.let { file ->
+            return item
+                .buildUpon()
+                .setUri(Uri.fromFile(file))
+                .setCustomCacheKey(null)
+                .build()
+        }
         if (!item.mediaId.startsWith(CLOUD_ID_PREFIX)) return item
 
         val identity = parseCloudMediaIdentity(item.mediaId) ?: return item

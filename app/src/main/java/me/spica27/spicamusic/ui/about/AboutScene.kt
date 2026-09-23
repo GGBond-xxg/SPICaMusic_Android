@@ -17,6 +17,7 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.AlertDialog
@@ -42,6 +43,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.skydoves.landscapist.image.LandscapistImage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.navkit.scene.StackScene
@@ -81,39 +83,43 @@ class AboutScene : StackScene() {
             if (isCheckingUpdate) return
             isCheckingUpdate = true
             scope.launch {
-                runCatching { GitHubReleaseChecker.fetchLatest() }
-                    .onSuccess { release ->
-                        when {
-                            !isVersionNewer(release.tagName, BuildConfig.VERSION_NAME) -> {
-                                Toast
-                                    .makeText(
-                                        context,
-                                        context.getString(R.string.about_update_latest),
-                                        Toast.LENGTH_SHORT,
-                                    ).show()
+                try {
+                    runCatching { GitHubReleaseChecker.fetchLatest() }
+                        .onSuccess { release ->
+                            when {
+                                !isVersionNewer(release.tagName, BuildConfig.VERSION_NAME) -> {
+                                    Toast
+                                        .makeText(
+                                            context,
+                                            context.getString(R.string.about_update_latest),
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                }
+                                IgnoredUpdateStore.isIgnored(context, release.tagName) -> {
+                                    Toast
+                                        .makeText(
+                                            context,
+                                            context.getString(
+                                                R.string.about_update_ignored,
+                                                release.tagName,
+                                            ),
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                }
+                                else -> availableRelease = release
                             }
-                            IgnoredUpdateStore.isIgnored(context, release.tagName) -> {
-                                Toast
-                                    .makeText(
-                                        context,
-                                        context.getString(
-                                            R.string.about_update_ignored,
-                                            release.tagName,
-                                        ),
-                                        Toast.LENGTH_SHORT,
-                                    ).show()
-                            }
-                            else -> availableRelease = release
+                        }.onFailure {
+                            if (it is CancellationException) throw it
+                            Toast
+                                .makeText(
+                                    context,
+                                    context.getString(R.string.about_update_failed),
+                                    Toast.LENGTH_SHORT,
+                                ).show()
                         }
-                    }.onFailure {
-                        Toast
-                            .makeText(
-                                context,
-                                context.getString(R.string.about_update_failed),
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                    }
-                isCheckingUpdate = false
+                } finally {
+                    isCheckingUpdate = false
+                }
             }
         }
 
@@ -135,6 +141,14 @@ class AboutScene : StackScene() {
 
             item {
                 AboutSectionCard(title = stringResource(R.string.about_section_more)) {
+                    AboutRow(
+                        title = stringResource(R.string.sponsor_title),
+                        subtitle = stringResource(R.string.sponsor_subtitle),
+                        icon = Icons.Default.FavoriteBorder,
+                        onClick = { path.push(SponsorScene()) },
+                        trailingContent = { ChevronRightIcon() },
+                    )
+                    AboutItemDivider()
                     AboutRow(
                         title = stringResource(R.string.about_open_source),
                         subtitle = stringResource(R.string.about_open_source_subtitle),

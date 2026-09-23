@@ -226,6 +226,25 @@ class PreferencesManager(
         }
     }
 
+    // Explicit portable preferences: no account credentials, file grants, or device-local fonts.
+    private val portableBooleans = listOf(Keys.DARK_MODE, Keys.KEEP_SCREEN_ON, Keys.BACKGROUND_PLAYBACK, Keys.RESUME_ON_HEADSET, Keys.FADE_ENABLED, Keys.HIFI_MODE, Keys.USB_DAC_OUTPUT, Keys.LYRICON_ENABLED, Keys.WAVY_PROGRESS_DEFAULT_APPLIED, Keys.EQ_ENABLED, Keys.REVERB_ENABLED, Keys.LOUDNESS_NORMALIZATION_ENABLED)
+    private val portableStrings = listOf(Keys.THEME_MODE, Keys.THEME_COLOR_STYLE, Keys.FADE_DURATION_MS, Keys.CLOUD_AUDIO_CACHE_MIB, Keys.NETEASE_AUDIO_QUALITY, Keys.QQ_AUDIO_QUALITY, Keys.TOP_DISPLAY_MODE, Keys.DYNAMIC_SPECTRUM_BACKGROUND, Keys.DYNAMIC_COVER_TYPE, Keys.PROGRESS_BAR_STYLE, Keys.FINDER_HERO_SOURCE, Keys.LYRICS_TEXT_ALIGNMENT, Keys.LYRICS_TEXT_SCALE, Keys.LYRICS_ACTIVE_LINE_SCALE, Keys.LYRICS_LINE_SPACING, Keys.EQ_BANDS, Keys.REVERB_LEVEL, Keys.REVERB_ROOM_SIZE, Keys.SCAN_MIN_DURATION_SEC, Keys.SCAN_MAX_DURATION_SEC, Keys.SCAN_MIN_FILE_SIZE_KB, Keys.SCAN_ENABLED_FORMATS)
+
+    suspend fun exportPortableSettings(): Pair<Map<String, Boolean>, Map<String, String>> {
+        val snapshot = context.dataStore.data.first()
+        return portableBooleans.mapNotNull { key -> snapshot[key]?.let { key.name to it } }.toMap() to
+            portableStrings.mapNotNull { key -> snapshot[key]?.let { key.name to it } }.toMap()
+    }
+
+    suspend fun restorePortableSettings(booleans: Map<String, Boolean>, strings: Map<String, String>) {
+        require(strings.values.all { it.length <= 4096 })
+        context.dataStore.edit { preferences ->
+            portableBooleans.forEach { key -> booleans[key.name]?.let { preferences[key] = it } }
+            portableStrings.forEach { key -> strings[key.name]?.let { preferences[key] = it } }
+        }
+        preloadRenderCache()
+    }
+
     private companion object {
         const val RENDER_CACHE_ARTWORK_URI = "player_theme_artwork_uri"
         const val RENDER_CACHE_THEME_ARGB = "player_theme_argb"

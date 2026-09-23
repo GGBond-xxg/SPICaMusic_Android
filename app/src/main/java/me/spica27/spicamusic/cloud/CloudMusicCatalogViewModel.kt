@@ -24,6 +24,7 @@ import me.spica27.spicamusic.player.api.PlayerAction
 import org.drinkless.tdlib.TdApi
 
 @Immutable
+@androidx.annotation.Keep
 enum class CloudSongSource {
     TELEGRAM,
     JELLYFIN,
@@ -1049,6 +1050,8 @@ class CloudMusicCatalogViewModel(
             )
         }
     }
+
+    suspend fun offlineMediaItem(song: CloudCatalogSong): MediaItem? = CatalogQueueItem.Cloud(song).toMediaItem()
 
     private suspend fun CatalogQueueItem.toMediaItem(): MediaItem? =
         when (this) {

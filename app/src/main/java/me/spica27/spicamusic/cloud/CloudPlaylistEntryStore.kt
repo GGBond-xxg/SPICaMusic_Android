@@ -9,6 +9,7 @@ import org.json.JSONObject
 import java.io.File
 
 /** Persisted cloud entry attached to a regular local playlist. */
+@androidx.annotation.Keep
 data class StoredCloudPlaylistSong(
     val stableId: String,
     val source: CloudSongSource,
@@ -89,6 +90,15 @@ class CloudPlaylistEntryStore(
                 file.nameWithoutExtension.toLongOrNull()?.let { it to read(it) }
             }.filter { (_, songs) -> songs.isNotEmpty() }
             .toMap()
+
+    @Synchronized
+    fun restore(
+        playlistId: Long,
+        songs: List<StoredCloudPlaylistSong>,
+    ) {
+        write(playlistId, songs.distinctBy { it.stableId })
+        _revision.update(Long::inc)
+    }
 
     @Synchronized
     fun add(

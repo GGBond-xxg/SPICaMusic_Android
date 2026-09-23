@@ -64,6 +64,7 @@
         android:usesCleartextTraffic="true"
         tools:replace="android:label"
         tools:targetApi="33">
+        <service android:name=".offline.OfflineDownloadService" android:exported="false" android:foregroundServiceType="dataSync" />
 
         <meta-data
             android:name="com.google.android.gms.car.application"

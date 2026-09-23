@@ -24,6 +24,7 @@ data class OssLibrary(
  */
 val ossLibraries: List<OssLibrary> =
     listOf(
+        OssLibrary("ZXing Core", "com.google.zxing:core", "Apache-2.0", "https://github.com/zxing/zxing"),
         // ---------- AndroidX / Jetpack ----------
         OssLibrary(
             "AndroidX Core KTX",

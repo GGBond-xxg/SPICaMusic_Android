@@ -25,3 +25,7 @@ Licensed under the Apache License, Version 2.0. You may obtain a copy at
 a product and interaction reference for cloud streaming. Its repository uses a
 custom proprietary, personal non-commercial license. No XiangsuPlayerHQ source
 code or binary is bundled or redistributed in this project.
+
+## ZXing Core
+
+赞助二维码使用 [ZXing Core](https://github.com/zxing/zxing)（`com.google.zxing:core:3.5.3`），遵循 Apache License 2.0。二维码在设备本地生成。
