@@ -1,6 +1,7 @@
 package me.spica27.navkit.stack
 
 import androidx.activity.BackEventCompat
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -126,6 +127,11 @@ fun NavigationStack(
     val predictiveBackEnabled =
         path.canPop &&
             ((path.scenes.lastOrNull() as? StackScene)?.predictiveBackEnabled != false)
+    // Opting out of the interactive animation must still return to the previous scene.
+    // Otherwise Android receives an unhandled Back and finishes the Activity.
+    BackHandler(enabled = path.canPop && !predictiveBackEnabled) {
+        path.popTop()
+    }
     PredictiveBackHandler(enabled = predictiveBackEnabled) { progress ->
         val top = path.scenes.lastOrNull() ?: return@PredictiveBackHandler
         // Consume gestures arriving while the previous transition is still finishing. Letting

@@ -26,11 +26,10 @@ import kotlinx.coroutines.flow.first
 abstract class StackScene : Scene() {
 
     /**
-     * Whether the system edge predictive-back gesture may dismiss this scene.
+     * Whether the system edge back gesture interactively drives this scene's return animation.
      *
-     * Scroll-heavy full-screen panels can opt out so a fast vertical fling that starts near an
-     * edge is never interpreted as navigation. Their explicit toolbar/back-button navigation is
-     * unaffected.
+     * Scenes that opt out still handle system Back by returning to the previous scene with the
+     * normal exit animation.
      */
     open val predictiveBackEnabled: Boolean = true
 
