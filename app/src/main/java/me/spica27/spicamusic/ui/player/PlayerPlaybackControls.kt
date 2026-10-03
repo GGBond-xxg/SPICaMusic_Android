@@ -61,7 +61,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -426,6 +428,7 @@ private fun LegacyPlayerTransportControls(
     onPlayModeClick: () -> Unit,
     onFavoriteClick: () -> Unit,
 ) {
+    val haptics = LocalHapticFeedback.current
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -456,6 +459,7 @@ private fun LegacyPlayerTransportControls(
         ) {
             IconButton(
                 onClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
                     onPreviousClick()
                 },
                 modifier =
@@ -481,7 +485,10 @@ private fun LegacyPlayerTransportControls(
                 label = "playPressScale",
             )
             IconButton(
-                onClick = onPlayPauseClick,
+                onClick = {
+                    haptics.performHapticFeedback(if (isPlaying) HapticFeedbackType.ToggleOff else HapticFeedbackType.ToggleOn)
+                    onPlayPauseClick()
+                },
                 interactionSource = playInteraction,
                 modifier =
                     Modifier
@@ -512,6 +519,7 @@ private fun LegacyPlayerTransportControls(
             }
             IconButton(
                 onClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
                     onNextClick()
                 },
                 modifier =
@@ -577,6 +585,7 @@ fun PlayerTransportControls(
     onSleepTimerSet: (Int) -> Unit = {},
     onSleepTimerCancel: () -> Unit = {},
 ) {
+    val haptics = LocalHapticFeedback.current
     var activeButton by remember { mutableStateOf<TransportButtonType?>(null) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     val sleepTimerMinutes =
@@ -666,6 +675,7 @@ fun PlayerTransportControls(
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.secondaryContainer)
                         .clickable(role = Role.Button) {
+                            haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
                             activeButton = TransportButtonType.Previous
                             onPreviousClick()
                         },
@@ -687,6 +697,7 @@ fun PlayerTransportControls(
                         .clip(RoundedCornerShape(playPauseCorner))
                         .background(MaterialTheme.colorScheme.primary)
                         .clickable(role = Role.Button) {
+                            haptics.performHapticFeedback(if (isPlaying) HapticFeedbackType.ToggleOff else HapticFeedbackType.ToggleOn)
                             activeButton = TransportButtonType.PlayPause
                             onPlayPauseClick()
                         },
@@ -719,6 +730,7 @@ fun PlayerTransportControls(
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.secondaryContainer)
                         .clickable(role = Role.Button) {
+                            haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
                             activeButton = TransportButtonType.Next
                             onNextClick()
                         },

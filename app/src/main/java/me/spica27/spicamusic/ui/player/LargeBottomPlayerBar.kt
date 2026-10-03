@@ -39,6 +39,8 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -74,6 +76,7 @@ fun LargeBottomPlayerBar(
     onExpand: () -> Unit,
     onNext: () -> Unit = viewModel::skipToNext,
 ) {
+    val haptics = LocalHapticFeedback.current
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
 
     val metadata = mediaItem?.mediaMetadata
@@ -227,7 +230,10 @@ fun LargeBottomPlayerBar(
 
                 // 播放/暂停按钮
                 IconButton(
-                    onClick = { viewModel.togglePlayPause() },
+                    onClick = {
+                        haptics.performHapticFeedback(if (isPlaying) HapticFeedbackType.ToggleOff else HapticFeedbackType.ToggleOn)
+                        viewModel.togglePlayPause()
+                    },
                     enabled = hasMediaItem && contentReady && controlsReady,
                     modifier =
                         playButtonModifier
@@ -245,6 +251,7 @@ fun LargeBottomPlayerBar(
                 // 下一首
                 IconButton(
                     onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
                         onNext()
                     },
                     enabled = hasMediaItem && contentReady && controlsReady,
