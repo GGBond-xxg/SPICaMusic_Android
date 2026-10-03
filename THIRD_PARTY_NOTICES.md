@@ -22,9 +22,10 @@ Licensed under the Apache License, Version 2.0. You may obtain a copy at
 ## XiangsuPlayerHQ
 
 [r3n011/XiangsuPlayerHQ](https://github.com/r3n011/XiangsuPlayerHQ) was used as
-a product and interaction reference for cloud streaming. Its repository uses a
-custom proprietary, personal non-commercial license. No XiangsuPlayerHQ source
-code or binary is bundled or redistributed in this project.
+a product and interaction reference for cloud streaming, including the Bilibili
+audio source introduced in v1.7.0. The referenced repository currently declares
+GPL-3.0. The SPICa cloud adapters are implemented for this project; no
+XiangsuPlayerHQ source code or binary is bundled or redistributed.
 
 ## ZXing Core
 

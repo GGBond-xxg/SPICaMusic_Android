@@ -971,4 +971,5 @@
   <string name="offline_canceling">Canceling…</string>
   <string name="settings_data">Data management</string>
   <string name="settings_data_subtitle">Backups and offline music</string>
+    <string name="music_source_bilibili">Bilibili</string>
 </resources>

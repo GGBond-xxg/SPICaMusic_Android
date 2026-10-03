@@ -13,6 +13,7 @@ enum class RemoteMusicProvider {
     SUBSONIC,
     NETEASE,
     QQ_MUSIC,
+    BILIBILI,
 }
 
 @Immutable

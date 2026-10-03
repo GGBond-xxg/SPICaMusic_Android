@@ -196,6 +196,7 @@ class CloudRecentStore(
             "subsonic" -> CloudSongSource.SUBSONIC
             "netease" -> CloudSongSource.NETEASE
             "qq_music" -> CloudSongSource.QQ_MUSIC
+            "bilibili" -> CloudSongSource.BILIBILI
             else -> null
         }
 

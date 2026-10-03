@@ -196,6 +196,7 @@ private enum class SongLibrarySource(
     Subsonic(R.string.music_source_subsonic, CloudSongSource.SUBSONIC, Icons.Default.Storage),
     Netease(R.string.music_source_netease, CloudSongSource.NETEASE, Icons.Default.Cloud),
     QqMusic(R.string.music_source_qq, CloudSongSource.QQ_MUSIC, Icons.Default.Cloud),
+    Bilibili(R.string.music_source_bilibili, CloudSongSource.BILIBILI, Icons.Default.Cloud),
 }
 
 @Immutable
@@ -329,6 +330,7 @@ private fun CloudSongSource.filter(): SongLibrarySource =
         CloudSongSource.SUBSONIC -> SongLibrarySource.Subsonic
         CloudSongSource.NETEASE -> SongLibrarySource.Netease
         CloudSongSource.QQ_MUSIC -> SongLibrarySource.QqMusic
+        CloudSongSource.BILIBILI -> SongLibrarySource.Bilibili
     }
 
 private fun formatDuration(durationMs: Long): String {
@@ -561,6 +563,8 @@ fun MusicPage() {
 
     fun openSourceMenu() {
         if (sourceAnchor.isOpen) return
+        keyboardController?.hide()
+        focusManager.clearFocus()
         path.push(
             SortMenuScene(
                 anchorState = sourceAnchor,
@@ -583,6 +587,8 @@ fun MusicPage() {
 
     fun openSortMenu() {
         if (sortAnchor.isOpen) return
+        keyboardController?.hide()
+        focusManager.clearFocus()
         val scene =
             when (selectedTab) {
                 MusicBrowserTab.Songs ->

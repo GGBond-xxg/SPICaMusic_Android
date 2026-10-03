@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -32,7 +33,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -40,6 +43,8 @@ import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -52,6 +57,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -62,9 +68,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -79,14 +87,18 @@ import androidx.paging.compose.itemKey
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import me.spica27.navkit.geometry.GeometryTransition
 import me.spica27.navkit.geometry.geometryTarget
 import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.navkit.scene.StackScene
+import me.spica27.spicamusic.R
 import me.spica27.spicamusic.common.entity.Playlist
-import me.spica27.spicamusic.ui.home.HomeViewModel
+import me.spica27.spicamusic.ui.dialog.CloudSongMenuScene
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.playlist.PlaylistViewModel
+import me.spica27.spicamusic.ui.playlistdetail.PlaylistCloudSongRow
+import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.widget.AudioCover
 import me.spica27.spicamusic.ui.widget.StableAudioCover
 import org.koin.compose.viewmodel.koinActivityViewModel
@@ -174,7 +186,7 @@ class RemoteMusicScene(
             }
         }
         LaunchedEffect(provider, state.selectedAccount?.id) {
-            if (provider == RemoteMusicProvider.QQ_MUSIC && state.selectedAccount != null) {
+            if (provider in setOf(RemoteMusicProvider.QQ_MUSIC, RemoteMusicProvider.BILIBILI) && state.selectedAccount != null) {
                 viewModel.refreshRemotePlaylists()
             }
         }
@@ -190,6 +202,10 @@ class RemoteMusicScene(
                                 RemoteMusicProvider.NETEASE -> {
                                     catalogViewModel.refreshNeteasePlaylists(forceRefresh = true)
                                     catalogViewModel.refreshDailyRecommendations(forceRefresh = true)
+                                }
+                                RemoteMusicProvider.BILIBILI -> {
+                                    viewModel.refreshRemotePlaylists(forceRefresh = true)
+                                    songs.refresh()
                                 }
                                 RemoteMusicProvider.QQ_MUSIC ->
                                     viewModel.refreshRemotePlaylists(forceRefresh = true)
@@ -217,6 +233,7 @@ class RemoteMusicScene(
                         )
                     RemoteMusicProvider.NETEASE,
                     RemoteMusicProvider.QQ_MUSIC,
+                    RemoteMusicProvider.BILIBILI,
                     ->
                         CookieWebLogin(
                             provider = provider,
@@ -228,6 +245,7 @@ class RemoteMusicScene(
                                 showLogin = false
                             },
                             onCookiesCaptured = viewModel::loginWithCookies,
+                            onBrowse = if (provider == RemoteMusicProvider.BILIBILI) viewModel::browseBilibili else null,
                         )
                 }
             } else {
@@ -305,7 +323,9 @@ class RemoteMusicScene(
                                     onValueChange = { searchText = it },
                                     modifier = Modifier.weight(1f).height(58.dp),
                                     singleLine = true,
-                                    placeholder = { Text("搜索${provider.displayName}歌曲") },
+                                    placeholder = {
+                                        Text(if (provider == RemoteMusicProvider.BILIBILI) "关键词或 BV 链接" else "搜索${provider.displayName}歌曲")
+                                    },
                                     leadingIcon = { Icon(Icons.Default.Search, null) },
                                     shape = RoundedCornerShape(20.dp),
                                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -481,10 +501,10 @@ class RemoteMusicScene(
                         }
                     }
 
-                    if (provider == RemoteMusicProvider.QQ_MUSIC && !hasSubmittedSearch) {
+                    if (provider in setOf(RemoteMusicProvider.QQ_MUSIC, RemoteMusicProvider.BILIBILI) && !hasSubmittedSearch) {
                         item(key = "qq_collection_title", contentType = "section_title") {
                             Text(
-                                "QQ 音乐歌单",
+                                if (provider == RemoteMusicProvider.BILIBILI) "Bilibili 收藏夹" else "QQ 音乐歌单",
                                 modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
                                 fontWeight = FontWeight.SemiBold,
                             )
@@ -522,7 +542,13 @@ class RemoteMusicScene(
                             state.remotePlaylists.isEmpty() -> {
                                 item(key = "qq_playlists_empty", contentType = "empty") {
                                     Text(
-                                        "还没有获取到 QQ 音乐歌单",
+                                        if (provider ==
+                                            RemoteMusicProvider.BILIBILI
+                                        ) {
+                                            "登录账号后可浏览收藏夹；下方可浏览公开音乐内容，也可以搜索关键词或 BV 链接。"
+                                        } else {
+                                            "还没有获取到 QQ 音乐歌单"
+                                        },
                                         modifier = Modifier.fillMaxWidth().padding(24.dp),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -535,8 +561,8 @@ class RemoteMusicScene(
                                     contentType = { "qq_playlist" },
                                 ) { index ->
                                     val playlist = state.remotePlaylists[index]
-                                    RemotePlaylistRow(playlist) {
-                                        path.push(QqPlaylistScene(playlist))
+                                    RemotePlaylistRow(playlist, provider = provider) {
+                                        path.push(QqPlaylistScene(playlist, provider))
                                     }
                                 }
                             }
@@ -659,15 +685,17 @@ class NeteasePlaylistScene(
     override fun Content() {
         val path = LocalNavigationPath.current
         val viewModel: CloudMusicCatalogViewModel = koinActivityViewModel()
-        val homeViewModel: HomeViewModel = koinActivityViewModel()
+        val playlistListState = rememberLazyListState()
         val playerViewModel = LocalPlayerViewModel.current
+        val currentMediaItem by playerViewModel.currentMediaItem.collectAsStateWithLifecycle()
         var pendingPlayerMediaId by remember { mutableStateOf<String?>(null) }
         LaunchedEffect(pendingPlayerMediaId) {
             val expectedMediaId = pendingPlayerMediaId ?: return@LaunchedEffect
-            playerViewModel.currentMediaItem.first { it?.mediaId == expectedMediaId }
+            withTimeoutOrNull(8_000L) {
+                playerViewModel.currentMediaItem.first { it?.mediaId == expectedMediaId }
+            }
             if (pendingPlayerMediaId == expectedMediaId) {
                 pendingPlayerMediaId = null
-                path.popToRoot { homeViewModel.expandPlayer() }
             }
         }
         val state by viewModel.state.collectAsStateWithLifecycle()
@@ -678,7 +706,9 @@ class NeteasePlaylistScene(
             viewModel.loadPlaylist(value)
         }
         RemoteSceneScaffold(
-            title = value.playlist.name,
+            title = if (playlistListState.firstVisibleItemIndex > 0) value.playlist.name else "",
+            playlistAppearance = true,
+            headerVisible = playlistListState.firstVisibleItemIndex == 0,
             onBack = { path.popTop() },
             actions = {
                 IconButton(onClick = { viewModel.loadPlaylist(value, forceRefresh = true) }) {
@@ -687,22 +717,31 @@ class NeteasePlaylistScene(
             },
         ) { padding ->
             LazyColumn(
+                state = playlistListState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding =
                     PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = padding.calculateTopPadding() + 10.dp,
-                        bottom = 36.dp,
+                        start = 0.dp,
+                        end = 0.dp,
+                        top = padding.calculateTopPadding(),
+                        bottom = 200.dp,
                     ),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 item(key = "playlist_header", contentType = "header") {
-                    NeteasePlaylistRow(
-                        value = value,
-                        onClick = null,
-                        geometryTransition = transition,
+                    OnlinePlaylistHeader(
+                        name = value.playlist.name,
+                        songCount = songs.size.takeIf { it > 0 } ?: value.playlist.songCount,
+                        coverUri = value.playlist.coverUrl?.let(Uri::parse),
+                        transition = transition,
                         retainedPainter = transitionCoverPainter,
+                        playEnabled = songs.isNotEmpty(),
+                        onPlayAll = {
+                            songs.firstOrNull()?.let { first ->
+                                pendingPlayerMediaId = first.stableId
+                                viewModel.playPlaylistSongs(first.stableId, songs)
+                            }
+                        },
                     )
                 }
                 items(
@@ -711,10 +750,19 @@ class NeteasePlaylistScene(
                     contentType = { "netease_song" },
                 ) { index ->
                     val song = songs[index]
-                    CloudPlaylistSongRow(song) {
-                        pendingPlayerMediaId = song.stableId
-                        viewModel.playPlaylistSongs(song.stableId, songs)
-                    }
+                    PlaylistCloudSongRow(
+                        song = song,
+                        isPlaying = currentMediaItem?.mediaId == song.stableId,
+                        isPending = pendingPlayerMediaId == song.stableId,
+                        isMultiSelectMode = false,
+                        isSelected = false,
+                        onClick = {
+                            pendingPlayerMediaId = song.stableId
+                            viewModel.playPlaylistSongs(song.stableId, songs)
+                        },
+                        onLongClick = { path.push(CloudSongMenuScene(song)) },
+                        onMore = { path.push(CloudSongMenuScene(song)) },
+                    )
                 }
                 if (loading) {
                     item(key = "loading", contentType = "loading") {
@@ -760,26 +808,29 @@ class NeteasePlaylistScene(
 
 class QqPlaylistScene(
     private val playlist: RemotePlaylist,
+    private val provider: RemoteMusicProvider = RemoteMusicProvider.QQ_MUSIC,
 ) : StackScene() {
     @Composable
     override fun Content() {
         val path = LocalNavigationPath.current
-        val homeViewModel: HomeViewModel = koinActivityViewModel()
+        val playlistListState = rememberLazyListState()
         val playerViewModel = LocalPlayerViewModel.current
+        val currentMediaItem by playerViewModel.currentMediaItem.collectAsStateWithLifecycle()
         var pendingPlayerMediaId by remember { mutableStateOf<String?>(null) }
         val viewModel: RemoteMusicViewModel =
-            koinViewModel(key = "remote_music_${RemoteMusicProvider.QQ_MUSIC.name}") {
-                parametersOf(RemoteMusicProvider.QQ_MUSIC)
+            koinViewModel(key = "remote_music_${provider.name}") {
+                parametersOf(provider)
             }
         val state by viewModel.state.collectAsStateWithLifecycle()
         val songs = state.remotePlaylistSongs[playlist.id].orEmpty()
         val loading = playlist.id in state.loadingRemotePlaylistIds
         LaunchedEffect(pendingPlayerMediaId) {
             val expectedMediaId = pendingPlayerMediaId ?: return@LaunchedEffect
-            playerViewModel.currentMediaItem.first { it?.mediaId == expectedMediaId }
+            withTimeoutOrNull(8_000L) {
+                playerViewModel.currentMediaItem.first { it?.mediaId == expectedMediaId }
+            }
             if (pendingPlayerMediaId == expectedMediaId) {
                 pendingPlayerMediaId = null
-                path.popToRoot { homeViewModel.expandPlayer() }
             }
         }
 
@@ -787,7 +838,9 @@ class QqPlaylistScene(
             viewModel.loadRemotePlaylist(playlist.id)
         }
         RemoteSceneScaffold(
-            title = playlist.name,
+            title = if (playlistListState.firstVisibleItemIndex > 0) playlist.name else "",
+            playlistAppearance = true,
+            headerVisible = playlistListState.firstVisibleItemIndex == 0,
             onBack = { path.popTop() },
             actions = {
                 IconButton(
@@ -798,18 +851,30 @@ class QqPlaylistScene(
             },
         ) { padding ->
             LazyColumn(
+                state = playlistListState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding =
                     PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = padding.calculateTopPadding() + 10.dp,
-                        bottom = 36.dp,
+                        start = 0.dp,
+                        end = 0.dp,
+                        top = padding.calculateTopPadding(),
+                        bottom = 200.dp,
                     ),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 item(key = "playlist_header", contentType = "header") {
-                    RemotePlaylistRow(playlist, onClick = null)
+                    OnlinePlaylistHeader(
+                        name = playlist.name,
+                        songCount = songs.size.takeIf { it > 0 } ?: playlist.songCount,
+                        coverUri = playlist.coverUrl?.let(Uri::parse),
+                        playEnabled = songs.isNotEmpty(),
+                        onPlayAll = {
+                            songs.firstOrNull()?.let { first ->
+                                pendingPlayerMediaId = state.selectedAccount?.let { first.remoteMediaId(it.provider, it.id) }
+                                viewModel.play(first, songs)
+                            }
+                        },
+                    )
                 }
                 items(
                     count = songs.size,
@@ -819,6 +884,10 @@ class QqPlaylistScene(
                     val song = songs[index]
                     RemoteSongRow(
                         song = song,
+                        isPlaying =
+                            state.selectedAccount?.let { currentMediaItem?.mediaId == song.remoteMediaId(it.provider, it.id) } == true,
+                        isPending = state.selectedAccount?.let { pendingPlayerMediaId == song.remoteMediaId(it.provider, it.id) } == true,
+                        playlistStyle = true,
                         onClick = {
                             pendingPlayerMediaId =
                                 state.selectedAccount?.let { account ->
@@ -901,8 +970,9 @@ class CloudUserPlaylistScene(
     @Composable
     override fun Content() {
         val path = LocalNavigationPath.current
-        val homeViewModel: HomeViewModel = koinActivityViewModel()
+        val playlistListState = rememberLazyListState()
         val playerViewModel = LocalPlayerViewModel.current
+        val currentMediaItem by playerViewModel.currentMediaItem.collectAsStateWithLifecycle()
         var pendingPlayerMediaId by remember { mutableStateOf<String?>(null) }
         val viewModel: RemoteMusicViewModel =
             koinViewModel(key = "remote_music_${playlist.provider.name}") {
@@ -913,10 +983,11 @@ class CloudUserPlaylistScene(
         var showDeleteDialog by rememberSaveable { mutableStateOf(false) }
         LaunchedEffect(pendingPlayerMediaId) {
             val expectedMediaId = pendingPlayerMediaId ?: return@LaunchedEffect
-            playerViewModel.currentMediaItem.first { it?.mediaId == expectedMediaId }
+            withTimeoutOrNull(8_000L) {
+                playerViewModel.currentMediaItem.first { it?.mediaId == expectedMediaId }
+            }
             if (pendingPlayerMediaId == expectedMediaId) {
                 pendingPlayerMediaId = null
-                path.popToRoot { homeViewModel.expandPlayer() }
             }
         }
         if (showDeleteDialog) {
@@ -942,7 +1013,9 @@ class CloudUserPlaylistScene(
             )
         }
         RemoteSceneScaffold(
-            title = currentPlaylist.name,
+            title = if (playlistListState.firstVisibleItemIndex > 0) currentPlaylist.name else "",
+            playlistAppearance = true,
+            headerVisible = playlistListState.firstVisibleItemIndex == 0,
             onBack = { path.popTop() },
             actions = {
                 IconButton(onClick = { showDeleteDialog = true }) {
@@ -951,72 +1024,36 @@ class CloudUserPlaylistScene(
             },
         ) { padding ->
             LazyColumn(
+                state = playlistListState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding =
                     PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = padding.calculateTopPadding() + 10.dp,
-                        bottom = 36.dp,
+                        start = 0.dp,
+                        end = 0.dp,
+                        top = padding.calculateTopPadding(),
+                        bottom = 200.dp,
                     ),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 item(key = "playlist_header", contentType = "header") {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        StableAudioCover(
-                            uri =
-                                currentPlaylist.songs
-                                    .firstOrNull()
-                                    ?.artworkUrl
-                                    ?.let(Uri::parse),
-                            retainedPainter = transitionCoverPainter,
-                            modifier =
-                                Modifier
-                                    .size(196.dp)
-                                    .clip(RoundedCornerShape(28.dp))
-                                    .then(
-                                        if (transition != null) Modifier.geometryTarget(transition) else Modifier,
-                                    ).graphicsLayer {
-                                        alpha = if (transition?.shouldShowTarget() != false) 1f else 0f
-                                    },
-                            placeHolder = {
-                                Box(
-                                    Modifier.fillMaxSize().background(
-                                        MaterialTheme.colorScheme.surfaceContainerHigh,
-                                        RoundedCornerShape(28.dp),
-                                    ),
-                                    contentAlignment = Alignment.Center,
-                                ) { Icon(Icons.Default.PlaylistPlay, null, modifier = Modifier.size(64.dp)) }
-                            },
-                        )
-                        Text(currentPlaylist.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                        Text(
-                            "本地歌单 · ${currentPlaylist.songs.size} 首 · 不同步到云端",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        FilledTonalButton(
-                            onClick = {
-                                currentPlaylist.songs.firstOrNull()?.let { first ->
-                                    pendingPlayerMediaId =
-                                        first.remoteMediaId(
-                                            currentPlaylist.provider,
-                                            currentPlaylist.accountId,
-                                        )
-                                    viewModel.play(first, currentPlaylist.songs)
-                                }
-                            },
-                            enabled = currentPlaylist.songs.isNotEmpty(),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Icon(Icons.Default.PlaylistPlay, null)
-                            Text("播放全部")
-                        }
-                    }
+                    OnlinePlaylistHeader(
+                        name = currentPlaylist.name,
+                        songCount = currentPlaylist.songs.size,
+                        coverUri =
+                            currentPlaylist.songs
+                                .firstOrNull()
+                                ?.artworkUrl
+                                ?.let(Uri::parse),
+                        transition = transition,
+                        retainedPainter = transitionCoverPainter,
+                        playEnabled = currentPlaylist.songs.isNotEmpty(),
+                        onPlayAll = {
+                            currentPlaylist.songs.firstOrNull()?.let { first ->
+                                pendingPlayerMediaId = first.remoteMediaId(currentPlaylist.provider, currentPlaylist.accountId)
+                                viewModel.play(first, currentPlaylist.songs)
+                            }
+                        },
+                    )
                 }
                 items(
                     count = currentPlaylist.songs.size,
@@ -1026,6 +1063,9 @@ class CloudUserPlaylistScene(
                     val song = currentPlaylist.songs[index]
                     RemoteSongRow(
                         song = song,
+                        isPlaying = currentMediaItem?.mediaId == song.remoteMediaId(currentPlaylist.provider, currentPlaylist.accountId),
+                        isPending = pendingPlayerMediaId == song.remoteMediaId(currentPlaylist.provider, currentPlaylist.accountId),
+                        playlistStyle = true,
                         onClick = {
                             pendingPlayerMediaId =
                                 song.remoteMediaId(
@@ -1074,6 +1114,60 @@ class CloudUserPlaylistScene(
             if (!skipGeometryOnExit) {
                 launch { geometryTransition?.animateReverse() }
             }
+        }
+    }
+}
+
+@Composable
+private fun OnlinePlaylistHeader(
+    name: String,
+    songCount: Int,
+    coverUri: Uri?,
+    playEnabled: Boolean,
+    onPlayAll: () -> Unit,
+    transition: GeometryTransition? = null,
+    retainedPainter: Painter? = null,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        StableAudioCover(
+            uri = coverUri,
+            retainedPainter = retainedPainter,
+            modifier =
+                Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .size(180.dp)
+                    .clip(Shapes.LargeCornerBasedShape)
+                    .then(if (transition != null) Modifier.geometryTarget(transition) else Modifier)
+                    .graphicsLayer { alpha = if (transition?.shouldShowTarget() != false) 1f else 0f },
+            placeHolder = {
+                Box(
+                    Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Default.MusicNote, null, modifier = Modifier.size(48.dp))
+                }
+            },
+        )
+        Column {
+            Text(
+                name,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                stringResource(R.string.songs_count, songCount),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Button(onClick = onPlayAll, enabled = playEnabled, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Default.PlayArrow, null)
+            Text(stringResource(R.string.play_all_songs))
         }
     }
 }
@@ -1138,6 +1232,7 @@ private fun NeteasePlaylistRow(
 @Composable
 private fun RemotePlaylistRow(
     playlist: RemotePlaylist,
+    provider: RemoteMusicProvider = RemoteMusicProvider.QQ_MUSIC,
     onClick: (() -> Unit)?,
 ) {
     val clickableModifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
@@ -1168,7 +1263,7 @@ private fun RemotePlaylistRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    "${playlist.songCount} 首 · QQ 音乐",
+                    "${playlist.songCount} 首 · ${provider.displayName}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1219,43 +1314,6 @@ private fun CloudUserPlaylistRow(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun CloudPlaylistSongRow(
-    song: CloudCatalogSong,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        AudioCover(
-            uri = song.artworkUri,
-            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(16.dp)),
-            placeHolder = {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.MusicNote, null)
-                }
-            },
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                "${song.artist} · ${song.album}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Text(
-            formatRemoteDuration(song.durationMs),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
@@ -1357,6 +1415,7 @@ private fun CookieWebLogin(
     modifier: Modifier,
     onCancel: () -> Unit,
     onCookiesCaptured: (String) -> Unit,
+    onBrowse: (() -> Unit)? = null,
 ) {
     Column(
         modifier = modifier.padding(horizontal = 16.dp, vertical = 10.dp),
@@ -1367,6 +1426,11 @@ private fun CookieWebLogin(
             body = "请在下方官方网页完成登录。应用只读取登录 Cookie，不会读取或保存你的密码。",
         )
         state.error?.let { LoginError(it) }
+        onBrowse?.let { browse ->
+            OutlinedButton(onClick = browse, enabled = !state.isConnecting, modifier = Modifier.fillMaxWidth()) {
+                Text("先浏览公开内容（收藏夹需登录）")
+            }
+        }
         AndroidView(
             modifier =
                 Modifier
@@ -1603,6 +1667,9 @@ private fun CloudPlaylistPickerDialog(
 private fun RemoteSongRow(
     song: RemoteSong,
     onClick: () -> Unit,
+    isPlaying: Boolean = false,
+    isPending: Boolean = false,
+    playlistStyle: Boolean = false,
     onAddToPlaylist: (() -> Unit)? = null,
     onRemoveFromPlaylist: (() -> Unit)? = null,
 ) {
@@ -1610,14 +1677,22 @@ private fun RemoteSongRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onClick)
-                .padding(horizontal = 4.dp, vertical = 9.dp),
+                .padding(horizontal = if (playlistStyle) 12.dp else 0.dp)
+                .clip(Shapes.MediumCornerBasedShape)
+                .background(
+                    if (isPlaying || isPending) {
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.30f)
+                    } else {
+                        androidx.compose.ui.graphics.Color.Transparent
+                    },
+                ).clickable(onClick = onClick)
+                .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         AudioCover(
             uri = song.artworkUrl?.let(Uri::parse),
-            modifier = Modifier.size(46.dp).clip(RoundedCornerShape(16.dp)),
+            modifier = Modifier.size(48.dp).clip(Shapes.SmallCornerBasedShape),
             placeHolder = {
                 Box(
                     modifier =
@@ -1636,31 +1711,56 @@ private fun RemoteSongRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 song.title,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                "${song.artist} · ${song.album}",
+                if (playlistStyle) song.artist else "${song.artist} · ${song.album}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Text(
-            formatRemoteDuration(song.durationMs),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        onAddToPlaylist?.let { add ->
-            IconButton(onClick = add) {
-                Icon(Icons.Default.Add, "添加到歌单")
+        if (isPending) {
+            CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+        } else if (playlistStyle) {
+            var showMenu by remember { mutableStateOf(false) }
+            Box {
+                IconButton(onClick = { showMenu = true }) {
+                    Icon(Icons.Default.MoreVert, stringResource(R.string.more), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                    DropdownMenuItem(text = { Text(song.title) }, onClick = {}, enabled = false)
+                    DropdownMenuItem(text = {
+                        Text("${song.artist} · ${song.album} · ${formatRemoteDuration(song.durationMs)}")
+                    }, onClick = {}, enabled = false)
+                    onRemoveFromPlaylist?.let { remove ->
+                        DropdownMenuItem(text = { Text("从歌单移除") }, onClick = {
+                            showMenu = false
+                            remove()
+                        })
+                    }
+                }
             }
-        }
-        onRemoveFromPlaylist?.let { remove ->
-            IconButton(onClick = remove) {
-                Icon(Icons.Default.DeleteOutline, "从歌单移除")
+        } else {
+            Text(
+                formatRemoteDuration(song.durationMs),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            onAddToPlaylist?.let { add ->
+                IconButton(onClick = add) {
+                    Icon(Icons.Default.Add, "添加到歌单")
+                }
+            }
+            onRemoveFromPlaylist?.let { remove ->
+                IconButton(onClick = remove) {
+                    Icon(Icons.Default.DeleteOutline, "从歌单移除")
+                }
             }
         }
     }
@@ -1671,23 +1771,44 @@ private fun RemoteSongRow(
 private fun RemoteSceneScaffold(
     title: String,
     onBack: () -> Unit,
+    playlistAppearance: Boolean = false,
+    headerVisible: Boolean = false,
     actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                actions = actions,
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        if (playlistAppearance && headerVisible) {
+            Box(
+                Modifier.fillMaxWidth().height(400.dp).background(
+                    Brush.verticalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
+                            androidx.compose.ui.graphics.Color.Transparent,
+                        ),
+                    ),
+                ),
             )
-        },
-        content = content,
-    )
+        }
+        Scaffold(
+            containerColor = if (playlistAppearance) androidx.compose.ui.graphics.Color.Transparent else MaterialTheme.colorScheme.background,
+            topBar = {
+                TopAppBar(
+                    colors =
+                        TopAppBarDefaults.topAppBarColors(
+                            containerColor = if (playlistAppearance) androidx.compose.ui.graphics.Color.Transparent else MaterialTheme.colorScheme.background,
+                        ),
+                    title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        }
+                    },
+                    actions = actions,
+                )
+            },
+            content = content,
+        )
+    }
 }
 
 private val RemoteMusicProvider.displayName: String
@@ -1696,6 +1817,7 @@ private val RemoteMusicProvider.displayName: String
             RemoteMusicProvider.SUBSONIC -> "Subsonic"
             RemoteMusicProvider.NETEASE -> "网易云音乐"
             RemoteMusicProvider.QQ_MUSIC -> "QQ 音乐"
+            RemoteMusicProvider.BILIBILI -> "Bilibili"
         }
 
 private val RemoteMusicProvider.loginUrl: String
@@ -1703,6 +1825,7 @@ private val RemoteMusicProvider.loginUrl: String
         when (this) {
             RemoteMusicProvider.NETEASE -> "https://music.163.com/m/login"
             RemoteMusicProvider.QQ_MUSIC -> "https://y.qq.com/"
+            RemoteMusicProvider.BILIBILI -> "https://passport.bilibili.com/login"
             RemoteMusicProvider.SUBSONIC -> error("Subsonic does not use web login")
         }
 
@@ -1721,6 +1844,12 @@ private val RemoteMusicProvider.cookieUrls: List<String>
                     "https://u6.y.qq.com/",
                     "https://c.y.qq.com/",
                 )
+            RemoteMusicProvider.BILIBILI ->
+                listOf(
+                    "https://www.bilibili.com/",
+                    "https://passport.bilibili.com/",
+                    "https://api.bilibili.com/",
+                )
             RemoteMusicProvider.SUBSONIC -> emptyList()
         }
 
@@ -1730,6 +1859,8 @@ private fun RemoteMusicProvider.accountSubtitle(account: RemoteMusicAccount): St
         RemoteMusicProvider.NETEASE,
         RemoteMusicProvider.QQ_MUSIC,
         -> "网页登录会话已加密保存在本机"
+        RemoteMusicProvider.BILIBILI ->
+            if (account.secret.isBlank()) "访客模式 · 登录后可浏览收藏夹" else "网页登录会话已加密保存在本机"
     }
 
 private fun collectCookies(urls: List<String>): String {

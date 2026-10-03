@@ -32,6 +32,7 @@ enum class CloudSongSource {
     SUBSONIC,
     NETEASE,
     QQ_MUSIC,
+    BILIBILI,
 }
 
 @Immutable
@@ -279,7 +280,7 @@ class CloudMusicCatalogViewModel(
         val accounts =
             accountStore
                 .getRemoteAccounts()
-                .filter { it.provider == RemoteMusicProvider.NETEASE || it.provider == RemoteMusicProvider.QQ_MUSIC }
+                .filter { it.provider in setOf(RemoteMusicProvider.NETEASE, RemoteMusicProvider.QQ_MUSIC, RemoteMusicProvider.BILIBILI) }
                 .associateBy(RemoteMusicAccount::id)
         if (accounts.isEmpty()) {
             _state.update {
@@ -1025,6 +1026,7 @@ class CloudMusicCatalogViewModel(
                     RemoteMusicProvider.SUBSONIC -> CloudSongSource.SUBSONIC
                     RemoteMusicProvider.NETEASE -> CloudSongSource.NETEASE
                     RemoteMusicProvider.QQ_MUSIC -> CloudSongSource.QQ_MUSIC
+                    RemoteMusicProvider.BILIBILI -> CloudSongSource.BILIBILI
                 },
         ) {
         private var offset = 0
@@ -1187,6 +1189,7 @@ internal fun RemoteMusicAccount.toCatalogSong(song: RemoteSong): CloudCatalogSon
                 RemoteMusicProvider.SUBSONIC -> CloudSongSource.SUBSONIC
                 RemoteMusicProvider.NETEASE -> CloudSongSource.NETEASE
                 RemoteMusicProvider.QQ_MUSIC -> CloudSongSource.QQ_MUSIC
+                RemoteMusicProvider.BILIBILI -> CloudSongSource.BILIBILI
             },
         accountName = displayName,
         title = song.title,
@@ -1209,6 +1212,7 @@ private fun RemoteMusicProvider.toCloudSongSource(): CloudSongSource =
         RemoteMusicProvider.SUBSONIC -> CloudSongSource.SUBSONIC
         RemoteMusicProvider.NETEASE -> CloudSongSource.NETEASE
         RemoteMusicProvider.QQ_MUSIC -> CloudSongSource.QQ_MUSIC
+        RemoteMusicProvider.BILIBILI -> CloudSongSource.BILIBILI
     }
 
 internal fun mergeCatalogSongs(

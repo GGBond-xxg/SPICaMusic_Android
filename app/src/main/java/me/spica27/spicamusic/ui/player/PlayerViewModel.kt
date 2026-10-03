@@ -350,7 +350,7 @@ class PlayerViewModel(
                 when (provider) {
                     RemoteMusicProvider.NETEASE -> PreferencesManager.Keys.NETEASE_AUDIO_QUALITY
                     RemoteMusicProvider.QQ_MUSIC -> PreferencesManager.Keys.QQ_AUDIO_QUALITY
-                    RemoteMusicProvider.SUBSONIC -> return@launch
+                    RemoteMusicProvider.SUBSONIC, RemoteMusicProvider.BILIBILI -> return@launch
                 }
             preferencesManager.setString(key, value)
             val item = currentMediaItem.value ?: return@launch

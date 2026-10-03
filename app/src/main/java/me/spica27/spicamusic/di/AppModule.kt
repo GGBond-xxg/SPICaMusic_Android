@@ -4,6 +4,7 @@ import com.linc.amplituda.Amplituda
 import com.skydoves.sandwich.retrofit.adapters.ApiResponseCallAdapterFactory
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import me.spica27.spicamusic.cloud.BilibiliClient
 import me.spica27.spicamusic.cloud.CloudAccountStore
 import me.spica27.spicamusic.cloud.CloudCatalogCountStore
 import me.spica27.spicamusic.cloud.CloudMusicCatalogViewModel
@@ -149,7 +150,8 @@ object AppModule {
             single { SubsonicClient(get(named("cloudHttpClient"))) }
             single { NeteaseClient(get(named("cloudHttpClient")), get(), get()) }
             single { QqMusicClient(get(named("cloudHttpClient")), get(), get()) }
-            single { RemoteMusicClientRegistry(get(), get(), get()) }
+            single { BilibiliClient(get(named("cloudHttpClient"))) }
+            single { RemoteMusicClientRegistry(get(), get(), get(), get()) }
             single { OnlineSourceFileStore(androidContext(), get(named("cloudHttpClient"))) }
             single { OnlineSourceEngine(androidContext(), get(), get(named("cloudHttpClient"))) }
             single { OnlineSourceRepository(get()) }

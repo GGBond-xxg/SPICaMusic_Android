@@ -137,6 +137,14 @@ class CloudLibraryScene : StackScene() {
                         },
                     )
                 }
+                item(key = "bilibili", contentType = "provider") {
+                    ProviderCard(
+                        title = "Bilibili",
+                        subtitle = "搜索视频音频、播放 BV 链接、浏览收藏夹",
+                        icon = Icons.Default.MusicNote,
+                        onClick = { path.push(RemoteMusicScene(RemoteMusicProvider.BILIBILI)) },
+                    )
+                }
                 item(key = "telegram", contentType = "provider") {
                     ProviderCard(
                         title = "Telegram",

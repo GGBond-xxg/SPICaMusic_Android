@@ -12,6 +12,7 @@ import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Arrangement
@@ -2101,6 +2102,7 @@ private fun SongInfo(
             modifier = Modifier.geometrySourceFor(titleTransition),
         ) { title ->
             Text(
+                modifier = Modifier.fillMaxWidth().basicMarquee(),
                 text = title,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,

@@ -54,16 +54,11 @@ fun PlaylistCoverView(
     iconSize: Dp = 32.dp,
 ) {
     Box(modifier = modifier) {
-        ShowOnIdleContent(
-            true,
-            enter = materialSharedAxisYIn(true),
-            exit = materialSharedAxisYOut(true),
-        ) {
-            when {
-                albumIds.isEmpty() -> EmptyPlaylistCover(Modifier.fillMaxSize(), iconSize)
-                albumIds.size < 4 -> SingleAlbumCover(albumIds.first(), Modifier.fillMaxSize())
-                else -> MosaicCover(albumIds.take(4), Modifier.fillMaxSize())
-            }
+        // Start visible covers immediately, including while the grid is flinging.
+        when {
+            albumIds.isEmpty() -> EmptyPlaylistCover(Modifier.fillMaxSize(), iconSize)
+            albumIds.size < 4 -> SingleAlbumCover(albumIds.first(), Modifier.fillMaxSize())
+            else -> MosaicCover(albumIds.take(4), Modifier.fillMaxSize())
         }
     }
 }

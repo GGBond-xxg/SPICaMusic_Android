@@ -320,6 +320,18 @@ internal fun remoteStreamRequestHeaders(
             }
         }
 
+        RemoteMusicProvider.BILIBILI -> {
+            if (host == "bilibili.com" ||
+                host.endsWith(".bilibili.com") ||
+                host == "bilivideo.com" ||
+                host.endsWith(".bilivideo.com") ||
+                host.endsWith(".bilivideo.cn")
+            ) {
+                mapOf("Referer" to BILIBILI_REFERER, "User-Agent" to BILIBILI_USER_AGENT)
+            } else {
+                emptyMap()
+            }
+        }
         RemoteMusicProvider.SUBSONIC -> emptyMap()
     }
 }

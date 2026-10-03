@@ -76,6 +76,7 @@ enum class SearchSource(
     LOCAL(null),
     QQ_MUSIC(RemoteMusicProvider.QQ_MUSIC),
     NETEASE(RemoteMusicProvider.NETEASE),
+    BILIBILI(RemoteMusicProvider.BILIBILI),
     ;
 
     val includesLocal: Boolean
@@ -364,10 +365,12 @@ class SearchViewModel(
             when (source) {
                 SearchSource.ALL ->
                     account.provider == RemoteMusicProvider.QQ_MUSIC ||
-                        account.provider == RemoteMusicProvider.NETEASE
+                        account.provider == RemoteMusicProvider.NETEASE ||
+                        account.provider == RemoteMusicProvider.BILIBILI
                 SearchSource.LOCAL -> false
                 SearchSource.QQ_MUSIC,
                 SearchSource.NETEASE,
+                SearchSource.BILIBILI,
                 -> account.provider == source.remoteProvider
             }
         }

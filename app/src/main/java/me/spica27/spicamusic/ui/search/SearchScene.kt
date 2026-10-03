@@ -510,6 +510,7 @@ private fun SearchProviderPicker(
             SearchSource.LOCAL to stringResource(R.string.search_filter_local_music),
             SearchSource.QQ_MUSIC to stringResource(R.string.search_source_qq_music),
             SearchSource.NETEASE to stringResource(R.string.search_source_netease),
+            SearchSource.BILIBILI to "Bilibili",
         )
     Box {
         Box(
@@ -575,6 +576,7 @@ private fun SearchSource.searchSourceIcon() =
         SearchSource.LOCAL -> Icons.Default.MusicNote
         SearchSource.QQ_MUSIC -> Icons.Default.Headphones
         SearchSource.NETEASE -> Icons.Default.Album
+        SearchSource.BILIBILI -> Icons.Default.Headphones
     }
 
 /** 胶囊形搜索输入框：52dp 高，Search 键收起键盘，清除按钮与占位等宽切换避免跳动 */
@@ -701,6 +703,7 @@ private fun SearchResultList(
         mapOf(
             CloudSongSource.NETEASE to stringResource(R.string.search_source_netease),
             CloudSongSource.QQ_MUSIC to stringResource(R.string.search_source_qq_music),
+            CloudSongSource.BILIBILI to "Bilibili",
         )
     val localHeader = stringResource(R.string.search_source_local_library)
     val remoteErrorText = stringResource(R.string.search_remote_source_failed)
@@ -717,7 +720,7 @@ private fun SearchResultList(
         verticalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall),
         overscrollEffect = rememberIOSOverScrollEffect(orientation = Orientation.Vertical),
     ) {
-        listOf(CloudSongSource.NETEASE, CloudSongSource.QQ_MUSIC).forEach { source ->
+        listOf(CloudSongSource.NETEASE, CloudSongSource.QQ_MUSIC, CloudSongSource.BILIBILI).forEach { source ->
             val sourceSongs = remoteSongs.filter { it.source == source }
             if (sourceSongs.isNotEmpty()) {
                 item(key = "remote_header_${source.name}", contentType = "source_header") {
@@ -1249,6 +1252,7 @@ private fun recentSourceLabel(source: String): String =
         "LOCAL" -> stringResource(R.string.search_source_local_library)
         CloudSongSource.NETEASE.name -> stringResource(R.string.search_source_netease)
         CloudSongSource.QQ_MUSIC.name -> stringResource(R.string.search_source_qq_music)
+        CloudSongSource.BILIBILI.name -> "Bilibili"
         CloudSongSource.TELEGRAM.name -> stringResource(R.string.music_source_telegram)
         CloudSongSource.JELLYFIN.name -> stringResource(R.string.music_source_jellyfin)
         CloudSongSource.EMBY.name -> stringResource(R.string.music_source_emby)

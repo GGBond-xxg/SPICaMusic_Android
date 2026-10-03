@@ -160,7 +160,6 @@ import me.spica27.spicamusic.common.entity.getAlbumCoverUri
 import me.spica27.spicamusic.common.entity.getCoverUri
 import me.spica27.spicamusic.ui.dialog.CloudSongMenuScene
 import me.spica27.spicamusic.ui.dialog.SongMenuScene
-import me.spica27.spicamusic.ui.home.HomeViewModel
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
@@ -235,7 +234,6 @@ fun PlaylistDetailScreen(
             key = "PlaylistDetailViewModel_${playlist.playlistId}",
         ) { parametersOf(playlistId) }
     val cloudCatalogViewModel: CloudMusicCatalogViewModel = koinActivityViewModel()
-    val homeViewModel: HomeViewModel = koinActivityViewModel()
 
     // ── State collection ───────────────────────────────────────────────────
     val currentPlaylist by viewModel.playlist.collectAsStateWithLifecycle()
@@ -268,20 +266,13 @@ fun PlaylistDetailScreen(
     val playingMediaId = currentMediaItem?.mediaId
     var pendingPlayerMediaId by remember { mutableStateOf<String?>(null) }
 
-    // 播放指令由 Media3 异步提交。只有目标 MediaItem 真正成为当前歌曲后才展开，
-    // 避免详情页退出时先露出上一首的播放器，再跳成刚点击的歌曲。
+    // Keep playback in the playlist; clear the loading highlight on success or timeout.
     LaunchedEffect(pendingPlayerMediaId) {
         val expectedMediaId = pendingPlayerMediaId ?: return@LaunchedEffect
-        val switched =
-            withTimeoutOrNull(PLAYER_SWITCH_TIMEOUT_MS) {
-                playerViewModel.currentMediaItem.first { it?.mediaId == expectedMediaId }
-            } != null
-        if (pendingPlayerMediaId == expectedMediaId && switched) {
-            pendingPlayerMediaId = null
-            path.popToRoot { homeViewModel.expandPlayer() }
-        } else if (pendingPlayerMediaId == expectedMediaId) {
-            pendingPlayerMediaId = null
+        withTimeoutOrNull(PLAYER_SWITCH_TIMEOUT_MS) {
+            playerViewModel.currentMediaItem.first { it?.mediaId == expectedMediaId }
         }
+        if (pendingPlayerMediaId == expectedMediaId) pendingPlayerMediaId = null
     }
 
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -1386,7 +1377,7 @@ private fun FloatingHintIcon(
 // ── 歌曲列表行（浏览 / 多选 / 排序共用一个家族）─────────────────────────────────
 
 @Composable
-private fun PlaylistCloudSongRow(
+internal fun PlaylistCloudSongRow(
     song: CloudCatalogSong,
     isPlaying: Boolean,
     isPending: Boolean = false,
@@ -1420,7 +1411,7 @@ private fun PlaylistCloudSongRow(
         }
         AudioCover(
             uri = song.artworkUri,
-            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(16.dp)),
+            modifier = Modifier.size(48.dp).clip(Shapes.SmallCornerBasedShape),
             placeHolder = {
                 Box(
                     modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh),
@@ -1433,13 +1424,14 @@ private fun PlaylistCloudSongRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = song.title,
-                fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Medium,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
                 color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = "${song.artist} · ${song.accountName}",
+                text = song.artist,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -2417,7 +2409,7 @@ private fun PickerCloudSongRow(
         ) {
             AudioCover(
                 uri = song.artworkUri,
-                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(16.dp)),
+                modifier = Modifier.size(48.dp).clip(Shapes.SmallCornerBasedShape),
                 placeHolder = {
                     Box(
                         Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh),

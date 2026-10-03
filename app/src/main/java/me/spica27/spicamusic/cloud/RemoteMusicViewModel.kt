@@ -86,6 +86,11 @@ class RemoteMusicViewModel(
         }
     }
 
+    fun browseBilibili() {
+        if (provider != RemoteMusicProvider.BILIBILI || _state.value.isConnecting) return
+        connect { Result.success(RemoteMusicAccount("", provider, "Bilibili 访客", secret = "")) }
+    }
+
     fun loginWithCookies(cookieHeader: String) {
         if (provider == RemoteMusicProvider.SUBSONIC || _state.value.isConnecting) return
         connect {
@@ -123,7 +128,7 @@ class RemoteMusicViewModel(
     }
 
     fun refreshRemotePlaylists(forceRefresh: Boolean = false) {
-        if (provider != RemoteMusicProvider.QQ_MUSIC || _state.value.loadingRemotePlaylists) return
+        if (provider !in setOf(RemoteMusicProvider.QQ_MUSIC, RemoteMusicProvider.BILIBILI) || _state.value.loadingRemotePlaylists) return
         val account = _state.value.selectedAccount ?: return
         val cached = clients.cachedPlaylists(account)
         if (cached.isNotEmpty()) {
@@ -144,7 +149,7 @@ class RemoteMusicViewModel(
                     _state.update {
                         it.copy(
                             loadingRemotePlaylists = false,
-                            remotePlaylistError = error.message ?: "无法获取 QQ 音乐歌单",
+                            remotePlaylistError = error.message ?: "无法获取云端歌单",
                         )
                     }
                 }
@@ -156,7 +161,11 @@ class RemoteMusicViewModel(
         forceRefresh: Boolean = false,
     ) {
         val account = _state.value.selectedAccount ?: return
-        if (provider != RemoteMusicProvider.QQ_MUSIC || playlistId in _state.value.loadingRemotePlaylistIds) return
+        if (provider !in setOf(RemoteMusicProvider.QQ_MUSIC, RemoteMusicProvider.BILIBILI) ||
+            playlistId in _state.value.loadingRemotePlaylistIds
+        ) {
+            return
+        }
         if (!forceRefresh && _state.value.remotePlaylistSongs.containsKey(playlistId)) return
         _state.update {
             it.copy(
@@ -177,7 +186,7 @@ class RemoteMusicViewModel(
                     _state.update {
                         it.copy(
                             loadingRemotePlaylistIds = it.loadingRemotePlaylistIds - playlistId,
-                            remotePlaylistError = error.message ?: "无法获取 QQ 音乐歌单内容",
+                            remotePlaylistError = error.message ?: "无法获取云端歌单内容",
                         )
                     }
                 }

@@ -29,6 +29,7 @@ class RemoteMusicClientRegistry(
     private val subsonic: SubsonicClient,
     private val netease: NeteaseClient,
     private val qqMusic: QqMusicClient,
+    private val bilibili: BilibiliClient,
 ) {
     suspend fun authenticateSubsonic(
         serverUrl: String,
@@ -43,6 +44,7 @@ class RemoteMusicClientRegistry(
         when (provider) {
             RemoteMusicProvider.NETEASE -> netease.authenticate(cookieHeader)
             RemoteMusicProvider.QQ_MUSIC -> qqMusic.authenticate(cookieHeader)
+            RemoteMusicProvider.BILIBILI -> bilibili.authenticate(cookieHeader)
             RemoteMusicProvider.SUBSONIC ->
                 Result.failure(IllegalArgumentException("Subsonic uses server credentials"))
         }
@@ -57,6 +59,7 @@ class RemoteMusicClientRegistry(
             RemoteMusicProvider.SUBSONIC -> subsonic.listSongs(account, query, offset, limit)
             RemoteMusicProvider.NETEASE -> netease.listSongs(account, query, offset, limit)
             RemoteMusicProvider.QQ_MUSIC -> qqMusic.listSongs(account, query, offset, limit)
+            RemoteMusicProvider.BILIBILI -> bilibili.listSongs(account, query, offset, limit)
         }
 
     suspend fun listPlaylists(
@@ -66,6 +69,7 @@ class RemoteMusicClientRegistry(
         when (account.provider) {
             RemoteMusicProvider.NETEASE -> netease.listPlaylists(account, forceRefresh)
             RemoteMusicProvider.QQ_MUSIC -> qqMusic.listPlaylists(account, forceRefresh)
+            RemoteMusicProvider.BILIBILI -> bilibili.listPlaylists(account, forceRefresh)
             else -> emptyList()
         }
 
@@ -73,6 +77,7 @@ class RemoteMusicClientRegistry(
         when (account.provider) {
             RemoteMusicProvider.NETEASE -> netease.cachedPlaylists(account.id)
             RemoteMusicProvider.QQ_MUSIC -> qqMusic.cachedPlaylists(account.id)
+            RemoteMusicProvider.BILIBILI -> bilibili.cachedPlaylists(account.id)
             else -> emptyList()
         }
 
@@ -86,6 +91,7 @@ class RemoteMusicClientRegistry(
                 netease.listPlaylistSongs(account, playlistId, forceRefresh)
             RemoteMusicProvider.QQ_MUSIC ->
                 qqMusic.listPlaylistSongs(account, playlistId, forceRefresh)
+            RemoteMusicProvider.BILIBILI -> bilibili.listPlaylistSongs(account, playlistId)
             else -> emptyList()
         }
 
@@ -141,11 +147,13 @@ class RemoteMusicClientRegistry(
             RemoteMusicProvider.SUBSONIC -> ResolvedRemoteStream(subsonic.streamUrl(account, songId))
             RemoteMusicProvider.NETEASE -> netease.resolveStream(account, songId)
             RemoteMusicProvider.QQ_MUSIC -> ResolvedRemoteStream(qqMusic.resolveStreamUrl(account, songId))
+            RemoteMusicProvider.BILIBILI -> ResolvedRemoteStream(bilibili.resolveStreamUrl(account, songId))
         }
 
     fun clearCache(accountId: String) {
         netease.clearCache(accountId)
         qqMusic.clearCache(accountId)
+        bilibili.clearCache(accountId)
     }
 }
 
