@@ -60,6 +60,7 @@ import me.spica27.spicamusic.player.api.PlayMode
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.player.LyricsPanel
 import me.spica27.spicamusic.ui.player.PlayerPlaybackBottomSection
+import me.spica27.spicamusic.ui.player.playerClick
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
 import me.spica27.spicamusic.ui.widget.AudioCover
@@ -428,7 +429,7 @@ private fun LyricsHeader(
         horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
     ) {
         IconButton(
-            onClick = onBack,
+            onClick = playerClick(onBack),
             enabled = showNavigationButton,
             modifier =
                 Modifier

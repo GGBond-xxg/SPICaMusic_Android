@@ -9,6 +9,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.media3.common.util.UnstableApi
 import me.spcia.lyric_core.di.extraInfoModule
+import me.spica27.spicamusic.cloud.KugouRewards
 import me.spica27.spicamusic.crash.CrashHandler
 import me.spica27.spicamusic.di.AppModule
 import me.spica27.spicamusic.diagnostics.DiagnosticLog
@@ -35,6 +36,7 @@ class App : Application() {
     private val musicScanService: MusicScanUseCases by inject()
 
     private val musicPlayer: IMusicPlayer by inject()
+    private val kugouRewards: KugouRewards by inject()
 
     override fun attachBaseContext(base: Context) {
         super.attachBaseContext(AppLocaleController.wrap(base))
@@ -74,6 +76,7 @@ class App : Application() {
         setupMediaStoreObserver()
         // FFT 采样由实际可见的播放器动态效果按需开启；这里负责后台兜底关闭。
         setupFftLifecycle()
+        kugouRewards.start()
         CrashHandler.init(this)
     }
 
@@ -87,6 +90,7 @@ class App : Application() {
             object : DefaultLifecycleObserver {
                 override fun onStart(owner: LifecycleOwner) {
                     DiagnosticLog.writeProcessSnapshot(this@App, "process-foreground")
+                    kugouRewards.onForeground(musicPlayer)
                 }
 
                 override fun onStop(owner: LifecycleOwner) {

@@ -332,7 +332,7 @@ internal fun remoteStreamRequestHeaders(
                 emptyMap()
             }
         }
-        RemoteMusicProvider.SUBSONIC -> emptyMap()
+        RemoteMusicProvider.SUBSONIC, RemoteMusicProvider.KUGOU -> emptyMap()
     }
 }
 

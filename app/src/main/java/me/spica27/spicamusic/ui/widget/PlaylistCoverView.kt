@@ -13,16 +13,23 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.core.net.toUri
-import com.skydoves.landscapist.image.LandscapistImage
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
+import me.spica27.spicamusic.ui.cache.LocalPlaylistArtworkCache
+import me.spica27.spicamusic.ui.model.PlaylistWithCover
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 公共入口：接受 albumId Flow（来自 PlaylistUseCases.getPlaylistCoverAlbumIds）
@@ -105,26 +112,7 @@ private fun SingleAlbumCover(
     albumId: Long,
     modifier: Modifier,
 ) {
-    LandscapistImage(
-        imageModel = { "content://media/external/audio/albumart/$albumId".toUri() },
-        modifier = modifier,
-        success = { _, painter ->
-            Image(
-                painter = painter,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        },
-        failure = {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-            )
-        },
-    )
+    CachedAlbumCover(albumId, 512, modifier)
 }
 
 /** 歌单达到 4 首时，拼 2×2 马赛克封面 */
@@ -172,16 +160,57 @@ private fun MosaicCell(
     albumId: Long,
     modifier: Modifier,
 ) {
-    LandscapistImage(
-        imageModel = { "content://media/external/audio/albumart/$albumId".toUri() },
-        modifier = modifier,
-        failure = {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-            )
-        },
-    )
+    CachedAlbumCover(albumId, 256, modifier)
+}
+
+@Composable
+private fun CachedAlbumCover(
+    albumId: Long,
+    size: Int,
+    modifier: Modifier,
+) {
+    val cache = LocalPlaylistArtworkCache.current
+    var bitmap by remember(cache, albumId, size) { mutableStateOf(cache.peek(albumId, size)) }
+    LaunchedEffect(cache, albumId, size) {
+        try {
+            bitmap = cache.load(albumId, size)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Missing artwork keeps the same stable placeholder without breaking the list.
+        }
+    }
+    Box(modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
+        bitmap?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+    }
+}
+
+/** Start the first rail/grid's covers before its lazy items enter the viewport. */
+@Composable
+internal fun PreloadPlaylistCovers(playlists: List<PlaylistWithCover>) {
+    val cache = LocalPlaylistArtworkCache.current
+    val covers =
+        playlists
+            .take(8)
+            .flatMap {
+                val ids = it.coverAlbumIds
+                if (ids.size < 4) ids.take(1).map { id -> id to 512 } else ids.take(4).map { id -> id to 256 }
+            }.distinct()
+    LaunchedEffect(cache, covers) {
+        coroutineScope {
+            covers.forEach { (id, size) ->
+                launch {
+                    try {
+                        cache.load(id, size)
+                    } catch (
+                        cancelled: CancellationException,
+                    ) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        // A missing cover must not cancel other thumbnails.
+                    }
+                }
+            }
+        }
+    }
 }

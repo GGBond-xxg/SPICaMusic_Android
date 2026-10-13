@@ -8,6 +8,8 @@ class SettingsUseCases(
     private val preferencesManager: PreferencesManager,
 ) {
     object Keys {
+        val PLAYER_HAPTICS_ENABLED = PreferencesManager.Keys.PLAYER_HAPTICS_ENABLED
+        val PLAYER_HAPTICS_STRENGTH = PreferencesManager.Keys.PLAYER_HAPTICS_STRENGTH
         val DARK_MODE = PreferencesManager.Keys.DARK_MODE
         val THEME_MODE = PreferencesManager.Keys.THEME_MODE
         val THEME_COLOR_STYLE = PreferencesManager.Keys.THEME_COLOR_STYLE

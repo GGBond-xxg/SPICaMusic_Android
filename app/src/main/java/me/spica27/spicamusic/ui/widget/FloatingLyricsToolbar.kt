@@ -64,6 +64,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import me.spcia.lyric_core.entity.SongLyrics
 import me.spica27.spicamusic.R
+import me.spica27.spicamusic.ui.player.PlayerHaptics
+import me.spica27.spicamusic.ui.player.playerClick
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -130,7 +132,7 @@ fun LyricsEditorSheet(
                     )
                 }
                 LyricsCircleButton(
-                    onClick = onDismiss,
+                    onClick = playerClick(onDismiss),
                     size = 40.dp,
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                 ) {
@@ -147,21 +149,30 @@ fun LyricsEditorSheet(
                         label = stringResource(R.string.align_left),
                         icon = Icons.AutoMirrored.Rounded.FormatAlignLeft,
                         selected = textAlignment == LyricsTextAlignment.Start,
-                        onClick = { onTextAlignmentChange(LyricsTextAlignment.Start) },
+                        onClick = {
+                            PlayerHaptics.click()
+                            onTextAlignmentChange(LyricsTextAlignment.Start)
+                        },
                         modifier = Modifier.weight(1f),
                     )
                     AlignmentOption(
                         label = stringResource(R.string.align_center),
                         icon = Icons.Rounded.FormatAlignCenter,
                         selected = textAlignment == LyricsTextAlignment.Center,
-                        onClick = { onTextAlignmentChange(LyricsTextAlignment.Center) },
+                        onClick = {
+                            PlayerHaptics.click()
+                            onTextAlignmentChange(LyricsTextAlignment.Center)
+                        },
                         modifier = Modifier.weight(1f),
                     )
                     AlignmentOption(
                         label = stringResource(R.string.align_right),
                         icon = Icons.AutoMirrored.Rounded.FormatAlignRight,
                         selected = textAlignment == LyricsTextAlignment.End,
-                        onClick = { onTextAlignmentChange(LyricsTextAlignment.End) },
+                        onClick = {
+                            PlayerHaptics.click()
+                            onTextAlignmentChange(LyricsTextAlignment.End)
+                        },
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -222,20 +233,29 @@ fun LyricsEditorSheet(
                     DropdownChoice(
                         title = stringResource(R.string.default_font),
                         selected = selectedFontId == LyricsFontIds.DEFAULT,
-                        onClick = { onFontSelected(LyricsFontIds.DEFAULT) },
+                        onClick = {
+                            PlayerHaptics.click()
+                            onFontSelected(LyricsFontIds.DEFAULT)
+                        },
                     )
                     DropdownDivider()
                     DropdownChoice(
                         title = "MiSans",
                         selected = selectedFontId == LyricsFontIds.MI_SANS,
-                        onClick = { onFontSelected(LyricsFontIds.MI_SANS) },
+                        onClick = {
+                            PlayerHaptics.click()
+                            onFontSelected(LyricsFontIds.MI_SANS)
+                        },
                     )
                     customFonts.forEach { font ->
                         DropdownDivider()
                         DropdownChoice(
                             title = font.name,
                             selected = selectedFontId == font.id,
-                            onClick = { onFontSelected(font.id) },
+                            onClick = {
+                                PlayerHaptics.click()
+                                onFontSelected(font.id)
+                            },
                             onDelete = { onFontDeleted(font) },
                         )
                     }
@@ -244,7 +264,7 @@ fun LyricsEditorSheet(
                         title = stringResource(R.string.add_more_fonts),
                         leadingIcon = Icons.Rounded.Add,
                         selected = false,
-                        onClick = onAddFont,
+                        onClick = playerClick(onAddFont),
                     )
                 }
             }
@@ -273,7 +293,10 @@ fun LyricsEditorSheet(
                                 title = localizedLyricSourceName(source),
                                 subtitle = localizedLyricSourceArtist(source),
                                 selected = index == currentLyricSourceIndex,
-                                onClick = { onLyricSourceSelected(index) },
+                                onClick = {
+                                    PlayerHaptics.click()
+                                    onLyricSourceSelected(index)
+                                },
                             )
                         }
                     }
@@ -340,7 +363,7 @@ private fun ExpandableEditorSection(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(20.dp))
                     .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                    .clickable(onClick = onToggle)
+                    .clickable(onClick = playerClick(onToggle))
                     .padding(horizontal = 14.dp, vertical = 13.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -393,10 +416,10 @@ private fun StepperRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        LyricsCircleButton(onClick = onDecrease, size = 40.dp, containerColor = MaterialTheme.colorScheme.surface) {
+        LyricsCircleButton(onClick = playerClick(onDecrease), size = 40.dp, containerColor = MaterialTheme.colorScheme.surface) {
             Icon(Icons.Rounded.Remove, decreaseDescription)
         }
-        LyricsPill(onClick = onReset, containerColor = MaterialTheme.colorScheme.primaryContainer) {
+        LyricsPill(onClick = playerClick(onReset), containerColor = MaterialTheme.colorScheme.primaryContainer) {
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleMedium,
@@ -404,7 +427,7 @@ private fun StepperRow(
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
         }
-        LyricsCircleButton(onClick = onIncrease, size = 40.dp, containerColor = MaterialTheme.colorScheme.surface) {
+        LyricsCircleButton(onClick = playerClick(onIncrease), size = 40.dp, containerColor = MaterialTheme.colorScheme.surface) {
             Icon(Icons.Rounded.Add, increaseDescription)
         }
     }
@@ -428,7 +451,7 @@ private fun ActiveLineScaleRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         LyricsCircleButton(
-            onClick = onDecrease,
+            onClick = playerClick(onDecrease),
             size = 40.dp,
             containerColor = MaterialTheme.colorScheme.surface,
         ) {
@@ -438,7 +461,10 @@ private fun ActiveLineScaleRow(
             val selected = kotlin.math.abs(value - preset) < 0.005f
             LyricsPill(
                 modifier = Modifier.weight(1f),
-                onClick = { onPreset(preset) },
+                onClick = {
+                    PlayerHaptics.click()
+                    onPreset(preset)
+                },
                 horizontalPadding = 4.dp,
                 verticalPadding = 10.dp,
                 containerColor =
@@ -464,7 +490,7 @@ private fun ActiveLineScaleRow(
             }
         }
         LyricsCircleButton(
-            onClick = onIncrease,
+            onClick = playerClick(onIncrease),
             size = 40.dp,
             containerColor = MaterialTheme.colorScheme.surface,
         ) {
@@ -483,7 +509,7 @@ private fun DropdownChoice(
     onDelete: (() -> Unit)? = null,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = playerClick(onClick)).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (leadingIcon != null) {
@@ -511,7 +537,7 @@ private fun DropdownChoice(
         }
         if (selected) Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary)
         if (onDelete != null) {
-            IconButton(onClick = onDelete) {
+            IconButton(onClick = playerClick(onDelete)) {
                 Icon(
                     imageVector = Icons.Rounded.DeleteOutline,
                     contentDescription = stringResource(R.string.delete_font),
@@ -558,7 +584,7 @@ private fun AlignmentOption(
             modifier
                 .clip(RoundedCornerShape(18.dp))
                 .background(containerColor)
-                .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+                .selectable(selected = selected, role = Role.RadioButton, onClick = playerClick(onClick))
                 .padding(vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(5.dp),

@@ -39,8 +39,6 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -76,7 +74,6 @@ fun LargeBottomPlayerBar(
     onExpand: () -> Unit,
     onNext: () -> Unit = viewModel::skipToNext,
 ) {
-    val haptics = LocalHapticFeedback.current
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
 
     val metadata = mediaItem?.mediaMetadata
@@ -105,7 +102,10 @@ fun LargeBottomPlayerBar(
                 // 点击态的 indication 默认按整个矩形布局绘制；先裁成胶囊，
                 // 避免按下时出现没有圆角的长方形灰影。
                 .clip(CircleShape)
-                .clickable(enabled = hasMediaItem) { onExpand() },
+                .clickable(enabled = hasMediaItem) {
+                    PlayerHaptics.click()
+                    onExpand()
+                },
     ) {
         Column {
             // 进度条
@@ -231,7 +231,7 @@ fun LargeBottomPlayerBar(
                 // 播放/暂停按钮
                 IconButton(
                     onClick = {
-                        haptics.performHapticFeedback(if (isPlaying) HapticFeedbackType.ToggleOff else HapticFeedbackType.ToggleOn)
+                        PlayerHaptics.click()
                         viewModel.togglePlayPause()
                     },
                     enabled = hasMediaItem && contentReady && controlsReady,
@@ -251,7 +251,7 @@ fun LargeBottomPlayerBar(
                 // 下一首
                 IconButton(
                     onClick = {
-                        haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                        PlayerHaptics.click()
                         onNext()
                     },
                     enabled = hasMediaItem && contentReady && controlsReady,

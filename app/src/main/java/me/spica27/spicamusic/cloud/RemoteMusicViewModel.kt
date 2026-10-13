@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
@@ -53,23 +54,24 @@ class RemoteMusicViewModel(
     val songs: Flow<PagingData<RemoteSong>> =
         combine(state, query) { uiState, currentQuery ->
             uiState.selectedAccount to currentQuery
-        }.flatMapLatest { (account, currentQuery) ->
-            if (account == null) {
-                flowOf(PagingData.empty())
-            } else {
-                Pager(
-                    PagingConfig(
-                        pageSize = RemoteMusicPagingSource.PAGE_SIZE,
-                        initialLoadSize = RemoteMusicPagingSource.PAGE_SIZE,
-                        prefetchDistance = 12,
-                        enablePlaceholders = false,
-                        maxSize = RemoteMusicPagingSource.PAGE_SIZE * 6,
-                    ),
-                ) {
-                    RemoteMusicPagingSource(clients, account, currentQuery)
-                }.flow
-            }
-        }.cachedIn(viewModelScope)
+        }.distinctUntilChanged()
+            .flatMapLatest { (account, currentQuery) ->
+                if (account == null) {
+                    flowOf(PagingData.empty())
+                } else {
+                    Pager(
+                        PagingConfig(
+                            pageSize = RemoteMusicPagingSource.PAGE_SIZE,
+                            initialLoadSize = RemoteMusicPagingSource.PAGE_SIZE,
+                            prefetchDistance = 12,
+                            enablePlaceholders = false,
+                            maxSize = RemoteMusicPagingSource.PAGE_SIZE * 6,
+                        ),
+                    ) {
+                        RemoteMusicPagingSource(clients, account, currentQuery)
+                    }.flow
+                }
+            }.cachedIn(viewModelScope)
 
     init {
         refreshAccounts()
@@ -91,6 +93,11 @@ class RemoteMusicViewModel(
         connect { Result.success(RemoteMusicAccount("", provider, "Bilibili 访客", secret = "")) }
     }
 
+    fun loginKugou(account: RemoteMusicAccount) {
+        if (provider != RemoteMusicProvider.KUGOU || account.provider != provider) return
+        connect { Result.success(account) }
+    }
+
     fun loginWithCookies(cookieHeader: String) {
         if (provider == RemoteMusicProvider.SUBSONIC || _state.value.isConnecting) return
         connect {
@@ -102,6 +109,7 @@ class RemoteMusicViewModel(
         val account = _state.value.accounts.firstOrNull { it.id == id }
         _state.update { current ->
             current.copy(
+                loadingRemotePlaylists = false,
                 selectedAccount = account,
                 localPlaylists = account?.let { playlistStore.read(provider, it.id) }.orEmpty(),
                 remotePlaylists = account?.let(clients::cachedPlaylists).orEmpty(),
@@ -128,7 +136,11 @@ class RemoteMusicViewModel(
     }
 
     fun refreshRemotePlaylists(forceRefresh: Boolean = false) {
-        if (provider !in setOf(RemoteMusicProvider.QQ_MUSIC, RemoteMusicProvider.BILIBILI) || _state.value.loadingRemotePlaylists) return
+        if (provider !in setOf(RemoteMusicProvider.QQ_MUSIC, RemoteMusicProvider.BILIBILI, RemoteMusicProvider.KUGOU) ||
+            _state.value.loadingRemotePlaylists
+        ) {
+            return
+        }
         val account = _state.value.selectedAccount ?: return
         val cached = clients.cachedPlaylists(account)
         if (cached.isNotEmpty()) {
@@ -138,6 +150,7 @@ class RemoteMusicViewModel(
         viewModelScope.launch {
             runCatching { clients.listPlaylists(account, forceRefresh) }
                 .onSuccess { playlists ->
+                    if (_state.value.selectedAccount != account) return@onSuccess
                     _state.update {
                         it.copy(
                             remotePlaylists = playlists,
@@ -146,6 +159,8 @@ class RemoteMusicViewModel(
                         )
                     }
                 }.onFailure { error ->
+                    if (error is kotlinx.coroutines.CancellationException) throw error
+                    if (_state.value.selectedAccount != account) return@onFailure
                     _state.update {
                         it.copy(
                             loadingRemotePlaylists = false,
@@ -161,7 +176,7 @@ class RemoteMusicViewModel(
         forceRefresh: Boolean = false,
     ) {
         val account = _state.value.selectedAccount ?: return
-        if (provider !in setOf(RemoteMusicProvider.QQ_MUSIC, RemoteMusicProvider.BILIBILI) ||
+        if (provider !in setOf(RemoteMusicProvider.QQ_MUSIC, RemoteMusicProvider.BILIBILI, RemoteMusicProvider.KUGOU) ||
             playlistId in _state.value.loadingRemotePlaylistIds
         ) {
             return
@@ -176,6 +191,7 @@ class RemoteMusicViewModel(
         viewModelScope.launch {
             runCatching { clients.listPlaylistSongs(account, playlistId, forceRefresh) }
                 .onSuccess { songs ->
+                    if (_state.value.selectedAccount != account) return@onSuccess
                     _state.update {
                         it.copy(
                             remotePlaylistSongs = it.remotePlaylistSongs + (playlistId to songs),
@@ -183,6 +199,8 @@ class RemoteMusicViewModel(
                         )
                     }
                 }.onFailure { error ->
+                    if (error is kotlinx.coroutines.CancellationException) throw error
+                    if (_state.value.selectedAccount != account) return@onFailure
                     _state.update {
                         it.copy(
                             loadingRemotePlaylistIds = it.loadingRemotePlaylistIds - playlistId,
@@ -286,7 +304,11 @@ class RemoteMusicViewModel(
             _state.update { it.copy(isConnecting = true, error = null) }
             block().fold(
                 onSuccess = { authenticated ->
-                    val account = authenticated.copy(id = accountStore.newAccountId())
+                    val existing =
+                        accountStore.getRemoteAccounts(provider).firstOrNull {
+                            authenticated.userId.isNotBlank() && it.userId == authenticated.userId
+                        }
+                    val account = authenticated.copy(id = existing?.id ?: accountStore.newAccountId())
                     accountStore.saveRemoteAccount(account)
                     refreshAccounts(account.id)
                 },

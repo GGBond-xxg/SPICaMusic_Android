@@ -29,6 +29,8 @@ class PreferencesManager(
     }
 
     object Keys {
+        val PLAYER_HAPTICS_ENABLED = booleanPreferencesKey("player_haptics_enabled")
+        val PLAYER_HAPTICS_STRENGTH = stringPreferencesKey("player_haptics_strength")
         val DARK_MODE = booleanPreferencesKey("dark_mode")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val THEME_COLOR_STYLE = stringPreferencesKey("theme_color_style")

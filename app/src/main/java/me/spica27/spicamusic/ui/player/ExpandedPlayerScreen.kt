@@ -690,6 +690,7 @@ fun ExpandedPlayerScreen(
                     )
                     IconButton(
                         onClick = {
+                            PlayerHaptics.click()
                             if (lyricsTransitionProgressProvider() > 0.5f) {
                                 coroutineScope.launch {
                                     lyricsPagerState.animateScrollToPage(
@@ -768,6 +769,7 @@ fun ExpandedPlayerScreen(
                             navigationIcon = {
                                 IconButton(
                                     onClick = {
+                                        PlayerHaptics.click()
                                         coroutineScope.launch {
                                             pagerState.animateScrollToPage(
                                                 0,
@@ -854,6 +856,7 @@ private fun TopBar(
                         },
                 enabled = showNavigationButton,
                 onClick = {
+                    PlayerHaptics.click()
                     onCollapse.invoke()
                 },
                 colors =
@@ -904,6 +907,7 @@ private fun MorphingPlayerTopAction(
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .clickable {
+                    PlayerHaptics.click()
                     if (showsEditor) onLyricsEditorClick() else onPlaylistClick()
                 },
         contentAlignment = Alignment.Center,
@@ -1155,6 +1159,7 @@ private fun PlayerPage(
                                 .clip(Shapes.LargeCornerBasedShape)
                                 .background(artworkContainerColor)
                                 .clickHighlight {
+                                    PlayerHaptics.click()
                                     onOpenLyrics()
                                     /*
                                     // 防止重复点击！！
@@ -1200,6 +1205,7 @@ private fun PlayerPage(
         MiniLyric(
             active = isAppInForeground && enableHeavyEffects,
             onClick = {
+                PlayerHaptics.click()
                 onOpenLyrics()
                 /*
                 // 防止重复点击！！
@@ -1322,7 +1328,7 @@ private fun PlayerPage(
                             .background(MaterialTheme.colorScheme.tertiaryContainer)
                             .then(
                                 if (onPlaybackSourceClick != null) {
-                                    Modifier.clickHighlight(onClick = onPlaybackSourceClick)
+                                    Modifier.clickHighlight(onClick = playerClick(onPlaybackSourceClick))
                                 } else {
                                     Modifier
                                 },
@@ -1422,6 +1428,7 @@ private fun PlayerAudioQualitySheet(
                                     selected = neteaseQuality == quality.value,
                                     membershipLabel = "SVIP",
                                     onClick = {
+                                        PlayerHaptics.click()
                                         playerViewModel.applyCloudQuality(
                                             RemoteMusicProvider.NETEASE,
                                             quality.value,
@@ -1457,6 +1464,7 @@ private fun PlayerAudioQualitySheet(
                                         else -> null
                                     },
                                 onClick = {
+                                    PlayerHaptics.click()
                                     playerViewModel.applyCloudQuality(
                                         RemoteMusicProvider.NETEASE,
                                         quality.value,
@@ -1478,6 +1486,7 @@ private fun PlayerAudioQualitySheet(
                                 selected = qqQuality == quality.value,
                                 membershipLabel = null,
                                 onClick = {
+                                    PlayerHaptics.click()
                                     playerViewModel.applyCloudQuality(
                                         RemoteMusicProvider.QQ_MUSIC,
                                         quality.value,
@@ -1527,7 +1536,10 @@ private fun PlayerAudioQualitySheet(
                             },
                         selected = progressStyle == style.value,
                         membershipLabel = null,
-                        onClick = { settingsViewModel.setProgressBarStyle(style.value) },
+                        onClick = {
+                            PlayerHaptics.click()
+                            settingsViewModel.setProgressBarStyle(style.value)
+                        },
                     )
                 }
             }
@@ -1548,7 +1560,7 @@ private fun FeaturedQualityCard(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        onClick = onClick,
+        onClick = playerClick(onClick),
         color =
             if (selected) {
                 MaterialTheme.colorScheme.tertiaryContainer
@@ -1619,7 +1631,7 @@ private fun ReferenceQualityRow(
     onClick: () -> Unit,
 ) {
     Surface(
-        onClick = onClick,
+        onClick = playerClick(onClick),
         color = Color.Transparent,
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -1739,7 +1751,10 @@ private fun PlaybackSourceDialog(
                                     } else {
                                         Color.Transparent
                                     },
-                                ).clickHighlight(onClick = { onSelect(option) })
+                                ).clickHighlight(onClick = {
+                                    PlayerHaptics.click()
+                                    onSelect(option)
+                                })
                                 .padding(horizontal = Spacing.Large, vertical = Spacing.Medium),
                     )
                 }
@@ -1891,6 +1906,7 @@ private fun String.cloudProviderLabel(): String =
     when (uppercase(Locale.ROOT)) {
         "NETEASE" -> "网易云音乐"
         "QQ_MUSIC" -> "QQ 音乐"
+        "KUGOU" -> "酷狗音乐"
         "TELEGRAM" -> "Telegram"
         "JELLYFIN" -> "Jellyfin"
         "EMBY" -> "Emby"

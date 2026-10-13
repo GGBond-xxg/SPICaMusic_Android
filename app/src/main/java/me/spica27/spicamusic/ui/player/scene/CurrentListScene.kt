@@ -34,6 +34,7 @@ import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.navkit.path.LocalScene
 import me.spica27.navkit.scene.DialogScene
 import me.spica27.spicamusic.R
+import me.spica27.spicamusic.ui.player.PlayerHaptics
 import me.spica27.spicamusic.ui.player.pages.CurrentPlaylistPage
 import me.spica27.spicamusic.ui.widget.ShowOnIdleContent
 
@@ -65,6 +66,7 @@ class CurrentListScene : DialogScene() {
                     navigationIcon = {
                         IconButton(
                             onClick = {
+                                PlayerHaptics.click()
                                 path.popTop()
                             },
                             colors =
@@ -120,7 +122,10 @@ class CurrentListScene : DialogScene() {
                         .clickable(
                             interactionSource = interactionSource,
                             indication = null,
-                        ) { path.pop(scene) },
+                        ) {
+                            PlayerHaptics.click()
+                            path.pop(scene)
+                        },
             )
 
             // ── 卡片：从底部上滑 + 淡入/淡出 ──

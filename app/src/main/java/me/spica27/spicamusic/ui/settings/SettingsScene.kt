@@ -126,6 +126,8 @@ class SettingsScene : StackScene() {
 
         val themeModeValue by viewModel.themeMode.collectAsStateWithLifecycle()
         val themeMode = ThemeMode.fromString(themeModeValue)
+        val playerHapticsEnabled by viewModel.playerHapticsEnabled.collectAsStateWithLifecycle()
+        val playerHapticsStrength by viewModel.playerHapticsStrength.collectAsStateWithLifecycle()
         val keepScreenOn by viewModel.keepScreenOn.collectAsStateWithLifecycle()
         val topDisplayModeValue by viewModel.topDisplayMode.collectAsStateWithLifecycle()
         val spectrumValue by viewModel.dynamicSpectrumBackground.collectAsStateWithLifecycle()
@@ -401,6 +403,36 @@ class SettingsScene : StackScene() {
                         title = stringResource(R.string.settings_player_page),
                         subtitle = stringResource(R.string.settings_player_page_subtitle),
                     ) {
+                        ModernSettingsSwitchItem(
+                            title = "播放界面震动",
+                            subtitle = "点击播放页及迷你播放器按钮时提供震动反馈",
+                            icon = Icons.Default.NotificationsActive,
+                            checked = playerHapticsEnabled,
+                            onCheckedChange = viewModel::setPlayerHapticsEnabled,
+                        )
+                        if (playerHapticsEnabled) {
+                            SettingsItemDivider()
+                            ModernSettingsSelectItem(
+                                rowKey = "player_haptic_strength",
+                                title = "震动强度",
+                                subtitle =
+                                    when (playerHapticsStrength) {
+                                        "light" -> "轻"
+                                        "strong" -> "强"
+                                        else -> "中"
+                                    },
+                                icon = Icons.Default.NotificationsActive,
+                                options =
+                                    ImmutableList.copyOf(
+                                        listOf(SelectOption("light", "轻"), SelectOption("medium", "中"), SelectOption("strong", "强")),
+                                    ),
+                                currentValue = playerHapticsStrength,
+                                expandedKey = expandedRowKey,
+                                onExpandChange = { expandedRowKey = it },
+                                onValueChange = viewModel::setPlayerHapticsStrength,
+                            )
+                        }
+                        SettingsItemDivider()
                         ModernSettingsSelectItem(
                             rowKey = "player_background",
                             title = stringResource(R.string.settings_dynamic_spectrum),

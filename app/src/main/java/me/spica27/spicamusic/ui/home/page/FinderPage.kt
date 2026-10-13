@@ -111,6 +111,7 @@ import me.spica27.spicamusic.cloud.CloudUserPlaylist
 import me.spica27.spicamusic.cloud.CloudUserPlaylistScene
 import me.spica27.spicamusic.cloud.NeteasePlaylistScene
 import me.spica27.spicamusic.cloud.RemoteMusicProvider
+import me.spica27.spicamusic.cloud.displayName
 import me.spica27.spicamusic.common.entity.FinderHeroSource
 import me.spica27.spicamusic.common.entity.Song
 import me.spica27.spicamusic.common.entity.getAlbumCoverUri
@@ -134,6 +135,7 @@ import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
 import me.spica27.spicamusic.ui.widget.AudioCover
 import me.spica27.spicamusic.ui.widget.PlaylistCoverView
+import me.spica27.spicamusic.ui.widget.PreloadPlaylistCovers
 import me.spica27.spicamusic.ui.widget.StableAudioCover
 import me.spica27.spicamusic.ui.widget.clickHighlight
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
@@ -313,6 +315,7 @@ fun FinderPage(playEntrance: Boolean = true) {
         remember(playlists, dailyPlaylistName) {
             playlists.count { it.playlistName != dailyPlaylistName }
         }
+    PreloadPlaylistCovers(overviewPlaylistsWithCover)
     val totalPlaylistCount =
         overviewLocalPlaylistCount + overviewCloudPlaylists.size + userCloudPlaylists.size
     val frequentEntries =
@@ -1613,7 +1616,7 @@ private fun CloudPlaylistRail(
                     )
                     Text(
                         text =
-                            "${if (item.account.provider == RemoteMusicProvider.NETEASE) "网易云" else "QQ 音乐"} · " +
+                            "${item.account.provider.displayName} · " +
                                 "${item.playlist.songCount} 首",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

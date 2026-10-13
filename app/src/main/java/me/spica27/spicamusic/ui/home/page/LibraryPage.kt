@@ -106,6 +106,7 @@ import me.spica27.spicamusic.cloud.CloudMusicCatalogViewModel
 import me.spica27.spicamusic.cloud.CloudUserPlaylistScene
 import me.spica27.spicamusic.cloud.NeteasePlaylistScene
 import me.spica27.spicamusic.cloud.RemoteMusicProvider
+import me.spica27.spicamusic.cloud.displayName
 import me.spica27.spicamusic.common.entity.PlayStats
 import me.spica27.spicamusic.feature.library.domain.ScanFolder
 import me.spica27.spicamusic.ui.home.LocalBottomBarScrollConnection
@@ -123,6 +124,7 @@ import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
 import me.spica27.spicamusic.ui.widget.AudioCover
 import me.spica27.spicamusic.ui.widget.PlaylistCoverView
+import me.spica27.spicamusic.ui.widget.PreloadPlaylistCovers
 import me.spica27.spicamusic.ui.widget.clickHighlight
 import me.spica27.spicamusic.ui.widget.materialSharedAxisZ
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
@@ -154,6 +156,7 @@ fun LibraryPage() {
     val cloudCatalogViewModel: CloudMusicCatalogViewModel = koinActivityViewModel()
 
     val playlists by viewModel.playlistsWithCover.collectAsStateWithLifecycle()
+    PreloadPlaylistCovers(playlists)
     val cloudCatalog by cloudCatalogViewModel.state.collectAsStateWithLifecycle()
     val remotePlaylists = cloudCatalog.remotePlaylists
     val neteasePlaylists =
@@ -461,7 +464,7 @@ fun LibraryPage() {
                 LibraryCloudPlaylistCard(
                     name = item.playlist.name,
                     subtitle =
-                        "${if (item.account.provider == RemoteMusicProvider.NETEASE) "网易云" else "QQ 音乐"} · " +
+                        "${item.account.provider.displayName} · " +
                             "${item.playlist.songCount} 首",
                     coverUrl = item.playlist.coverUrl,
                     onClick = { path.push(NeteasePlaylistScene(item)) },

@@ -61,9 +61,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -225,7 +223,7 @@ fun PlayerProgressSection(
                             .clickable(
                                 enabled = audioQualityActionEnabled,
                                 role = Role.Button,
-                                onClick = onClick,
+                                onClick = playerClick(onClick),
                             ).padding(horizontal = 11.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -428,13 +426,12 @@ private fun LegacyPlayerTransportControls(
     onPlayModeClick: () -> Unit,
     onFavoriteClick: () -> Unit,
 ) {
-    val haptics = LocalHapticFeedback.current
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onPlayModeClick) {
+        IconButton(onClick = playerClick(onPlayModeClick)) {
             AnimatedContent(
                 targetState = playMode,
                 transitionSpec = { playbackControlIconTransform() },
@@ -459,7 +456,7 @@ private fun LegacyPlayerTransportControls(
         ) {
             IconButton(
                 onClick = {
-                    haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                    PlayerHaptics.click()
                     onPreviousClick()
                 },
                 modifier =
@@ -486,7 +483,7 @@ private fun LegacyPlayerTransportControls(
             )
             IconButton(
                 onClick = {
-                    haptics.performHapticFeedback(if (isPlaying) HapticFeedbackType.ToggleOff else HapticFeedbackType.ToggleOn)
+                    PlayerHaptics.click()
                     onPlayPauseClick()
                 },
                 interactionSource = playInteraction,
@@ -519,7 +516,7 @@ private fun LegacyPlayerTransportControls(
             }
             IconButton(
                 onClick = {
-                    haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                    PlayerHaptics.click()
                     onNextClick()
                 },
                 modifier =
@@ -534,7 +531,7 @@ private fun LegacyPlayerTransportControls(
                 )
             }
         }
-        IconButton(onClick = onFavoriteClick) {
+        IconButton(onClick = playerClick(onFavoriteClick)) {
             AnimatedContent(
                 targetState = isLike,
                 transitionSpec = { playbackControlIconTransform() },
@@ -585,7 +582,6 @@ fun PlayerTransportControls(
     onSleepTimerSet: (Int) -> Unit = {},
     onSleepTimerCancel: () -> Unit = {},
 ) {
-    val haptics = LocalHapticFeedback.current
     var activeButton by remember { mutableStateOf<TransportButtonType?>(null) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     val sleepTimerMinutes =
@@ -675,7 +671,7 @@ fun PlayerTransportControls(
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.secondaryContainer)
                         .clickable(role = Role.Button) {
-                            haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                            PlayerHaptics.click()
                             activeButton = TransportButtonType.Previous
                             onPreviousClick()
                         },
@@ -697,7 +693,7 @@ fun PlayerTransportControls(
                         .clip(RoundedCornerShape(playPauseCorner))
                         .background(MaterialTheme.colorScheme.primary)
                         .clickable(role = Role.Button) {
-                            haptics.performHapticFeedback(if (isPlaying) HapticFeedbackType.ToggleOff else HapticFeedbackType.ToggleOn)
+                            PlayerHaptics.click()
                             activeButton = TransportButtonType.PlayPause
                             onPlayPauseClick()
                         },
@@ -730,7 +726,7 @@ fun PlayerTransportControls(
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.secondaryContainer)
                         .clickable(role = Role.Button) {
-                            haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                            PlayerHaptics.click()
                             activeButton = TransportButtonType.Next
                             onNextClick()
                         },
@@ -769,7 +765,7 @@ fun PlayerTransportControls(
                             } else {
                                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)
                             },
-                        ).clickable(role = Role.Button, onClick = onPlayModeClick),
+                        ).clickable(role = Role.Button, onClick = playerClick(onPlayModeClick)),
                 contentAlignment = Alignment.Center,
             ) {
                 AnimatedContent(
@@ -808,7 +804,7 @@ fun PlayerTransportControls(
                             } else {
                                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)
                             },
-                        ).clickable(role = Role.Button, onClick = onFavoriteClick),
+                        ).clickable(role = Role.Button, onClick = playerClick(onFavoriteClick)),
                 contentAlignment = Alignment.Center,
             ) {
                 AnimatedContent(
@@ -843,6 +839,7 @@ fun PlayerTransportControls(
                                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)
                             },
                         ).clickable(role = Role.Button) {
+                            PlayerHaptics.click()
                             showSleepTimerDialog = true
                         },
                 contentAlignment = Alignment.Center,

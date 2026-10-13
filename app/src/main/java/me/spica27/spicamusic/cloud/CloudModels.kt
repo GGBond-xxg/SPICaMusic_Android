@@ -14,6 +14,7 @@ enum class RemoteMusicProvider {
     NETEASE,
     QQ_MUSIC,
     BILIBILI,
+    KUGOU,
 }
 
 @Immutable

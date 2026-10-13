@@ -197,6 +197,7 @@ private enum class SongLibrarySource(
     Netease(R.string.music_source_netease, CloudSongSource.NETEASE, Icons.Default.Cloud),
     QqMusic(R.string.music_source_qq, CloudSongSource.QQ_MUSIC, Icons.Default.Cloud),
     Bilibili(R.string.music_source_bilibili, CloudSongSource.BILIBILI, Icons.Default.Cloud),
+    Kugou(R.string.music_source_kugou, CloudSongSource.KUGOU, Icons.Default.Cloud),
 }
 
 @Immutable
@@ -331,6 +332,7 @@ private fun CloudSongSource.filter(): SongLibrarySource =
         CloudSongSource.NETEASE -> SongLibrarySource.Netease
         CloudSongSource.QQ_MUSIC -> SongLibrarySource.QqMusic
         CloudSongSource.BILIBILI -> SongLibrarySource.Bilibili
+        CloudSongSource.KUGOU -> SongLibrarySource.Kugou
     }
 
 private fun formatDuration(durationMs: Long): String {

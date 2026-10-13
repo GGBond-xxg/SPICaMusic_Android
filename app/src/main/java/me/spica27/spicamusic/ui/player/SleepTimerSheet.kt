@@ -141,7 +141,7 @@ fun SleepTimerSheet(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                IconButton(onClick = onDismiss) {
+                IconButton(onClick = playerClick(onDismiss)) {
                     Icon(Icons.Rounded.Close, stringResource(R.string.close))
                 }
             }
@@ -173,6 +173,7 @@ fun SleepTimerSheet(
                                         MaterialTheme.colorScheme.surfaceContainerHighest
                                     },
                                 ).clickable {
+                                    PlayerHaptics.click()
                                     dismissAfter { onSetTimer(minutes) }
                                 }.padding(vertical = Spacing.Medium),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -205,8 +206,10 @@ fun SleepTimerSheet(
                         .animateContentSize(tween(220))
                         .clip(Shapes.ExtraLargeCornerBasedShape)
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                        .clickable { customExpanded = !customExpanded }
-                        .padding(Spacing.Medium),
+                        .clickable {
+                            PlayerHaptics.click()
+                            customExpanded = !customExpanded
+                        }.padding(Spacing.Medium),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -236,7 +239,11 @@ fun SleepTimerSheet(
                             TimerStepButton(
                                 icon = Icons.Rounded.Remove,
                                 enabled = customMinutes > CustomTimerMin,
-                                onClick = { customMinutes = (customMinutes - CustomTimerStep).coerceAtLeast(CustomTimerMin) },
+                                onClick = {
+                                    PlayerHaptics.click()
+                                    customMinutes =
+                                        (customMinutes - CustomTimerStep).coerceAtLeast(CustomTimerMin)
+                                },
                             )
                             Text(
                                 text = stringResource(R.string.sleep_timer_minutes, customMinutes),
@@ -246,12 +253,19 @@ fun SleepTimerSheet(
                             TimerStepButton(
                                 icon = Icons.Rounded.Add,
                                 enabled = customMinutes < CustomTimerMax,
-                                onClick = { customMinutes = (customMinutes + CustomTimerStep).coerceAtMost(CustomTimerMax) },
+                                onClick = {
+                                    PlayerHaptics.click()
+                                    customMinutes =
+                                        (customMinutes + CustomTimerStep).coerceAtMost(CustomTimerMax)
+                                },
                             )
                         }
                         Spacer(modifier = Modifier.height(Spacing.Medium))
                         Button(
-                            onClick = { dismissAfter { onSetTimer(customMinutes) } },
+                            onClick = {
+                                PlayerHaptics.click()
+                                dismissAfter { onSetTimer(customMinutes) }
+                            },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(stringResource(R.string.sleep_timer_start))
@@ -262,7 +276,10 @@ fun SleepTimerSheet(
 
             AnimatedVisibility(visible = remainingMs != null) {
                 Button(
-                    onClick = { dismissAfter(onCancelTimer) },
+                    onClick = {
+                        PlayerHaptics.click()
+                        dismissAfter(onCancelTimer)
+                    },
                     modifier = Modifier.fillMaxWidth().padding(top = Spacing.Medium),
                     colors =
                         ButtonDefaults.buttonColors(
@@ -386,7 +403,7 @@ private fun TimerStepButton(
     onClick: () -> Unit,
 ) {
     IconButton(
-        onClick = onClick,
+        onClick = playerClick(onClick),
         enabled = enabled,
         modifier = Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerHighest),
     ) {

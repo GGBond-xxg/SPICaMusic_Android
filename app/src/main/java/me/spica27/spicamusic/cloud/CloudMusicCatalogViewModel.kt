@@ -33,6 +33,7 @@ enum class CloudSongSource {
     NETEASE,
     QQ_MUSIC,
     BILIBILI,
+    KUGOU,
 }
 
 @Immutable
@@ -280,8 +281,15 @@ class CloudMusicCatalogViewModel(
         val accounts =
             accountStore
                 .getRemoteAccounts()
-                .filter { it.provider in setOf(RemoteMusicProvider.NETEASE, RemoteMusicProvider.QQ_MUSIC, RemoteMusicProvider.BILIBILI) }
-                .associateBy(RemoteMusicAccount::id)
+                .filter {
+                    it.provider in
+                        setOf(
+                            RemoteMusicProvider.NETEASE,
+                            RemoteMusicProvider.QQ_MUSIC,
+                            RemoteMusicProvider.BILIBILI,
+                            RemoteMusicProvider.KUGOU,
+                        )
+                }.associateBy(RemoteMusicAccount::id)
         if (accounts.isEmpty()) {
             _state.update {
                 it.copy(
@@ -1027,6 +1035,7 @@ class CloudMusicCatalogViewModel(
                     RemoteMusicProvider.NETEASE -> CloudSongSource.NETEASE
                     RemoteMusicProvider.QQ_MUSIC -> CloudSongSource.QQ_MUSIC
                     RemoteMusicProvider.BILIBILI -> CloudSongSource.BILIBILI
+                    RemoteMusicProvider.KUGOU -> CloudSongSource.KUGOU
                 },
         ) {
         private var offset = 0
@@ -1190,6 +1199,7 @@ internal fun RemoteMusicAccount.toCatalogSong(song: RemoteSong): CloudCatalogSon
                 RemoteMusicProvider.NETEASE -> CloudSongSource.NETEASE
                 RemoteMusicProvider.QQ_MUSIC -> CloudSongSource.QQ_MUSIC
                 RemoteMusicProvider.BILIBILI -> CloudSongSource.BILIBILI
+                RemoteMusicProvider.KUGOU -> CloudSongSource.KUGOU
             },
         accountName = displayName,
         title = song.title,
@@ -1213,6 +1223,7 @@ private fun RemoteMusicProvider.toCloudSongSource(): CloudSongSource =
         RemoteMusicProvider.NETEASE -> CloudSongSource.NETEASE
         RemoteMusicProvider.QQ_MUSIC -> CloudSongSource.QQ_MUSIC
         RemoteMusicProvider.BILIBILI -> CloudSongSource.BILIBILI
+        RemoteMusicProvider.KUGOU -> CloudSongSource.KUGOU
     }
 
 internal fun mergeCatalogSongs(

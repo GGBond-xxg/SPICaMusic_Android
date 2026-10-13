@@ -25,7 +25,7 @@ class CloudPlaybackItemResolver(
 ) {
     fun isExplicitPreview(item: MediaItem): Boolean {
         val identity = parseCloudMediaIdentity(item.mediaId) ?: return false
-        if (identity.provider != NETEASE_PROVIDER) return false
+        if (identity.provider !in setOf(NETEASE_PROVIDER, "kugou")) return false
         return remoteProxy.isExplicitPreview(identity.accountOrChatId, identity.songId)
     }
 
@@ -35,7 +35,9 @@ class CloudPlaybackItemResolver(
         if (
             identity.provider == NETEASE_PROVIDER ||
             identity.provider == QQ_MUSIC_PROVIDER ||
-            identity.provider == SUBSONIC_PROVIDER
+            identity.provider == SUBSONIC_PROVIDER ||
+            identity.provider == "kugou" ||
+            identity.provider == "bilibili"
         ) {
             remoteProxy.invalidate(identity.accountOrChatId, identity.songId)
         }
@@ -49,7 +51,9 @@ class CloudPlaybackItemResolver(
         if (
             identity.provider != NETEASE_PROVIDER &&
             identity.provider != QQ_MUSIC_PROVIDER &&
-            identity.provider != SUBSONIC_PROVIDER
+            identity.provider != SUBSONIC_PROVIDER &&
+            identity.provider != "kugou" &&
+            identity.provider != "bilibili"
         ) {
             return
         }

@@ -44,6 +44,7 @@ import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
 import me.spica27.spicamusic.ui.widget.PlaylistCoverView
+import me.spica27.spicamusic.ui.widget.PreloadPlaylistCovers
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
 import org.koin.compose.viewmodel.koinActivityViewModel
 
@@ -54,6 +55,7 @@ fun AllPlaylistsScreen() {
     val viewModel: PlaylistViewModel = koinActivityViewModel()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val playlistsWithCover by viewModel.playlistsWithCover.collectAsStateWithLifecycle()
+    PreloadPlaylistCovers(playlistsWithCover)
 
     BackHandler { path.popTop() }
 

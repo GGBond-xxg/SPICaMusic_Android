@@ -137,6 +137,14 @@ class CloudLibraryScene : StackScene() {
                         },
                     )
                 }
+                item(key = "kugou", contentType = "provider") {
+                    ProviderCard(
+                        title = "酷狗音乐 / 概念版",
+                        subtitle = "扫码登录、云端歌单、搜索与播放",
+                        icon = Icons.Default.MusicNote,
+                        onClick = { path.push(RemoteMusicScene(RemoteMusicProvider.KUGOU)) },
+                    )
+                }
                 item(key = "bilibili", contentType = "provider") {
                     ProviderCard(
                         title = "Bilibili",

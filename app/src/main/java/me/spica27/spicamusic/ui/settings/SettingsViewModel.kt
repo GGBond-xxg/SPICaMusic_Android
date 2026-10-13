@@ -38,6 +38,38 @@ class SettingsViewModel(
     private val settingsUseCases: SettingsUseCases,
     private val topDisplayModeController: TopDisplayModeController,
 ) : ViewModel() {
+    val playerHapticsEnabled =
+        settingsUseCases
+            .getBoolean(SettingsUseCases.Keys.PLAYER_HAPTICS_ENABLED, true)
+            .stateIn(
+                viewModelScope,
+                SharingStarted.Eagerly,
+                settingsUseCases.getCachedBoolean(SettingsUseCases.Keys.PLAYER_HAPTICS_ENABLED, true),
+            )
+    val playerHapticsStrength =
+        settingsUseCases
+            .getString(SettingsUseCases.Keys.PLAYER_HAPTICS_STRENGTH, "medium")
+            .stateIn(
+                viewModelScope,
+                SharingStarted.Eagerly,
+                settingsUseCases.getInitialString(SettingsUseCases.Keys.PLAYER_HAPTICS_STRENGTH, "medium"),
+            )
+
+    fun setPlayerHapticsEnabled(enabled: Boolean) {
+        viewModelScope.launch { settingsUseCases.setBoolean(SettingsUseCases.Keys.PLAYER_HAPTICS_ENABLED, enabled) }
+    }
+
+    fun setPlayerHapticsStrength(strength: String) {
+        if (strength !in listOf("light", "medium", "strong")) return
+        viewModelScope.launch {
+            settingsUseCases.setString(SettingsUseCases.Keys.PLAYER_HAPTICS_STRENGTH, strength)
+            if (playerHapticsEnabled.value) {
+                me.spica27.spicamusic.ui.player.PlayerHaptics
+                    .vibrate(strength)
+            }
+        }
+    }
+
     // 主题模式；旧版本只有 DARK_MODE 布尔值，首次读取时自动兼容。
     val themeMode =
         combine(

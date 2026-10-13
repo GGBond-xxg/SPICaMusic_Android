@@ -250,7 +250,10 @@ fun LyricsPanel(
             dismissButton = {
                 TextButton(
                     enabled = !fontImporting,
-                    onClick = { pendingFontUri = null },
+                    onClick = {
+                        PlayerHaptics.click()
+                        pendingFontUri = null
+                    },
                 ) {
                     Text(stringResource(R.string.cancel))
                 }
@@ -259,6 +262,7 @@ fun LyricsPanel(
                 TextButton(
                     enabled = pendingFontName.isNotBlank() && !fontImporting,
                     onClick = {
+                        PlayerHaptics.click()
                         fontImporting = true
                         fontImportError = null
                         coroutineScope.launch {

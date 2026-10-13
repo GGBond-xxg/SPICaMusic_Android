@@ -110,6 +110,7 @@ import me.spica27.spicamusic.ui.player.LargeBottomPlayerBar
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.player.MorphingPlayPauseIcon
 import me.spica27.spicamusic.ui.player.PlayerArtworkMorphOverlay
+import me.spica27.spicamusic.ui.player.PlayerHaptics
 import me.spica27.spicamusic.ui.player.playerArtworkMorphHost
 import me.spica27.spicamusic.ui.player.playerArtworkMorphSource
 import me.spica27.spicamusic.ui.player.rememberPlayerArtworkMorphState
@@ -419,6 +420,7 @@ fun BottomMediaBar(bottomBarScrollConnection: BottomBarScrollConnection = LocalB
                     ) {
                         IconButton(
                             onClick = {
+                                PlayerHaptics.click()
                                 isSingleLineMode = false
                             },
                             modifier =
@@ -459,6 +461,7 @@ fun BottomMediaBar(bottomBarScrollConnection: BottomBarScrollConnection = LocalB
                                             alpha = BOTTOM_FLOATING_CONTAINER_ALPHA,
                                         ),
                                     ).clickable {
+                                        PlayerHaptics.click()
                                         isSingleLineMode = false
                                     }.padding(
                                         8.dp,
@@ -856,6 +859,7 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                 ) {
                     IconButton(
                         onClick = {
+                            PlayerHaptics.click()
                             bottomBarScrollConnection.expand()
                         },
                         modifier =
@@ -885,6 +889,7 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                                 .weight(1f)
                                 .clip(CircleShape)
                                 .clickable {
+                                    PlayerHaptics.click()
                                     bottomBarScrollConnection.expand()
                                 },
                     ) {
@@ -991,7 +996,10 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                             }
                             Box(modifier = Modifier.size(40.dp)) {
                                 IconButton(
-                                    onClick = { playerViewModel.togglePlayPause() },
+                                    onClick = {
+                                        PlayerHaptics.click()
+                                        playerViewModel.togglePlayPause()
+                                    },
                                     modifier =
                                         Modifier
                                             .sharedElement(
@@ -1216,6 +1224,7 @@ private fun HomePageSwitchItem(
                     .fillMaxWidth()
                     .clip(CircleShape)
                     .clickable {
+                        PlayerHaptics.click()
                         if (!isSelected) {
                             homeViewModel.navigateToPage(bandHomePage)
                         }

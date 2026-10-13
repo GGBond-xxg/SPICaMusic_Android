@@ -30,6 +30,7 @@ class RemoteMusicClientRegistry(
     private val netease: NeteaseClient,
     private val qqMusic: QqMusicClient,
     private val bilibili: BilibiliClient,
+    private val kugou: KugouClient,
 ) {
     suspend fun authenticateSubsonic(
         serverUrl: String,
@@ -45,6 +46,7 @@ class RemoteMusicClientRegistry(
             RemoteMusicProvider.NETEASE -> netease.authenticate(cookieHeader)
             RemoteMusicProvider.QQ_MUSIC -> qqMusic.authenticate(cookieHeader)
             RemoteMusicProvider.BILIBILI -> bilibili.authenticate(cookieHeader)
+            RemoteMusicProvider.KUGOU -> Result.failure(IllegalArgumentException("酷狗使用扫码登录"))
             RemoteMusicProvider.SUBSONIC ->
                 Result.failure(IllegalArgumentException("Subsonic uses server credentials"))
         }
@@ -60,6 +62,7 @@ class RemoteMusicClientRegistry(
             RemoteMusicProvider.NETEASE -> netease.listSongs(account, query, offset, limit)
             RemoteMusicProvider.QQ_MUSIC -> qqMusic.listSongs(account, query, offset, limit)
             RemoteMusicProvider.BILIBILI -> bilibili.listSongs(account, query, offset, limit)
+            RemoteMusicProvider.KUGOU -> kugou.listSongs(account, query, offset, limit)
         }
 
     suspend fun listPlaylists(
@@ -70,6 +73,7 @@ class RemoteMusicClientRegistry(
             RemoteMusicProvider.NETEASE -> netease.listPlaylists(account, forceRefresh)
             RemoteMusicProvider.QQ_MUSIC -> qqMusic.listPlaylists(account, forceRefresh)
             RemoteMusicProvider.BILIBILI -> bilibili.listPlaylists(account, forceRefresh)
+            RemoteMusicProvider.KUGOU -> kugou.listPlaylists(account, forceRefresh)
             else -> emptyList()
         }
 
@@ -78,6 +82,7 @@ class RemoteMusicClientRegistry(
             RemoteMusicProvider.NETEASE -> netease.cachedPlaylists(account.id)
             RemoteMusicProvider.QQ_MUSIC -> qqMusic.cachedPlaylists(account.id)
             RemoteMusicProvider.BILIBILI -> bilibili.cachedPlaylists(account.id)
+            RemoteMusicProvider.KUGOU -> kugou.cachedPlaylists(account)
             else -> emptyList()
         }
 
@@ -92,6 +97,7 @@ class RemoteMusicClientRegistry(
             RemoteMusicProvider.QQ_MUSIC ->
                 qqMusic.listPlaylistSongs(account, playlistId, forceRefresh)
             RemoteMusicProvider.BILIBILI -> bilibili.listPlaylistSongs(account, playlistId)
+            RemoteMusicProvider.KUGOU -> kugou.listPlaylistSongs(account, playlistId)
             else -> emptyList()
         }
 
@@ -148,12 +154,14 @@ class RemoteMusicClientRegistry(
             RemoteMusicProvider.NETEASE -> netease.resolveStream(account, songId)
             RemoteMusicProvider.QQ_MUSIC -> ResolvedRemoteStream(qqMusic.resolveStreamUrl(account, songId))
             RemoteMusicProvider.BILIBILI -> ResolvedRemoteStream(bilibili.resolveStreamUrl(account, songId))
+            RemoteMusicProvider.KUGOU -> kugou.resolveStream(account, songId)
         }
 
     fun clearCache(accountId: String) {
         netease.clearCache(accountId)
         qqMusic.clearCache(accountId)
         bilibili.clearCache(accountId)
+        kugou.clearCache(accountId)
     }
 }
 

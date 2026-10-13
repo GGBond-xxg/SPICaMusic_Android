@@ -79,8 +79,10 @@ import me.spica27.spicamusic.App
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.ui.player.CurrentPlaylistPanelViewModel
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
+import me.spica27.spicamusic.ui.player.PlayerHaptics
 import me.spica27.spicamusic.ui.player.PlayerViewModel
 import me.spica27.spicamusic.ui.player.formatTime
+import me.spica27.spicamusic.ui.player.playerClick
 import me.spica27.spicamusic.ui.playlistdetail.RenameDialog
 import me.spica27.spicamusic.ui.widget.ShowOnIdleContent
 import me.spica27.spicamusic.ui.widget.combinedClickHighlight
@@ -185,6 +187,7 @@ fun CurrentPlaylistPage(
                 if (selectMode) {
                     TextButton(
                         onClick = {
+                            PlayerHaptics.click()
                             isMultiSelectMode = false
                             selectedMediaIds.clear()
                         },
@@ -215,6 +218,7 @@ fun CurrentPlaylistPage(
                                             bottomEndPercent = 15,
                                         ),
                                     ).clickable {
+                                        PlayerHaptics.click()
                                         if (currentPlayingIndex >= 0) {
                                             coroutineScope.launch {
                                                 scrollState.animateScrollToItem(
@@ -240,6 +244,7 @@ fun CurrentPlaylistPage(
                                         MaterialTheme.colorScheme.surfaceContainerHighest,
                                         RoundedCornerShape(15),
                                     ).clickable {
+                                        PlayerHaptics.click()
                                         isMultiSelectMode = true
                                     }.padding(horizontal = 8.dp, vertical = 8.dp),
                         ) {
@@ -270,6 +275,7 @@ fun CurrentPlaylistPage(
                                             bottomEndPercent = 50,
                                         ),
                                     ).clickable {
+                                        PlayerHaptics.click()
                                         showClearConfirmDialog = true
                                     }.padding(horizontal = 12.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -402,6 +408,7 @@ fun CurrentPlaylistPage(
                         isMultiSelectMode = isMultiSelectMode,
                         isSelected = isSelected,
                         onClick = {
+                            PlayerHaptics.click()
                             if (isMultiSelectMode) {
                                 if (isSelected) {
                                     selectedMediaIds.remove(item.mediaId)
@@ -441,6 +448,7 @@ fun CurrentPlaylistPage(
             ) {
                 Button(
                     onClick = {
+                        PlayerHaptics.click()
                         showDeleteConfirmDialog = true
                     },
                     enabled = selectedCount > 0,
@@ -459,7 +467,10 @@ fun CurrentPlaylistPage(
                 }
 
                 Button(
-                    onClick = { showCreateDialog = true },
+                    onClick = {
+                        PlayerHaptics.click()
+                        showCreateDialog = true
+                    },
                     enabled = selectedCount > 0,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(15),
@@ -553,7 +564,7 @@ private fun CurrentPlaylistConfirmDialog(
         text = { Text(message) },
         confirmButton = {
             TextButton(
-                onClick = onConfirm,
+                onClick = playerClick(onConfirm),
                 colors =
                     ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.error,
@@ -563,7 +574,7 @@ private fun CurrentPlaylistConfirmDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = playerClick(onDismiss)) {
                 Text(stringResource(R.string.cancel))
             }
         },
@@ -599,7 +610,7 @@ private fun PlaylistItemRow(
             modifier
                 .fillMaxWidth()
                 .combinedClickHighlight(
-                    onClick = onClick,
+                    onClick = playerClick(onClick),
                     onLongClick = onLongClick,
                 ).height(80.dp)
                 .padding(vertical = 8.dp, horizontal = 16.dp),

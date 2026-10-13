@@ -12,6 +12,8 @@ import me.spica27.spicamusic.cloud.CloudPlaybackItemResolver
 import me.spica27.spicamusic.cloud.CloudPlaylistEntryStore
 import me.spica27.spicamusic.cloud.CloudRecentStore
 import me.spica27.spicamusic.cloud.CloudUserPlaylistStore
+import me.spica27.spicamusic.cloud.KugouClient
+import me.spica27.spicamusic.cloud.KugouRewards
 import me.spica27.spicamusic.cloud.MediaServerClient
 import me.spica27.spicamusic.cloud.MediaServerType
 import me.spica27.spicamusic.cloud.MediaServerViewModel
@@ -151,7 +153,9 @@ object AppModule {
             single { NeteaseClient(get(named("cloudHttpClient")), get(), get()) }
             single { QqMusicClient(get(named("cloudHttpClient")), get(), get()) }
             single { BilibiliClient(get(named("cloudHttpClient"))) }
-            single { RemoteMusicClientRegistry(get(), get(), get(), get()) }
+            single { KugouClient(get(named("cloudHttpClient"))) }
+            single { KugouRewards(androidContext(), get(), get()) }
+            single { RemoteMusicClientRegistry(get(), get(), get(), get(), get()) }
             single { OnlineSourceFileStore(androidContext(), get(named("cloudHttpClient"))) }
             single { OnlineSourceEngine(androidContext(), get(), get(named("cloudHttpClient"))) }
             single { OnlineSourceRepository(get()) }

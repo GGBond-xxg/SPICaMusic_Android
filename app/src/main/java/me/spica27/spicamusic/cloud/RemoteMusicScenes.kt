@@ -134,7 +134,7 @@ class RemoteMusicScene(
         var pendingPlaylistSong by remember { mutableStateOf<RemoteSong?>(null) }
         val showsRemotePlaylistLanding =
             !hasSubmittedSearch &&
-                (provider == RemoteMusicProvider.NETEASE || provider == RemoteMusicProvider.QQ_MUSIC)
+                (provider in setOf(RemoteMusicProvider.NETEASE, RemoteMusicProvider.QQ_MUSIC, RemoteMusicProvider.KUGOU))
 
         if (showCreatePlaylist) {
             CloudPlaylistNameDialog(
@@ -179,14 +179,16 @@ class RemoteMusicScene(
             )
         }
 
-        LaunchedEffect(state.accounts.size) {
+        LaunchedEffect(state.accounts, state.isConnecting) {
             if (state.accounts.isEmpty()) showLogin = true
             if (state.accounts.isNotEmpty() && !state.isConnecting && state.error == null) {
                 showLogin = false
             }
         }
-        LaunchedEffect(provider, state.selectedAccount?.id) {
-            if (provider in setOf(RemoteMusicProvider.QQ_MUSIC, RemoteMusicProvider.BILIBILI) && state.selectedAccount != null) {
+        LaunchedEffect(provider, state.selectedAccount) {
+            if (provider in setOf(RemoteMusicProvider.QQ_MUSIC, RemoteMusicProvider.BILIBILI, RemoteMusicProvider.KUGOU) &&
+                state.selectedAccount != null
+            ) {
                 viewModel.refreshRemotePlaylists()
             }
         }
@@ -207,7 +209,7 @@ class RemoteMusicScene(
                                     viewModel.refreshRemotePlaylists(forceRefresh = true)
                                     songs.refresh()
                                 }
-                                RemoteMusicProvider.QQ_MUSIC ->
+                                RemoteMusicProvider.KUGOU, RemoteMusicProvider.QQ_MUSIC ->
                                     viewModel.refreshRemotePlaylists(forceRefresh = true)
                                 RemoteMusicProvider.SUBSONIC -> songs.refresh()
                             }
@@ -220,6 +222,12 @@ class RemoteMusicScene(
         ) { padding ->
             if (showLogin) {
                 when (provider) {
+                    RemoteMusicProvider.KUGOU ->
+                        KugouLogin(
+                            modifier = Modifier.fillMaxSize().padding(padding),
+                            onLogin = viewModel::loginKugou,
+                            onCancel = if (state.accounts.isNotEmpty()) ({ showLogin = false }) else null,
+                        )
                     RemoteMusicProvider.SUBSONIC ->
                         SubsonicLogin(
                             state = state,
@@ -352,6 +360,11 @@ class RemoteMusicScene(
                         }
                     }
 
+                    if (provider == RemoteMusicProvider.KUGOU && state.selectedAccount != null) {
+                        item(key = "kugou_rewards", contentType = "rewards") {
+                            KugouRewardsCard(state.selectedAccount!!)
+                        }
+                    }
                     if (provider != RemoteMusicProvider.SUBSONIC && state.localPlaylists.isNotEmpty()) {
                         item(key = "local_playlist_title", contentType = "section_title") {
                             Column(modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)) {
@@ -501,10 +514,12 @@ class RemoteMusicScene(
                         }
                     }
 
-                    if (provider in setOf(RemoteMusicProvider.QQ_MUSIC, RemoteMusicProvider.BILIBILI) && !hasSubmittedSearch) {
+                    if (provider in setOf(RemoteMusicProvider.QQ_MUSIC, RemoteMusicProvider.BILIBILI, RemoteMusicProvider.KUGOU) &&
+                        !hasSubmittedSearch
+                    ) {
                         item(key = "qq_collection_title", contentType = "section_title") {
                             Text(
-                                if (provider == RemoteMusicProvider.BILIBILI) "Bilibili 收藏夹" else "QQ 音乐歌单",
+                                if (provider == RemoteMusicProvider.BILIBILI) "Bilibili 收藏夹" else "${provider.displayName}歌单",
                                 modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
                                 fontWeight = FontWeight.SemiBold,
                             )
@@ -547,7 +562,7 @@ class RemoteMusicScene(
                                         ) {
                                             "登录账号后可浏览收藏夹；下方可浏览公开音乐内容，也可以搜索关键词或 BV 链接。"
                                         } else {
-                                            "还没有获取到 QQ 音乐歌单"
+                                            "还没有获取到${provider.displayName}歌单"
                                         },
                                         modifier = Modifier.fillMaxWidth().padding(24.dp),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1811,13 +1826,14 @@ private fun RemoteSceneScaffold(
     }
 }
 
-private val RemoteMusicProvider.displayName: String
+internal val RemoteMusicProvider.displayName: String
     get() =
         when (this) {
             RemoteMusicProvider.SUBSONIC -> "Subsonic"
             RemoteMusicProvider.NETEASE -> "网易云音乐"
             RemoteMusicProvider.QQ_MUSIC -> "QQ 音乐"
             RemoteMusicProvider.BILIBILI -> "Bilibili"
+            RemoteMusicProvider.KUGOU -> "酷狗音乐"
         }
 
 private val RemoteMusicProvider.loginUrl: String
@@ -1826,7 +1842,7 @@ private val RemoteMusicProvider.loginUrl: String
             RemoteMusicProvider.NETEASE -> "https://music.163.com/m/login"
             RemoteMusicProvider.QQ_MUSIC -> "https://y.qq.com/"
             RemoteMusicProvider.BILIBILI -> "https://passport.bilibili.com/login"
-            RemoteMusicProvider.SUBSONIC -> error("Subsonic does not use web login")
+            RemoteMusicProvider.SUBSONIC, RemoteMusicProvider.KUGOU -> error("Provider does not use web login")
         }
 
 private val RemoteMusicProvider.cookieUrls: List<String>
@@ -1850,12 +1866,13 @@ private val RemoteMusicProvider.cookieUrls: List<String>
                     "https://passport.bilibili.com/",
                     "https://api.bilibili.com/",
                 )
-            RemoteMusicProvider.SUBSONIC -> emptyList()
+            RemoteMusicProvider.SUBSONIC, RemoteMusicProvider.KUGOU -> emptyList()
         }
 
 private fun RemoteMusicProvider.accountSubtitle(account: RemoteMusicAccount): String =
     when (this) {
         RemoteMusicProvider.SUBSONIC -> account.normalizedServerUrl
+        RemoteMusicProvider.KUGOU -> "登录凭据已加密保存在本机"
         RemoteMusicProvider.NETEASE,
         RemoteMusicProvider.QQ_MUSIC,
         -> "网页登录会话已加密保存在本机"

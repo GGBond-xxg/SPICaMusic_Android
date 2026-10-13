@@ -106,8 +106,10 @@ fun MiniLyric(
         modifier =
             modifier
                 .clip(Shapes.MediumCornerBasedShape)
-                .clickable(onClickLabel = stringResource(R.string.tab_lrc)) { onClick.invoke() }
-                .padding(horizontal = Spacing.Medium, vertical = Spacing.Small)
+                .clickable(onClickLabel = stringResource(R.string.tab_lrc)) {
+                    PlayerHaptics.click()
+                    onClick.invoke()
+                }.padding(horizontal = Spacing.Medium, vertical = Spacing.Small)
                 .heightIn(min = 20.dp),
         contentAlignment = Alignment.Center,
     ) {
