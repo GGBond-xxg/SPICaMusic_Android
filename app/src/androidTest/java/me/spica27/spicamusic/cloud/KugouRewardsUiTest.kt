@@ -53,21 +53,21 @@ class KugouRewardsUiTest {
 
     @Test fun loggedInCardRequiresListeningAndOffersManualOfficialAdFlow() {
         compose.setContent { MaterialTheme { Surface { KugouRewardsCard(account, rewards) } } }
-        compose.onNodeWithText("概念版会员与奖励").assertExists()
-        compose.onNodeWithText("听歌领取").assertIsNotEnabled()
-        compose.onNodeWithText("广告奖励 · 打开概念版").performClick()
-        compose.onNodeWithText("在官方概念版领取广告奖励").assertExists()
-        compose.onNodeWithText("取消").performClick()
-        compose.onNodeWithText("在官方概念版领取广告奖励").assertDoesNotExist()
+        compose.onNodeWithText(cloudText(me.spica27.spicamusic.R.string.kugou_rewards_title)).assertExists()
+        compose.onNodeWithText(cloudText(me.spica27.spicamusic.R.string.kugou_listening_claim)).assertIsNotEnabled()
+        compose.onNodeWithText(cloudText(me.spica27.spicamusic.R.string.kugou_ads_open)).performClick()
+        compose.onNodeWithText(cloudText(me.spica27.spicamusic.R.string.kugou_ads_title)).assertExists()
+        compose.onNodeWithText(cloudText(me.spica27.spicamusic.R.string.cloud_action_cancel)).performClick()
+        compose.onNodeWithText(cloudText(me.spica27.spicamusic.R.string.kugou_ads_title)).assertDoesNotExist()
     }
 
     @Test fun loggedOutAccountHasNoRewardControls() {
         compose.setContent { MaterialTheme { KugouRewardsCard(account.copy(secret = ""), rewards) } }
-        compose.onNodeWithText("概念版会员与奖励").assertDoesNotExist()
+        compose.onNodeWithText(cloudText(me.spica27.spicamusic.R.string.kugou_rewards_title)).assertDoesNotExist()
     }
 
     @Test fun otherProvidersHaveNoKugouRewardControls() {
         compose.setContent { MaterialTheme { KugouRewardsCard(account.copy(provider = RemoteMusicProvider.NETEASE), rewards) } }
-        compose.onNodeWithText("概念版会员与奖励").assertDoesNotExist()
+        compose.onNodeWithText(cloudText(me.spica27.spicamusic.R.string.kugou_rewards_title)).assertDoesNotExist()
     }
 }

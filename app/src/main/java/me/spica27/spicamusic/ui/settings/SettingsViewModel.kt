@@ -60,7 +60,7 @@ class SettingsViewModel(
     }
 
     fun setPlayerHapticsStrength(strength: String) {
-        if (strength !in listOf("light", "medium", "strong")) return
+        if (strength !in listOf("light", "medium", "strong") && strength.toIntOrNull() !in 0..100) return
         viewModelScope.launch {
             settingsUseCases.setString(SettingsUseCases.Keys.PLAYER_HAPTICS_STRENGTH, strength)
             if (playerHapticsEnabled.value) {

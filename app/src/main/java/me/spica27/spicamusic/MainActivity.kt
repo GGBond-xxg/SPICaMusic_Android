@@ -72,6 +72,8 @@ class MainActivity :
             splashView.remove()
         }
         super.onCreate(savedInstanceState)
+        me.spica27.spicamusic.ui.player.PlayerHaptics
+            .bind(window.decorView)
 
         ContextCompat.registerReceiver(
             this,
@@ -137,6 +139,8 @@ class MainActivity :
     }
 
     override fun onDestroy() {
+        me.spica27.spicamusic.ui.player.PlayerHaptics
+            .unbind(window.decorView)
         if (exitReceiverRegistered) {
             unregisterReceiver(exitReceiver)
             exitReceiverRegistered = false

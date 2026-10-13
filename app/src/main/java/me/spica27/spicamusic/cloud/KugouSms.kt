@@ -3,6 +3,7 @@ package me.spica27.spicamusic.cloud
 import android.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import me.spica27.spicamusic.R
 import org.json.JSONObject
 import java.security.KeyFactory
 import java.security.SecureRandom
@@ -32,12 +33,13 @@ internal class KugouSmsSession {
 internal suspend fun KugouClient.sendSms(
     mobile: String,
     session: KugouSmsSession,
+    countryCode: String = "86",
 ) = withContext(Dispatchers.IO) {
-    require(mobile.matches(Regex("1[3-9][0-9]{9}"))) { "请输入有效的中国大陆手机号" }
+    val phone = kugouSmsPhone(mobile, countryCode)
     request(
         "https://login-user.kugou.com/v7/send_mobile_code",
         params = session.params,
-        body = JSONObject().put("businessid", 5).put("mobile", mobile).put("plat", 3),
+        body = JSONObject().put("businessid", 5).put("mobile", phone).put("plat", 3),
         strict = true,
     )
     Unit
@@ -48,9 +50,11 @@ internal suspend fun KugouClient.loginSms(
     code: String,
     session: KugouSmsSession,
     userId: String? = null,
+    countryCode: String = "86",
 ): KugouSmsResult =
     withContext(Dispatchers.IO) {
-        require(mobile.matches(Regex("1[3-9][0-9]{9}")) && code.matches(Regex("[0-9]{4,8}"))) { "请检查手机号和验证码" }
+        val phone = kugouSmsPhone(mobile, countryCode)
+        require(code.matches(Regex("[0-9]{4,8}"))) { cloudText(R.string.kugou_sms_invalid) }
         val time = System.currentTimeMillis()
         val key = randomKey(16)
         val derived = kugouMd5(key)
@@ -67,10 +71,10 @@ internal suspend fun KugouClient.loginSms(
                         "17a20ae7adae7020",
                     ),
                 ).put("clienttime_ms", time)
-                .put("mobile", mobile.take(2) + "*****" + mobile.last())
+                .put("mobile", phone.take(2) + "*****" + phone.last())
                 .put("key", kugouMd5("3116LnT6xpN3khm36zse0QzvmgTZ3waWdRSA11440$time"))
                 .put("pk", kugouSmsRsa(JSONObject().put("clienttime_ms", time).put("key", key).toString()))
-                .put("params", aesHex(JSONObject().put("mobile", mobile).put("code", code).toString(), derived, derived.takeLast(16)))
+                .put("params", aesHex(JSONObject().put("mobile", phone).put("code", code).toString(), derived, derived.takeLast(16)))
                 .put("dfid", session.dfid)
                 .put("dev", session.guid)
                 .put("gitversion", "5f0b7c4")
@@ -152,3 +156,24 @@ internal fun kugouSmsRsa(value: String): String {
     cipher.init(Cipher.ENCRYPT_MODE, publicKey)
     return cipher.doFinal(bytes.copyOf(128)).joinToString("") { "%02X".format(it) }
 }
+
+/** Domestic requests retain the existing wire format. Other regions carry an explicit E.164 prefix
+ * in BOTH requests; never silently interpret an overseas number as a mainland number.
+ * The undocumented service may reject overseas SMS; QR login remains available.
+ */
+internal fun kugouSmsPhone(
+    mobile: String,
+    countryCode: String,
+): String {
+    require(isKugouSmsPhoneValid(mobile, countryCode)) { cloudText(R.string.kugou_sms_invalid_phone) }
+    return if (countryCode == "86") mobile else "+$countryCode$mobile"
+}
+
+internal fun isKugouSmsPhoneValid(
+    mobile: String,
+    countryCode: String,
+): Boolean =
+    countryCode.matches(Regex("[1-9][0-9]{0,2}")) &&
+        mobile.matches(Regex("[0-9]{4,14}")) &&
+        countryCode.length + mobile.length <= 15 &&
+        (countryCode != "86" || mobile.matches(Regex("1[3-9][0-9]{9}")))

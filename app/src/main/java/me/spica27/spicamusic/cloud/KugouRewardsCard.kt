@@ -22,10 +22,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import me.spica27.spicamusic.R
 import org.koin.compose.koinInject
 
 @Composable
@@ -37,16 +39,18 @@ internal fun KugouRewardsCard(
     val states by rewards.states.collectAsStateWithLifecycle()
     val state = states[account.userId] ?: KugouRewardState()
     val context = LocalContext.current
+    val message = localizedRewardMessage(state.message)
+    val checkinDescription = stringResource(R.string.kugou_auto_checkin)
     var showAdInfo by remember(account.userId) { mutableStateOf(false) }
     var openError by remember { mutableStateOf(false) }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("概念版会员与奖励", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.kugou_rewards_title), style = MaterialTheme.typography.titleMedium)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("每日自动签到")
+                    Text(stringResource(R.string.kugou_auto_checkin))
                     Text(
-                        "按账号每天一次 · 北京时间",
+                        stringResource(R.string.kugou_checkin_timezone),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -55,15 +59,18 @@ internal fun KugouRewardsCard(
                     checked = state.autoEnabled,
                     enabled = !state.busy,
                     onCheckedChange = { rewards.setAutomatic(account.userId, it) },
-                    modifier = Modifier.semantics { contentDescription = "每日自动签到" },
+                    modifier =
+                        Modifier.semantics {
+                            contentDescription = checkinDescription
+                        },
                 )
             }
             Text(
-                if (state.signedToday) "今日签到已完成 · 概念版会员已领取" else state.message,
+                if (state.signedToday) stringResource(R.string.kugou_checkin_done) else message,
                 style = MaterialTheme.typography.bodyMedium,
             )
-            if (state.signedToday && state.message != "签到成功，概念版会员已领取") {
-                Text(state.message, style = MaterialTheme.typography.bodySmall)
+            if (state.signedToday && state.message != stringResource(R.string.kugou_checkin_success)) {
+                Text(message, style = MaterialTheme.typography.bodySmall)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
@@ -73,11 +80,11 @@ internal fun KugouRewardsCard(
                 ) {
                     Text(
                         if (state.signedToday) {
-                            "今日已签到"
+                            stringResource(R.string.kugou_checked_today)
                         } else if (state.busy) {
-                            "处理中…"
+                            stringResource(R.string.kugou_rewards_busy)
                         } else {
-                            "手动签到"
+                            stringResource(R.string.kugou_checkin_manual)
                         },
                     )
                 }
@@ -86,32 +93,40 @@ internal fun KugouRewardsCard(
                     enabled = !state.busy && !state.listenedToday && state.canClaimListening,
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text(if (state.listenedToday) "听歌已领取" else "听歌领取")
+                    Text(
+                        if (state.listenedToday) {
+                            stringResource(
+                                R.string.kugou_listening_done,
+                            )
+                        } else {
+                            stringResource(R.string.kugou_listening_claim)
+                        },
+                    )
                 }
             }
             if (!state.listenedToday && !state.canClaimListening) {
                 Text(
-                    "在本应用连续播放一首酷狗歌曲满 60 秒后，可手动领取听歌奖励。",
+                    stringResource(R.string.kugou_listening_help),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             OutlinedButton(onClick = { showAdInfo = true }, modifier = Modifier.fillMaxWidth()) {
-                Text("广告奖励 · 打开概念版")
+                Text(stringResource(R.string.kugou_ads_open))
             }
             Text(
-                "后台签到时间由系统安排；打开应用时也会检查。领取结果以酷狗返回为准。",
+                stringResource(R.string.kugou_schedule_help),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (openError) Text("无法打开概念版，请安装官方应用后重试。", color = MaterialTheme.colorScheme.error)
+            if (openError) Text(stringResource(R.string.kugou_open_error), color = MaterialTheme.colorScheme.error)
         }
     }
     if (showAdInfo) {
         AlertDialog(
             onDismissRequest = { showAdInfo = false },
-            title = { Text("在官方概念版领取广告奖励") },
-            text = { Text("请在酷狗概念版登录同一个账号（${account.userId}），进入会员任务并完成广告观看。本应用不会自动观看广告或代报广告完成。") },
+            title = { Text(stringResource(R.string.kugou_ads_title)) },
+            text = { Text(stringResource(R.string.kugou_ads_help, account.userId)) },
             confirmButton = {
                 TextButton(onClick = {
                     showAdInfo = false
@@ -122,9 +137,45 @@ internal fun KugouRewardsCard(
                                     ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://www.kugouyouth.com/"))
                             context.startActivity(launch)
                         }.isFailure
-                }) { Text("打开概念版") }
+                }) { Text(stringResource(R.string.kugou_open_concept)) }
             },
-            dismissButton = { TextButton(onClick = { showAdInfo = false }) { Text("取消") } },
+            dismissButton = {
+                TextButton(onClick = { showAdInfo = false }) { Text(stringResource(R.string.cloud_action_cancel)) }
+            },
         )
     }
+}
+
+/** Reward status is cached across activity/locale changes and old versions stored Chinese text. */
+@Composable
+private fun localizedRewardMessage(message: String): String {
+    val context = LocalContext.current
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val resources =
+        listOf(
+            R.string.kugou_auto_default,
+            R.string.kugou_checkin_success,
+            R.string.kugou_checkin_busy,
+            R.string.kugou_listening_required,
+            R.string.kugou_listening_busy,
+            R.string.kugou_listening_claimed_today,
+            R.string.kugou_checkin_attempted,
+            R.string.kugou_checkin_pending,
+            R.string.cloud_retry_later,
+            R.string.cloud_network_error,
+        )
+    val translations =
+        remember {
+            listOf("en", "zh-CN", "zh-TW")
+                .flatMap { language ->
+                    val localized =
+                        context.createConfigurationContext(
+                            android.content.res.Configuration(configuration).apply {
+                                setLocale(java.util.Locale.forLanguageTag(language))
+                            },
+                        )
+                    resources.map { localized.getString(it) to it }
+                }.toMap()
+        }
+    return translations[message]?.let { stringResource(it) } ?: message
 }

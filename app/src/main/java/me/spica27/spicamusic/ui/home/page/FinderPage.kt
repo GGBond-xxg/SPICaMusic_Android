@@ -4,11 +4,8 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VisibilityThreshold
@@ -85,6 +82,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -95,7 +93,6 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.common.collect.ImmutableList
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import me.spica27.navkit.geometry.GeometryTransition
 import me.spica27.navkit.geometry.geometrySource
@@ -129,8 +126,6 @@ import me.spica27.spicamusic.ui.playlistdetail.PlaylistDetailScene
 import me.spica27.spicamusic.ui.search.SearchScene
 import me.spica27.spicamusic.ui.settings.SettingsScene
 import me.spica27.spicamusic.ui.theme.LayoutTokens
-import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
-import me.spica27.spicamusic.ui.theme.ListItemFadeOutSpec
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
 import me.spica27.spicamusic.ui.widget.AudioCover
@@ -148,9 +143,6 @@ import org.koin.compose.viewmodel.koinActivityViewModel
 
 /** 大标题收缩归一化距离的上限（实际取刊头实测滚出高度，见 mastheadCollapse） */
 private val MastheadCollapseDistance = 140.dp
-
-/** 首屏入场交错间隔 */
-private const val ENTRANCE_STAGGER_MILLIS = 55L
 
 /** 收藏预览最多展示的歌曲数 */
 private const val FavoritePreviewSongCount = 5
@@ -215,7 +207,7 @@ private val ItemPlacementSpec: FiniteAnimationSpec<IntOffset> =
     )
 
 @Composable
-fun FinderPage(playEntrance: Boolean = true) {
+fun FinderPage() {
     val path = LocalNavigationPath.current
     val homeViewModel: HomeViewModel = koinActivityViewModel()
     val cloudCatalogViewModel: CloudMusicCatalogViewModel = koinActivityViewModel()
@@ -388,6 +380,7 @@ fun FinderPage(playEntrance: Boolean = true) {
             state = listState,
             modifier =
                 Modifier
+                    .testTag("finder_list")
                     .fillMaxSize()
                     .nestedScroll(LocalBottomBarScrollConnection.current),
             contentPadding =
@@ -398,7 +391,6 @@ fun FinderPage(playEntrance: Boolean = true) {
             verticalArrangement = Arrangement.spacedBy(Spacing.Medium),
         ) {
             item(key = "masthead", contentType = "masthead") {
-                val entrance = rememberEntrance(order = 0, play = playEntrance)
                 FinderMasthead(
                     frequentCount = frequentEntries.size,
                     favoriteCount = favoriteSongs.size,
@@ -412,15 +404,12 @@ fun FinderPage(playEntrance: Boolean = true) {
                                 // 不再缩放文字。滚动时对 Text 做位图缩放会产生重影和字形变形；
                                 // 这里只做互斥淡出，位置由 LazyColumn 自然滚动，保证字形始终清晰。
                                 val t = mastheadCollapse(listState)
-                                val enter = entrance.value
-                                alpha = expandedTitleAlpha(t) * enter
-                                translationY = (1f - enter) * 28.dp.toPx()
+                                alpha = expandedTitleAlpha(t)
                             },
                 )
             }
 
             item(key = "search", contentType = "search") {
-                val entrance = rememberEntrance(order = 1, play = playEntrance)
                 val searchTransition =
                     remember {
                         GeometryTransition(
@@ -432,19 +421,17 @@ fun FinderPage(playEntrance: Boolean = true) {
                 SearchCapsule(
                     transition = searchTransition,
                     onClick = { path.push(SearchScene(transition = searchTransition)) },
-                    modifier = Modifier.entranceGraphics(entrance),
+                    modifier = Modifier,
                 )
             }
 
             // 常听榜单：冷启动查询完成后直接呈现，避免 Lazy 条目首次插入淡入导致整卡闪黑。
-            // 从其他 Tab 切回发现页时仍由 entranceGraphics 负责统一的控件入场动画。
             if (!heroInitialized) {
                 item(key = "frequent_loading", contentType = "loading") {
                     FrequentHeroPlaceholder()
                 }
             } else if (heroEntries.isEmpty()) {
                 item(key = "frequent_empty", contentType = "empty") {
-                    val entrance = rememberEntrance(order = 3, play = playEntrance)
                     FinderEmptyRow(
                         title =
                             stringResource(
@@ -462,12 +449,11 @@ fun FinderPage(playEntrance: Boolean = true) {
                                     R.string.finder_no_frequent_subtitle
                                 },
                             ),
-                        modifier = Modifier.entranceGraphics(entrance),
+                        modifier = Modifier,
                     )
                 }
             } else {
                 item(key = "frequent_hero", contentType = "hero") {
-                    val entrance = rememberEntrance(order = 3, play = playEntrance)
                     FrequentHeroCard(
                         title = heroTitle,
                         songs = heroSongs,
@@ -498,14 +484,13 @@ fun FinderPage(playEntrance: Boolean = true) {
                                 items = heroEntries.map(FrequentEntry::queueItem),
                             )
                         },
-                        modifier = Modifier.entranceGraphics(entrance),
+                        modifier = Modifier,
                     )
                 }
             }
 
             if (favoriteSongs.isNotEmpty()) {
                 item(key = "favorites_header", contentType = "section_header") {
-                    val entrance = rememberEntrance(order = 4, play = playEntrance)
                     SectionHeader(
                         title = stringResource(R.string.my_favorites),
                         subtitle = stringResource(R.string.songs_count_format, favoriteSongs.size),
@@ -514,15 +499,13 @@ fun FinderPage(playEntrance: Boolean = true) {
                         modifier =
                             Modifier
                                 .animateItem(
-                                    fadeInSpec = ListItemFadeInSpec,
+                                    fadeInSpec = null,
                                     placementSpec = ItemPlacementSpec,
-                                    fadeOutSpec = ListItemFadeOutSpec,
-                                ).padding(top = Spacing.Medium)
-                                .entranceGraphics(entrance),
+                                    fadeOutSpec = null,
+                                ).padding(top = Spacing.Medium),
                     )
                 }
                 item(key = "favorites_card", contentType = "favorites") {
-                    val entrance = rememberEntrance(order = 5, play = playEntrance)
                     FavoritesCard(
                         songs = favoritePreviewSongs,
                         onPlayAll = {
@@ -550,17 +533,16 @@ fun FinderPage(playEntrance: Boolean = true) {
                         modifier =
                             Modifier
                                 .animateItem(
-                                    fadeInSpec = ListItemFadeInSpec,
+                                    fadeInSpec = null,
                                     placementSpec = null,
-                                    fadeOutSpec = ListItemFadeOutSpec,
-                                ).entranceGraphics(entrance),
+                                    fadeOutSpec = null,
+                                ),
                     )
                 }
             }
 
             if (totalPlaylistCount > 0) {
                 item(key = "playlists_header", contentType = "section_header") {
-                    val entrance = rememberEntrance(order = 6, play = playEntrance)
                     SectionHeader(
                         title = stringResource(R.string.finder_playlists_overview_title),
                         subtitle = stringResource(R.string.library_summary_playlists, totalPlaylistCount),
@@ -575,16 +557,14 @@ fun FinderPage(playEntrance: Boolean = true) {
                         modifier =
                             Modifier
                                 .animateItem(
-                                    fadeInSpec = ListItemFadeInSpec,
+                                    fadeInSpec = null,
                                     placementSpec = ItemPlacementSpec,
-                                    fadeOutSpec = ListItemFadeOutSpec,
-                                ).padding(top = Spacing.Medium)
-                                .entranceGraphics(entrance),
+                                    fadeOutSpec = null,
+                                ).padding(top = Spacing.Medium),
                     )
                 }
                 if (overviewPlaylistsWithCover.isNotEmpty()) {
                     item(key = "playlists_rail", contentType = "rail") {
-                        val entrance = rememberEntrance(order = 6, play = playEntrance)
                         PlaylistRail(
                             playlists = overviewPlaylistsWithCover,
                             onPlaylistClick = { item, albumIds ->
@@ -593,34 +573,32 @@ fun FinderPage(playEntrance: Boolean = true) {
                             modifier =
                                 Modifier
                                     .animateItem(
-                                        fadeInSpec = ListItemFadeInSpec,
+                                        fadeInSpec = null,
                                         placementSpec = null,
-                                        fadeOutSpec = ListItemFadeOutSpec,
-                                    ).entranceGraphics(entrance),
+                                        fadeOutSpec = null,
+                                    ),
                         )
                     }
                 }
                 if (overviewCloudPlaylists.isNotEmpty()) {
                     item(key = "cloud_playlists_rail", contentType = "rail") {
-                        val entrance = rememberEntrance(order = 6, play = playEntrance)
                         CloudPlaylistRail(
                             playlists = overviewCloudPlaylists,
                             onPlaylistClick = { item ->
                                 path.push(NeteasePlaylistScene(item))
                             },
-                            modifier = Modifier.entranceGraphics(entrance),
+                            modifier = Modifier,
                         )
                     }
                 }
                 if (userCloudPlaylists.isNotEmpty()) {
                     item(key = "user_cloud_playlists_rail", contentType = "rail") {
-                        val entrance = rememberEntrance(order = 6, play = playEntrance)
                         CloudUserPlaylistRail(
                             playlists = userCloudPlaylists,
                             onPlaylistClick = { item ->
                                 path.push(CloudUserPlaylistScene(item))
                             },
-                            modifier = Modifier.entranceGraphics(entrance),
+                            modifier = Modifier,
                         )
                     }
                 }
@@ -688,9 +666,9 @@ fun FinderPage(playEntrance: Boolean = true) {
                     modifier =
                         Modifier
                             .animateItem(
-                                fadeInSpec = ListItemFadeInSpec,
+                                fadeInSpec = null,
                                 placementSpec = ItemPlacementSpec,
-                                fadeOutSpec = ListItemFadeOutSpec,
+                                fadeOutSpec = null,
                             ).padding(horizontal = LayoutTokens.MusicHeaderHorizontalPadding)
                             .padding(top = Spacing.ExtraLarge),
                 )
@@ -705,9 +683,9 @@ fun FinderPage(playEntrance: Boolean = true) {
                     onClick = { homeViewModel.navigateToPage(HomePage.Library) },
                     modifier =
                         Modifier.animateItem(
-                            fadeInSpec = ListItemFadeInSpec,
+                            fadeInSpec = null,
                             placementSpec = ItemPlacementSpec,
-                            fadeOutSpec = ListItemFadeOutSpec,
+                            fadeOutSpec = null,
                         ),
                 )
             }
@@ -721,9 +699,9 @@ fun FinderPage(playEntrance: Boolean = true) {
                     onClick = { homeViewModel.navigateToPage(HomePage.Music) },
                     modifier =
                         Modifier.animateItem(
-                            fadeInSpec = ListItemFadeInSpec,
+                            fadeInSpec = null,
                             placementSpec = ItemPlacementSpec,
-                            fadeOutSpec = ListItemFadeOutSpec,
+                            fadeOutSpec = null,
                         ),
                 )
             }
@@ -737,9 +715,9 @@ fun FinderPage(playEntrance: Boolean = true) {
                     onClick = { path.push(SettingsScene()) },
                     modifier =
                         Modifier.animateItem(
-                            fadeInSpec = ListItemFadeInSpec,
+                            fadeInSpec = null,
                             placementSpec = ItemPlacementSpec,
-                            fadeOutSpec = ListItemFadeOutSpec,
+                            fadeOutSpec = null,
                         ),
                 )
             }
@@ -768,37 +746,6 @@ private fun expandedTitleAlpha(progress: Float): Float = (1f - progress / 0.72f)
 
 /** 固定标题从 72% 折叠进度开始淡入。 */
 private fun collapsedTitleAlpha(progress: Float): Float = ((progress - 0.72f) / 0.28f).coerceIn(0f, 1f)
-
-/** 首屏入场：延迟 [order] 个节拍后弹入，[play] 为 false 时直接呈现（配方同资料库页） */
-@Composable
-private fun rememberEntrance(
-    order: Int,
-    play: Boolean,
-): Animatable<Float, AnimationVector1D> {
-    val entrance = remember { Animatable(if (play) 0f else 1f) }
-    if (play) {
-        LaunchedEffect(Unit) {
-            delay(order * ENTRANCE_STAGGER_MILLIS)
-            entrance.animateTo(
-                targetValue = 1f,
-                animationSpec =
-                    spring(
-                        dampingRatio = Spring.DampingRatioLowBouncy,
-                        stiffness = 380f,
-                    ),
-            )
-        }
-    }
-    return entrance
-}
-
-/** 入场位移+淡入，全部在 Draw 阶段读取动画值 */
-private fun Modifier.entranceGraphics(entrance: Animatable<Float, AnimationVector1D>): Modifier =
-    graphicsLayer {
-        val enter = entrance.value
-        alpha = enter
-        translationY = (1f - enter) * 28.dp.toPx()
-    }
 
 /** 按压回弹缩放值：0.95f 硬弹簧（资料库命令药丸同款） */
 @Composable
@@ -1514,9 +1461,9 @@ private fun PlaylistRail(
                 onClick = { albumIds -> onPlaylistClick(item, albumIds) },
                 modifier =
                     Modifier.animateItem(
-                        fadeInSpec = ListItemFadeInSpec,
+                        fadeInSpec = null,
                         placementSpec = ItemPlacementSpec,
-                        fadeOutSpec = ListItemFadeOutSpec,
+                        fadeOutSpec = null,
                     ),
             )
         }
@@ -1829,22 +1776,16 @@ private fun FinderPlaylistCard(
                 .clickHighlight(onClick = { onClick(displayedAlbumIds) }),
         verticalArrangement = Arrangement.spacedBy(Spacing.Small),
     ) {
-        Crossfade(
-            targetState = displayedAlbumIds,
-            animationSpec = tween(durationMillis = 180),
-            label = "playlistCoverSnapshot",
+        PlaylistCoverView(
+            albumIds = displayedAlbumIds,
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
                     .clip(Shapes.ExtraLargeCornerBasedShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-        ) { albumIds ->
-            PlaylistCoverView(
-                albumIds = albumIds,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
+                    .testTag("finder_cover_${item.playlist.playlistId}"),
+        )
+
         Column(
             modifier = Modifier.padding(bottom = Spacing.Small),
             verticalArrangement = Arrangement.spacedBy(2.dp),

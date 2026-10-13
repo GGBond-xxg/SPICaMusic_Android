@@ -19,11 +19,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,13 +53,6 @@ class HomeScene : StackScene() {
         val homeViewModel: HomeViewModel = koinActivityViewModel()
 
         val currentPage by homeViewModel.currentPage.collectAsStateWithLifecycle()
-        var hasLeftInitialFinder by rememberSaveable { mutableStateOf(false) }
-        LaunchedEffect(currentPage) {
-            if (currentPage != HomePage.Finder) {
-                hasLeftInitialFinder = true
-            }
-        }
-
         val bottomBarScrollConnection = rememberBottomBarScrollConnection()
         val bottomScrimHeight by
             animateDpAsState(
@@ -95,9 +85,7 @@ class HomeScene : StackScene() {
                 ) {
                     when (it) {
                         HomePage.Finder ->
-                            FinderPage(
-                                playEntrance = hasLeftInitialFinder,
-                            )
+                            FinderPage()
                         HomePage.Music -> MusicPage()
                         HomePage.Library -> LibraryPage()
                     }

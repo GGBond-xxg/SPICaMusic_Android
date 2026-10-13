@@ -24,6 +24,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import me.spica27.spicamusic.R
 import me.spica27.spicamusic.player.api.IMusicPlayer
 import org.koin.core.context.GlobalContext
 import java.time.LocalDate
@@ -39,7 +40,7 @@ internal data class KugouRewardState(
     val listenedToday: Boolean = false,
     val canClaimListening: Boolean = false,
     val busy: Boolean = false,
-    val message: String = "登录后每天自动签到一次",
+    val message: String = cloudText(R.string.kugou_auto_default),
 )
 
 /** Dates are keyed by the service user ID, so logging in again cannot reset today's claims. */
@@ -62,7 +63,9 @@ internal class KugouRewardLedger(
         key: String,
         value: String,
     ) {
-        check(prefs.edit().putString("$userId:$key", value).commit()) { "无法保存签到记录，请重试" }
+        check(
+            prefs.edit().putString("$userId:$key", value).commit(),
+        ) { cloudText(R.string.kugou_checkin_saving_error) }
     }
 
     fun enabled(userId: String): Boolean = value(userId, "disabled") != "true"
@@ -177,7 +180,7 @@ internal class KugouRewards(
         try {
             requireKugouLogin(account)
             if (automatic) ledger.put(userId, "attempt", day)
-            refresh(userId, busy = true, message = "正在签到…")
+            refresh(userId, busy = true, message = cloudText(R.string.kugou_checkin_busy))
             if (!ledger.hasDay(userId, "base", day)) {
                 client.claimDailyVip(account, day)
                 ledger.put(userId, "base", day)
@@ -186,11 +189,23 @@ internal class KugouRewards(
             client.upgradeDailyVip(account)
             ledger.put(userId, "signed", day)
             ledger.put(userId, "messageDay", day)
-            ledger.put(userId, "message", "签到成功，概念版会员已领取")
+            ledger.put(userId, "message", cloudText(R.string.kugou_checkin_success))
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            val prefix = if (ledger.hasDay(userId, "base", day)) "畅听 VIP 已领取，概念版升级未完成：" else "签到未完成："
+            val prefix =
+                if (ledger.hasDay(
+                        userId,
+                        "base",
+                        day,
+                    )
+                ) {
+                    cloudText(
+                        R.string.kugou_checkin_partial,
+                    )
+                } else {
+                    cloudText(R.string.kugou_checkin_failed)
+                }
             ledger.put(userId, "messageDay", day)
             ledger.put(userId, "message", prefix + rewardError(error))
         } finally {
@@ -205,20 +220,20 @@ internal class KugouRewards(
                 val day = kugouRewardDay()
                 if (ledger.hasDay(userId, "listen", day)) return@withLock
                 if (!ledger.hasDay(userId, "eligible", day)) {
-                    refresh(userId, message = "先在本应用连续播放一首酷狗歌曲满 60 秒，再手动领取")
+                    refresh(userId, message = cloudText(R.string.kugou_listening_required))
                     return@withLock
                 }
                 try {
-                    refresh(userId, busy = true, message = "正在领取听歌奖励…")
+                    refresh(userId, busy = true, message = cloudText(R.string.kugou_listening_busy))
                     client.claimListeningReward(account, ledger.value(userId, "audio"))
                     ledger.put(userId, "listen", day)
                     ledger.put(userId, "messageDay", day)
-                    ledger.put(userId, "message", "今日听歌奖励已领取")
+                    ledger.put(userId, "message", cloudText(R.string.kugou_listening_claimed_today))
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
                     ledger.put(userId, "messageDay", day)
-                    ledger.put(userId, "message", "听歌奖励未领取：${rewardError(error)}")
+                    ledger.put(userId, "message", cloudText(R.string.kugou_listening_error, rewardError(error)))
                 } finally {
                     refresh(userId)
                 }
@@ -252,9 +267,13 @@ internal class KugouRewards(
                         busy = busy,
                         message =
                             message ?: if (ledger.hasDay(userId, "messageDay", day)) {
-                                ledger.value(userId, "message").ifBlank { "今日自动签到已尝试，可手动重试" }
+                                ledger
+                                    .value(
+                                        userId,
+                                        "message",
+                                    ).ifBlank { cloudText(R.string.kugou_checkin_attempted) }
                             } else {
-                                "今日尚未签到"
+                                cloudText(R.string.kugou_checkin_pending)
                             },
                     )
             )
@@ -282,9 +301,9 @@ internal class KugouRewards(
 
     private fun rewardError(error: Exception): String =
         if (error is IllegalStateException || error is IllegalArgumentException) {
-            error.message ?: "请稍后重试"
+            error.message ?: cloudText(R.string.cloud_retry_later)
         } else {
-            "网络连接失败，请稍后重试"
+            cloudText(R.string.cloud_network_error)
         }
 }
 

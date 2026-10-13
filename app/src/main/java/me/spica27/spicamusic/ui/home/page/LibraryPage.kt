@@ -7,7 +7,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -74,7 +73,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -97,7 +95,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.spicamusic.R
@@ -118,8 +115,6 @@ import me.spica27.spicamusic.ui.playlistdetail.PlaylistDetailScene
 import me.spica27.spicamusic.ui.scan.ScannerScene
 import me.spica27.spicamusic.ui.settings.MediaLibrarySourceViewModel
 import me.spica27.spicamusic.ui.theme.LayoutTokens
-import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
-import me.spica27.spicamusic.ui.theme.ListItemFadeOutSpec
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
 import me.spica27.spicamusic.ui.widget.AudioCover
@@ -137,15 +132,6 @@ import java.util.concurrent.TimeUnit
 
 /** 大标题收缩归一化距离的上限（实际取刊头实测滚出高度，见 mastheadCollapse） */
 private val MastheadCollapseDistance = 140.dp
-
-/** 首屏入场交错间隔 */
-private const val ENTRANCE_STAGGER_MILLIS = 55L
-
-/** 参与入场编排的最大歌单卡数（之后的卡片直接呈现） */
-private const val ENTRANCE_MAX_CARD = 6
-
-/** 首屏元素在编排中的槽位：刊头=0 操作行=1 统计条=2 歌单区头=3 歌单卡从 4 开始 */
-private const val ENTRANCE_ORDER_CARD_BASE = 4
 
 @Composable
 fun LibraryPage() {
@@ -198,15 +184,6 @@ fun LibraryPage() {
             pendingReauthFolderId = -1L
         }
 
-    var playEntrance by remember { mutableStateOf(true) }
-    LaunchedEffect(Unit) {
-        if (playEntrance) {
-            // 本地翻转推迟到最后一张卡的弹簧收尾之后，只用于让此后新组合的项直接呈现
-            delay(1400)
-            playEntrance = false
-        }
-    }
-
     val gridState = rememberLazyGridState()
     val scope = rememberCoroutineScope()
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -243,7 +220,6 @@ fun LibraryPage() {
             overscrollEffect = rememberIOSOverScrollEffect(Orientation.Vertical),
         ) {
             item(key = "masthead", span = { GridItemSpan(maxLineSpan) }, contentType = "masthead") {
-                val entrance = rememberEntrance(order = 0, play = playEntrance)
                 LibraryMasthead(
                     playlistCount = totalPlaylistCount,
                     subtitle =
@@ -260,10 +236,9 @@ fun LibraryPage() {
                             .graphicsLayer {
                                 // 跟手收缩：大标题缩小、上移、淡出，直接耦合滚动偏移
                                 val t = mastheadCollapse(gridState)
-                                val enter = entrance.value
                                 transformOrigin = TransformOrigin(0f, 0f)
-                                alpha = (1f - t) * enter
-                                translationY = -t * 16.dp.toPx() + (1f - enter) * 28.dp.toPx()
+                                alpha = (1f - t)
+                                translationY = -t * 16.dp.toPx()
                                 scaleX = 1f - 0.18f * t
                                 scaleY = 1f - 0.18f * t
                             },
@@ -279,16 +254,15 @@ fun LibraryPage() {
 
             if (showStats) {
                 item(key = "weekly_stats", span = { GridItemSpan(maxLineSpan) }, contentType = "stats") {
-                    val entrance = rememberEntrance(order = 2, play = playEntrance)
                     WeeklyStatsStrip(
                         stats = weeklyStats ?: return@item,
                         modifier =
                             Modifier
                                 .animateItem(
-                                    fadeInSpec = ListItemFadeInSpec,
+                                    fadeInSpec = null,
                                     placementSpec = null,
-                                    fadeOutSpec = ListItemFadeOutSpec,
-                                ).entranceGraphics(entrance),
+                                    fadeOutSpec = null,
+                                ),
                     )
                 }
             }
@@ -339,13 +313,11 @@ fun LibraryPage() {
             }
 
             item(key = "actions", span = { GridItemSpan(maxLineSpan) }, contentType = "actions") {
-                val entrance = rememberEntrance(order = 1, play = playEntrance)
                 Row(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(top = Spacing.Small)
-                            .entranceGraphics(entrance),
+                            .padding(top = Spacing.Small),
                     horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
                 ) {
                     LibraryCommandPill(
@@ -383,9 +355,9 @@ fun LibraryPage() {
                         },
                         modifier =
                             Modifier.animateItem(
-                                fadeInSpec = ListItemFadeInSpec,
+                                fadeInSpec = null,
                                 placementSpec = null,
-                                fadeOutSpec = ListItemFadeOutSpec,
+                                fadeOutSpec = null,
                             ),
                     )
                 }
@@ -393,7 +365,6 @@ fun LibraryPage() {
 
             if (playlists.isNotEmpty()) {
                 item(key = "playlists_header", span = { GridItemSpan(maxLineSpan) }, contentType = "section_header") {
-                    val entrance = rememberEntrance(order = 3, play = playEntrance)
                     Text(
                         text =
                             stringResource(
@@ -404,8 +375,7 @@ fun LibraryPage() {
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier =
                             Modifier
-                                .padding(top = Spacing.Medium)
-                                .entranceGraphics(entrance),
+                                .padding(top = Spacing.Medium),
                     )
                 }
 
@@ -420,27 +390,15 @@ fun LibraryPage() {
                 ) { index, item ->
                     val cardModifier =
                         Modifier.animateItem(
-                            fadeInSpec = ListItemFadeInSpec,
+                            fadeInSpec = null,
                             placementSpec =
                                 spring(
                                     dampingRatio = Spring.DampingRatioLowBouncy,
                                     stiffness = Spring.StiffnessMediumLow,
                                     visibilityThreshold = IntOffset.VisibilityThreshold,
                                 ),
-                            fadeOutSpec = ListItemFadeOutSpec,
+                            fadeOutSpec = null,
                         )
-                    // 编舞只覆盖首屏前几张卡；播完后不再为滚动进场的卡片挂空操作 graphicsLayer
-                    val entranceModifier =
-                        if (playEntrance && index < ENTRANCE_MAX_CARD) {
-                            val entrance =
-                                rememberEntrance(
-                                    order = ENTRANCE_ORDER_CARD_BASE + index,
-                                    play = true,
-                                )
-                            cardModifier.entranceGraphics(entrance)
-                        } else {
-                            cardModifier
-                        }
                     PlaylistCard(
                         item = item,
                         onClick = {
@@ -451,7 +409,7 @@ fun LibraryPage() {
                                 ),
                             )
                         },
-                        modifier = entranceModifier,
+                        modifier = cardModifier,
                     )
                 }
             }
@@ -520,14 +478,14 @@ fun LibraryPage() {
                         },
                         modifier =
                             Modifier.animateItem(
-                                fadeInSpec = ListItemFadeInSpec,
+                                fadeInSpec = null,
                                 placementSpec =
                                     spring(
                                         dampingRatio = Spring.DampingRatioLowBouncy,
                                         stiffness = Spring.StiffnessMediumLow,
                                         visibilityThreshold = IntOffset.VisibilityThreshold,
                                     ),
-                                fadeOutSpec = ListItemFadeOutSpec,
+                                fadeOutSpec = null,
                             ),
                     )
                 }
@@ -558,14 +516,14 @@ fun LibraryPage() {
                         onRemove = { sourceViewModel.removeFolder(context, folder) },
                         modifier =
                             Modifier.animateItem(
-                                fadeInSpec = ListItemFadeInSpec,
+                                fadeInSpec = null,
                                 placementSpec =
                                     spring(
                                         dampingRatio = Spring.DampingRatioLowBouncy,
                                         stiffness = Spring.StiffnessMediumLow,
                                         visibilityThreshold = IntOffset.VisibilityThreshold,
                                     ),
-                                fadeOutSpec = ListItemFadeOutSpec,
+                                fadeOutSpec = null,
                             ),
                     )
                 }
@@ -579,14 +537,14 @@ fun LibraryPage() {
                         Modifier
                             .padding(top = Spacing.Small)
                             .animateItem(
-                                fadeInSpec = ListItemFadeInSpec,
+                                fadeInSpec = null,
                                 placementSpec =
                                     spring(
                                         dampingRatio = Spring.DampingRatioLowBouncy,
                                         stiffness = Spring.StiffnessMediumLow,
                                         visibilityThreshold = IntOffset.VisibilityThreshold,
                                     ),
-                                fadeOutSpec = ListItemFadeOutSpec,
+                                fadeOutSpec = null,
                             ),
                 )
             }
@@ -615,37 +573,6 @@ private fun Density.mastheadCollapse(gridState: LazyGridState): Float {
             .coerceIn(1f, MastheadCollapseDistance.toPx())
     return (gridState.firstVisibleItemScrollOffset / scrollOutDistance).coerceIn(0f, 1f)
 }
-
-/** 首屏入场：延迟 [order] 个节拍后弹入，[play] 为 false 时直接呈现（配方同收藏页） */
-@Composable
-private fun rememberEntrance(
-    order: Int,
-    play: Boolean,
-): Animatable<Float, AnimationVector1D> {
-    val entrance = remember { Animatable(if (play) 0f else 1f) }
-    LaunchedEffect(Unit) {
-        if (entrance.value < 1f) {
-            delay(order * ENTRANCE_STAGGER_MILLIS)
-            entrance.animateTo(
-                targetValue = 1f,
-                animationSpec =
-                    spring(
-                        dampingRatio = Spring.DampingRatioLowBouncy,
-                        stiffness = 380f,
-                    ),
-            )
-        }
-    }
-    return entrance
-}
-
-/** 入场位移+淡入，全部在 Draw 阶段读取动画值 */
-private fun Modifier.entranceGraphics(entrance: Animatable<Float, AnimationVector1D>): Modifier =
-    graphicsLayer {
-        val enter = entrance.value
-        alpha = enter
-        translationY = (1f - enter) * 28.dp.toPx()
-    }
 
 /** 固定顶栏：背景与标题透明度跟随刊头收缩进度，收起后弹出迷你「新建歌单」药丸 */
 @Composable

@@ -139,8 +139,8 @@ class CloudLibraryScene : StackScene() {
                 }
                 item(key = "kugou", contentType = "provider") {
                     ProviderCard(
-                        title = "酷狗音乐 / 概念版",
-                        subtitle = "扫码登录、云端歌单、搜索与播放",
+                        title = stringResource(R.string.kugou_provider_title),
+                        subtitle = stringResource(R.string.kugou_provider_subtitle),
                         icon = Icons.Default.MusicNote,
                         onClick = { path.push(RemoteMusicScene(RemoteMusicProvider.KUGOU)) },
                     )
@@ -148,7 +148,7 @@ class CloudLibraryScene : StackScene() {
                 item(key = "bilibili", contentType = "provider") {
                     ProviderCard(
                         title = "Bilibili",
-                        subtitle = "搜索视频音频、播放 BV 链接、浏览收藏夹",
+                        subtitle = stringResource(R.string.bilibili_provider_subtitle),
                         icon = Icons.Default.MusicNote,
                         onClick = { path.push(RemoteMusicScene(RemoteMusicProvider.BILIBILI)) },
                     )

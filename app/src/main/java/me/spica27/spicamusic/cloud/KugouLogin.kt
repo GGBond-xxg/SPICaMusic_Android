@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -43,6 +44,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import me.spica27.spicamusic.R
 import org.koin.compose.koinInject
 
 @Composable
@@ -54,8 +56,8 @@ internal fun KugouLogin(
     var sms by remember { mutableStateOf(true) }
     Column(modifier) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-            TextButton(onClick = { sms = true }, enabled = !sms) { Text("验证码登录") }
-            TextButton(onClick = { sms = false }, enabled = sms) { Text("扫码登录") }
+            TextButton(onClick = { sms = true }, enabled = !sms) { Text(stringResource(R.string.kugou_sms_tab)) }
+            TextButton(onClick = { sms = false }, enabled = sms) { Text(stringResource(R.string.kugou_qr_tab)) }
         }
         if (sms) {
             KugouSmsLogin(Modifier.weight(1f), onLogin, onCancel)
@@ -78,7 +80,7 @@ private fun KugouQrLogin(
     val currentOnLogin by rememberUpdatedState(onLogin)
     var revision by remember { mutableIntStateOf(0) }
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var message by remember { mutableStateOf("正在生成二维码…") }
+    var message by remember { mutableStateOf(cloudText(R.string.kugou_qr_creating)) }
     var saved by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(true) }
@@ -86,7 +88,7 @@ private fun KugouQrLogin(
         bitmap = null
         saved = false
         loading = true
-        message = "正在生成二维码…"
+        message = cloudText(R.string.kugou_qr_creating)
         try {
             val key = client.createQr()
             bitmap =
@@ -107,13 +109,13 @@ private fun KugouQrLogin(
                     }
                 }
             loading = false
-            message = "等待扫码"
+            message = cloudText(R.string.kugou_qr_wait)
             val deadline = android.os.SystemClock.elapsedRealtime() + 180_000
             var complete = false
             lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 while (!complete) {
                     if (android.os.SystemClock.elapsedRealtime() >= deadline) {
-                        message = "二维码已过期，请刷新"
+                        message = cloudText(R.string.kugou_qr_expired)
                         bitmap = null
                         complete = true
                         break
@@ -122,19 +124,19 @@ private fun KugouQrLogin(
                     when (result.status) {
                         4 -> {
                             complete = true
-                            message = "登录成功"
+                            message = cloudText(R.string.kugou_login_success)
                             result.account?.let(currentOnLogin)
                         }
                         0, 800 -> {
                             complete = true
                             bitmap = null
-                            message = "二维码已过期，请刷新"
+                            message = cloudText(R.string.kugou_qr_expired)
                         }
-                        2, 803 -> message = "已扫码，请在酷狗中确认登录"
-                        1 -> message = "等待扫码"
+                        2, 803 -> message = cloudText(R.string.kugou_qr_confirm)
+                        1 -> message = cloudText(R.string.kugou_qr_wait)
                         else -> {
                             complete = true
-                            message = "暂时无法确认登录状态，请刷新重试"
+                            message = cloudText(R.string.kugou_qr_status_error)
                         }
                     }
                     if (!complete) delay(2500)
@@ -144,7 +146,7 @@ private fun KugouQrLogin(
             throw cancelled
         } catch (_: Exception) {
             loading = false
-            message = "连接酷狗失败，请检查网络后刷新重试"
+            message = cloudText(R.string.kugou_qr_network_error)
         }
     }
     Column(
@@ -152,17 +154,26 @@ private fun KugouQrLogin(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("扫码登录酷狗", style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.kugou_qr_title), style = MaterialTheme.typography.headlineSmall)
         Text(
-            "使用酷狗音乐或概念版扫一扫并确认登录。同一台手机可先保存二维码，再从扫一扫的相册中识别。",
+            stringResource(R.string.kugou_qr_help),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (loading) CircularProgressIndicator()
-        bitmap?.let { Image(it.asImageBitmap(), "酷狗登录二维码", Modifier.sizeIn(maxWidth = 280.dp).fillMaxWidth().aspectRatio(1f)) }
+        bitmap?.let {
+            Image(
+                it.asImageBitmap(),
+                stringResource(R.string.kugou_qr_description),
+                Modifier.sizeIn(maxWidth = 280.dp).fillMaxWidth().aspectRatio(1f),
+            )
+        }
         Text(message, style = MaterialTheme.typography.bodyLarge)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = { revision++ }, enabled = !loading) { Text("刷新二维码") }
+            OutlinedButton(
+                onClick = { revision++ },
+                enabled = !loading,
+            ) { Text(stringResource(R.string.kugou_qr_refresh)) }
             Button(enabled = bitmap != null && !saving, onClick = {
                 val image = bitmap ?: return@Button
                 saving = true
@@ -196,19 +207,29 @@ private fun KugouQrLogin(
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (_: Exception) {
-                        message = "保存失败，请重试"
+                        message = cloudText(R.string.kugou_qr_save_error)
                     } finally {
                         saving = false
                     }
                 }
-            }) { Text(if (saved) "已保存，可再次保存" else "保存二维码") }
+            }) {
+                Text(
+                    if (saved) {
+                        stringResource(
+                            R.string.kugou_qr_saved_again,
+                        )
+                    } else {
+                        stringResource(R.string.kugou_qr_save)
+                    },
+                )
+            }
         }
-        if (saved) Text("已保存到相册，请打开酷狗扫一扫。", color = MaterialTheme.colorScheme.primary)
+        if (saved) Text(stringResource(R.string.kugou_qr_saved), color = MaterialTheme.colorScheme.primary)
         Text(
-            "登录凭据加密保存在本机。登录后可浏览歌单、搜索并播放账号有权访问的歌曲。",
+            stringResource(R.string.kugou_qr_privacy),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        onCancel?.let { TextButton(onClick = it) { Text("返回账号") } }
+        onCancel?.let { TextButton(onClick = it) { Text(stringResource(R.string.cloud_back_account)) } }
     }
 }

@@ -293,7 +293,10 @@ class RemoteMusicScene(
                                     }
                                     if (provider != RemoteMusicProvider.SUBSONIC) {
                                         IconButton(onClick = { showCreatePlaylist = true }) {
-                                            Icon(Icons.Default.PlaylistPlay, "创建本地歌单")
+                                            Icon(
+                                                Icons.Default.PlaylistPlay,
+                                                stringResource(R.string.cloud_create_local_playlist),
+                                            )
                                         }
                                     }
                                     IconButton(onClick = { showLogin = true }) {
@@ -332,7 +335,15 @@ class RemoteMusicScene(
                                     modifier = Modifier.weight(1f).height(58.dp),
                                     singleLine = true,
                                     placeholder = {
-                                        Text(if (provider == RemoteMusicProvider.BILIBILI) "关键词或 BV 链接" else "搜索${provider.displayName}歌曲")
+                                        Text(
+                                            if (provider ==
+                                                RemoteMusicProvider.BILIBILI
+                                            ) {
+                                                stringResource(R.string.bilibili_search_hint)
+                                            } else {
+                                                stringResource(R.string.cloud_search_provider, provider.displayName)
+                                            },
+                                        )
                                     },
                                     leadingIcon = { Icon(Icons.Default.Search, null) },
                                     shape = RoundedCornerShape(20.dp),
@@ -354,7 +365,7 @@ class RemoteMusicScene(
                                     shape = RoundedCornerShape(20.dp),
                                     contentPadding = PaddingValues(horizontal = 20.dp),
                                 ) {
-                                    Text("搜索")
+                                    Text(stringResource(R.string.cloud_search))
                                 }
                             }
                         }
@@ -368,9 +379,9 @@ class RemoteMusicScene(
                     if (provider != RemoteMusicProvider.SUBSONIC && state.localPlaylists.isNotEmpty()) {
                         item(key = "local_playlist_title", contentType = "section_title") {
                             Column(modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)) {
-                                Text("本地歌单", fontWeight = FontWeight.SemiBold)
+                                Text(stringResource(R.string.cloud_local_playlists), fontWeight = FontWeight.SemiBold)
                                 Text(
-                                    "仅保存在本机，不会同步到${provider.displayName}",
+                                    stringResource(R.string.cloud_local_only_provider, provider.displayName),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -451,7 +462,7 @@ class RemoteMusicScene(
                                                 catalogViewModel.refreshDailyRecommendations(forceRefresh = true)
                                             },
                                         ) {
-                                            Text("重试")
+                                            Text(stringResource(R.string.cloud_retry))
                                         }
                                     }
                                 }
@@ -519,7 +530,13 @@ class RemoteMusicScene(
                     ) {
                         item(key = "qq_collection_title", contentType = "section_title") {
                             Text(
-                                if (provider == RemoteMusicProvider.BILIBILI) "Bilibili 收藏夹" else "${provider.displayName}歌单",
+                                if (provider ==
+                                    RemoteMusicProvider.BILIBILI
+                                ) {
+                                    stringResource(R.string.bilibili_favorites)
+                                } else {
+                                    stringResource(R.string.cloud_provider_playlists, provider.displayName)
+                                },
                                 modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
                                 fontWeight = FontWeight.SemiBold,
                             )
@@ -549,7 +566,7 @@ class RemoteMusicScene(
                                         OutlinedButton(
                                             onClick = { viewModel.refreshRemotePlaylists(forceRefresh = true) },
                                         ) {
-                                            Text("重试")
+                                            Text(stringResource(R.string.cloud_retry))
                                         }
                                     }
                                 }
@@ -560,9 +577,9 @@ class RemoteMusicScene(
                                         if (provider ==
                                             RemoteMusicProvider.BILIBILI
                                         ) {
-                                            "登录账号后可浏览收藏夹；下方可浏览公开音乐内容，也可以搜索关键词或 BV 链接。"
+                                            stringResource(R.string.bilibili_guest_help)
                                         } else {
-                                            "还没有获取到${provider.displayName}歌单"
+                                            stringResource(R.string.cloud_no_playlists, provider.displayName)
                                         },
                                         modifier = Modifier.fillMaxWidth().padding(24.dp),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -636,11 +653,11 @@ class RemoteMusicScene(
                                         verticalArrangement = Arrangement.spacedBy(8.dp),
                                     ) {
                                         Text(
-                                            error?.message ?: "加载云端音乐失败",
+                                            error?.message ?: stringResource(R.string.cloud_load_error),
                                             color = MaterialTheme.colorScheme.error,
                                         )
                                         OutlinedButton(onClick = songs::retry) {
-                                            Text("重试")
+                                            Text(stringResource(R.string.cloud_retry))
                                         }
                                     }
                                 }
@@ -648,7 +665,7 @@ class RemoteMusicScene(
                             hasSubmittedSearch && songs.itemCount == 0 -> {
                                 item(key = "search_empty", contentType = "empty") {
                                     Text(
-                                        "没有找到相关歌曲",
+                                        stringResource(R.string.cloud_no_songs),
                                         modifier = Modifier.fillMaxWidth().padding(24.dp),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -791,7 +808,7 @@ class NeteasePlaylistScene(
                 } else if (songs.isEmpty()) {
                     item(key = "empty", contentType = "empty") {
                         Text(
-                            text = "歌单中暂无可播放歌曲",
+                            text = stringResource(R.string.cloud_empty_playlist),
                             modifier = Modifier.fillMaxWidth().padding(24.dp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -932,7 +949,7 @@ class QqPlaylistScene(
                 } else if (songs.isEmpty()) {
                     item(key = "empty", contentType = "empty") {
                         Text(
-                            "歌单中暂无可播放歌曲",
+                            stringResource(R.string.cloud_empty_playlist),
                             modifier = Modifier.fillMaxWidth().padding(24.dp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -1008,8 +1025,8 @@ class CloudUserPlaylistScene(
         if (showDeleteDialog) {
             AlertDialog(
                 onDismissRequest = { showDeleteDialog = false },
-                title = { Text("删除歌单？") },
-                text = { Text("将删除“${currentPlaylist.name}”。歌曲本身不会被删除。") },
+                title = { Text(stringResource(R.string.cloud_delete_playlist_question)) },
+                text = { Text(stringResource(R.string.cloud_delete_playlist_help, currentPlaylist.name)) },
                 confirmButton = {
                     TextButton(
                         onClick = {
@@ -1020,10 +1037,12 @@ class CloudUserPlaylistScene(
                             viewModel.deleteLocalPlaylist(currentPlaylist.accountId, currentPlaylist.id)
                             path.popTop()
                         },
-                    ) { Text("删除") }
+                    ) { Text(stringResource(R.string.cloud_delete)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showDeleteDialog = false }) { Text("取消") }
+                    TextButton(
+                        onClick = { showDeleteDialog = false },
+                    ) { Text(stringResource(R.string.cloud_action_cancel)) }
                 },
             )
         }
@@ -1034,7 +1053,7 @@ class CloudUserPlaylistScene(
             onBack = { path.popTop() },
             actions = {
                 IconButton(onClick = { showDeleteDialog = true }) {
-                    Icon(Icons.Default.DeleteOutline, "删除歌单")
+                    Icon(Icons.Default.DeleteOutline, stringResource(R.string.cloud_delete_playlist))
                 }
             },
         ) { padding ->
@@ -1101,7 +1120,7 @@ class CloudUserPlaylistScene(
                 if (currentPlaylist.songs.isEmpty()) {
                     item(key = "empty", contentType = "empty") {
                         Text(
-                            "歌单还是空的，请从搜索结果右侧的 + 添加歌曲。",
+                            stringResource(R.string.cloud_empty_playlist_help),
                             modifier = Modifier.fillMaxWidth().padding(24.dp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -1235,7 +1254,11 @@ private fun NeteasePlaylistRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    "${value.playlist.songCount} 首 · ${value.account.displayName}",
+                    stringResource(
+                        R.string.cloud_song_count_provider,
+                        value.playlist.songCount,
+                        value.account.displayName,
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1278,7 +1301,7 @@ private fun RemotePlaylistRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    "${playlist.songCount} 首 · ${provider.displayName}",
+                    stringResource(R.string.cloud_song_count_provider, playlist.songCount, provider.displayName),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1323,7 +1346,7 @@ private fun CloudUserPlaylistRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    "${playlist.songs.size} 首 · 仅保存在本机",
+                    stringResource(R.string.cloud_song_count_local, playlist.songs.size),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1398,7 +1421,7 @@ private fun SubsonicLogin(
                         enabled = !state.isConnecting,
                         modifier = Modifier.weight(1f).heightIn(min = 52.dp),
                     ) {
-                        Text("取消")
+                        Text(stringResource(R.string.cloud_action_cancel))
                     }
                 }
                 Button(
@@ -1437,13 +1460,13 @@ private fun CookieWebLogin(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         LoginIntro(
-            title = "登录 ${provider.displayName}",
-            body = "请在下方官方网页完成登录。应用只读取登录 Cookie，不会读取或保存你的密码。",
+            title = stringResource(R.string.cloud_web_login_title, provider.displayName),
+            body = stringResource(R.string.cloud_web_login_help),
         )
         state.error?.let { LoginError(it) }
         onBrowse?.let { browse ->
             OutlinedButton(onClick = browse, enabled = !state.isConnecting, modifier = Modifier.fillMaxWidth()) {
-                Text("先浏览公开内容（收藏夹需登录）")
+                Text(stringResource(R.string.bilibili_guest_action))
             }
         }
         AndroidView(
@@ -1491,7 +1514,7 @@ private fun CookieWebLogin(
                     enabled = !state.isConnecting,
                     modifier = Modifier.weight(1f).heightIn(min = 52.dp),
                 ) {
-                    Text("取消")
+                    Text(stringResource(R.string.cloud_action_cancel))
                 }
             }
             Button(
@@ -1506,7 +1529,7 @@ private fun CookieWebLogin(
                 if (state.isConnecting) {
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                 } else {
-                    Text("我已完成登录")
+                    Text(stringResource(R.string.cloud_login_done))
                 }
             }
         }
@@ -1580,11 +1603,11 @@ private fun CloudPlaylistNameDialog(
     var name by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("创建本地歌单") },
+        title = { Text(stringResource(R.string.cloud_create_local_playlist)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    "当前没有稳定的${provider.displayName}歌单写入接口，新歌单只保存在本机。",
+                    stringResource(R.string.cloud_create_local_help, provider.displayName),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1593,7 +1616,7 @@ private fun CloudPlaylistNameDialog(
                     onValueChange = { name = it },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    label = { Text("歌单名称") },
+                    label = { Text(stringResource(R.string.cloud_playlist_name)) },
                 )
             }
         },
@@ -1602,11 +1625,11 @@ private fun CloudPlaylistNameDialog(
                 onClick = { onConfirm(name) },
                 enabled = name.isNotBlank(),
             ) {
-                Text("创建")
+                Text(stringResource(R.string.cloud_create))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cloud_action_cancel)) }
         },
     )
 }
@@ -1622,12 +1645,12 @@ private fun CloudPlaylistPickerDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("添加到歌单") },
+        title = { Text(stringResource(R.string.cloud_add_to_playlist)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (cloudPlaylists.isEmpty() && homePlaylists.isEmpty()) {
                     Text(
-                        "还没有本地歌单，请先创建一个。",
+                        stringResource(R.string.cloud_no_local_playlists),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
@@ -1640,7 +1663,7 @@ private fun CloudPlaylistPickerDialog(
                                 Column(modifier = Modifier.fillMaxWidth()) {
                                     Text(playlist.playlistName, color = MaterialTheme.colorScheme.onSurface)
                                     Text(
-                                        "首页/资料库歌单 · 可添加所有音乐源",
+                                        stringResource(R.string.cloud_local_playlist_hint),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -1656,7 +1679,7 @@ private fun CloudPlaylistPickerDialog(
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 Text(playlist.name, color = MaterialTheme.colorScheme.onSurface)
                                 Text(
-                                    "${playlist.songs.size} 首 · 仅保存在本机",
+                                    stringResource(R.string.cloud_song_count_local, playlist.songs.size),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -1669,11 +1692,11 @@ private fun CloudPlaylistPickerDialog(
         confirmButton = {
             TextButton(onClick = onCreate) {
                 Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
-                Text("新建歌单")
+                Text(stringResource(R.string.cloud_new_playlist))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cloud_action_cancel)) }
         },
     )
 }
@@ -1754,7 +1777,11 @@ private fun RemoteSongRow(
                         Text("${song.artist} · ${song.album} · ${formatRemoteDuration(song.durationMs)}")
                     }, onClick = {}, enabled = false)
                     onRemoveFromPlaylist?.let { remove ->
-                        DropdownMenuItem(text = { Text("从歌单移除") }, onClick = {
+                        DropdownMenuItem(text = {
+                            Text(
+                                stringResource(R.string.cloud_remove_from_playlist),
+                            )
+                        }, onClick = {
                             showMenu = false
                             remove()
                         })
@@ -1769,12 +1796,12 @@ private fun RemoteSongRow(
             )
             onAddToPlaylist?.let { add ->
                 IconButton(onClick = add) {
-                    Icon(Icons.Default.Add, "添加到歌单")
+                    Icon(Icons.Default.Add, stringResource(R.string.cloud_add_to_playlist))
                 }
             }
             onRemoveFromPlaylist?.let { remove ->
                 IconButton(onClick = remove) {
-                    Icon(Icons.Default.DeleteOutline, "从歌单移除")
+                    Icon(Icons.Default.DeleteOutline, stringResource(R.string.cloud_remove_from_playlist))
                 }
             }
         }
@@ -1833,7 +1860,7 @@ internal val RemoteMusicProvider.displayName: String
             RemoteMusicProvider.NETEASE -> "网易云音乐"
             RemoteMusicProvider.QQ_MUSIC -> "QQ 音乐"
             RemoteMusicProvider.BILIBILI -> "Bilibili"
-            RemoteMusicProvider.KUGOU -> "酷狗音乐"
+            RemoteMusicProvider.KUGOU -> cloudText(R.string.kugou_provider_name)
         }
 
 private val RemoteMusicProvider.loginUrl: String
@@ -1872,12 +1899,18 @@ private val RemoteMusicProvider.cookieUrls: List<String>
 private fun RemoteMusicProvider.accountSubtitle(account: RemoteMusicAccount): String =
     when (this) {
         RemoteMusicProvider.SUBSONIC -> account.normalizedServerUrl
-        RemoteMusicProvider.KUGOU -> "登录凭据已加密保存在本机"
+        RemoteMusicProvider.KUGOU -> cloudText(R.string.cloud_credentials_saved)
         RemoteMusicProvider.NETEASE,
         RemoteMusicProvider.QQ_MUSIC,
-        -> "网页登录会话已加密保存在本机"
+        -> cloudText(R.string.cloud_session_saved)
         RemoteMusicProvider.BILIBILI ->
-            if (account.secret.isBlank()) "访客模式 · 登录后可浏览收藏夹" else "网页登录会话已加密保存在本机"
+            if (account.secret.isBlank()) {
+                cloudText(
+                    R.string.bilibili_guest_mode,
+                )
+            } else {
+                cloudText(R.string.cloud_session_saved)
+            }
     }
 
 private fun collectCookies(urls: List<String>): String {

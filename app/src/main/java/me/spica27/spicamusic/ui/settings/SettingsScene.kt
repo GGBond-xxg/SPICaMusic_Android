@@ -70,6 +70,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -90,6 +91,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -108,6 +111,7 @@ import me.spica27.spicamusic.common.entity.ThemeMode
 import me.spica27.spicamusic.topdisplay.TopDisplayMode
 import me.spica27.spicamusic.ui.about.AboutScene
 import me.spica27.spicamusic.ui.audioeffects.AudioEffectsScene
+import me.spica27.spicamusic.ui.player.playerHapticStrength
 import me.spica27.spicamusic.ui.theme.EaseOutEmphasized
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.theme.Shapes
@@ -115,6 +119,7 @@ import me.spica27.spicamusic.ui.theme.Spacing
 import me.spica27.spicamusic.ui.widget.clickHighlight
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
 import org.koin.compose.viewmodel.koinViewModel
+import kotlin.math.roundToInt
 
 class SettingsScene : StackScene() {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -126,6 +131,7 @@ class SettingsScene : StackScene() {
 
         val themeModeValue by viewModel.themeMode.collectAsStateWithLifecycle()
         val themeMode = ThemeMode.fromString(themeModeValue)
+        val hapticSliderDescription = stringResource(R.string.player_haptics_strength)
         val playerHapticsEnabled by viewModel.playerHapticsEnabled.collectAsStateWithLifecycle()
         val playerHapticsStrength by viewModel.playerHapticsStrength.collectAsStateWithLifecycle()
         val keepScreenOn by viewModel.keepScreenOn.collectAsStateWithLifecycle()
@@ -404,8 +410,8 @@ class SettingsScene : StackScene() {
                         subtitle = stringResource(R.string.settings_player_page_subtitle),
                     ) {
                         ModernSettingsSwitchItem(
-                            title = "播放界面震动",
-                            subtitle = "点击播放页及迷你播放器按钮时提供震动反馈",
+                            title = stringResource(R.string.player_haptics_title),
+                            subtitle = stringResource(R.string.player_haptics_description),
                             icon = Icons.Default.NotificationsActive,
                             checked = playerHapticsEnabled,
                             onCheckedChange = viewModel::setPlayerHapticsEnabled,
@@ -414,23 +420,42 @@ class SettingsScene : StackScene() {
                             SettingsItemDivider()
                             ModernSettingsSelectItem(
                                 rowKey = "player_haptic_strength",
-                                title = "震动强度",
-                                subtitle =
-                                    when (playerHapticsStrength) {
-                                        "light" -> "轻"
-                                        "strong" -> "强"
-                                        else -> "中"
-                                    },
+                                title = stringResource(R.string.player_haptics_strength),
+                                subtitle = stringResource(R.string.player_haptics_percent, playerHapticStrength(playerHapticsStrength)),
                                 icon = Icons.Default.NotificationsActive,
                                 options =
                                     ImmutableList.copyOf(
-                                        listOf(SelectOption("light", "轻"), SelectOption("medium", "中"), SelectOption("strong", "强")),
+                                        listOf(
+                                            SelectOption("light", stringResource(R.string.player_haptics_light)),
+                                            SelectOption("medium", stringResource(R.string.player_haptics_medium)),
+                                            SelectOption("strong", stringResource(R.string.player_haptics_strong)),
+                                        ),
                                     ),
-                                currentValue = playerHapticsStrength,
+                                currentValue =
+                                    when (playerHapticStrength(playerHapticsStrength)) {
+                                        25 -> "light"
+                                        60 -> "medium"
+                                        100 -> "strong"
+                                        else -> playerHapticsStrength
+                                    },
                                 expandedKey = expandedRowKey,
                                 onExpandChange = { expandedRowKey = it },
                                 onValueChange = viewModel::setPlayerHapticsStrength,
                             )
+                            var sliderStrength by remember(playerHapticsStrength) {
+                                mutableStateOf(playerHapticStrength(playerHapticsStrength).toFloat())
+                            }
+                            Column(Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
+                                Text(stringResource(R.string.player_haptics_percent, sliderStrength.roundToInt()))
+                                Slider(
+                                    value = sliderStrength,
+                                    onValueChange = { sliderStrength = it },
+                                    onValueChangeFinished = { viewModel.setPlayerHapticsStrength(sliderStrength.roundToInt().toString()) },
+                                    valueRange = 0f..100f,
+                                    modifier = Modifier.semantics { contentDescription = hapticSliderDescription },
+                                )
+                                Text(stringResource(R.string.player_haptics_device_hint), style = MaterialTheme.typography.bodySmall)
+                            }
                         }
                         SettingsItemDivider()
                         ModernSettingsSelectItem(

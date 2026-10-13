@@ -7,12 +7,25 @@ import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.view.HapticFeedbackConstants
+import android.view.View
 import me.spica27.spicamusic.App
 import me.spica27.spicamusic.core.preferences.PreferencesManager
 import org.koin.core.context.GlobalContext
+import java.lang.ref.WeakReference
 
 /** Only invoked by UI actions, never by playback state updates or automatic track changes. */
 internal object PlayerHaptics {
+    private var feedbackView = WeakReference<View>(null)
+
+    fun bind(view: View) {
+        feedbackView = WeakReference(view)
+    }
+
+    fun unbind(view: View) {
+        if (feedbackView.get() === view) feedbackView.clear()
+    }
+
     private var lastClick = Long.MIN_VALUE
 
     fun click() {
@@ -36,24 +49,54 @@ internal object PlayerHaptics {
                 (context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator)
             } ?: return
         if (!vibrator.hasVibrator()) return
-        val (duration, amplitude) = playerHapticPulse(strength)
+        val amount = playerHapticStrength(strength)
+        if (amount == 0) return
+        val effect =
+            when {
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                    vibrator.arePrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_CLICK).all { it } ->
+                    VibrationEffect
+                        .startComposition()
+                        .addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, amount / 100f)
+                        .compose()
+                else -> {
+                    val effectId =
+                        when {
+                            amount <= 33 -> VibrationEffect.EFFECT_TICK
+                            amount >= 80 -> VibrationEffect.EFFECT_HEAVY_CLICK
+                            else -> VibrationEffect.EFFECT_CLICK
+                        }
+                    // Let the OEM select its calibrated touch effect when the vibrator cannot play
+                    // predefined effects. Never stretch a raw pulse to simulate stronger feedback.
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                        vibrator.areEffectsSupported(effectId).firstOrNull() == Vibrator.VIBRATION_EFFECT_SUPPORT_NO
+                    ) {
+                        feedbackView.get()?.performHapticFeedback(
+                            if (amount <= 33) HapticFeedbackConstants.CLOCK_TICK else HapticFeedbackConstants.KEYBOARD_TAP,
+                        )
+                        return
+                    }
+                    VibrationEffect.createPredefined(effectId)
+                }
+            }
         vibrator.vibrate(
-            VibrationEffect.createOneShot(duration, if (vibrator.hasAmplitudeControl()) amplitude else VibrationEffect.DEFAULT_AMPLITUDE),
+            effect,
             AudioAttributes
                 .Builder()
-                .setUsage(
-                    AudioAttributes.USAGE_ASSISTANCE_SONIFICATION,
-                ).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build(),
         )
     }
 }
 
-internal fun playerHapticPulse(strength: String): Pair<Long, Int> =
+/** Keep the three legacy presets readable after upgrading; numeric values enable fine adjustment. */
+internal fun playerHapticStrength(strength: String): Int =
     when (strength) {
-        "light" -> 12L to 65
-        "strong" -> 35L to 255
-        else -> 22L to 150
+        "light" -> 25
+        "strong" -> 100
+        "medium" -> 60
+        else -> strength.toIntOrNull()?.coerceIn(0, 100) ?: 60
     }
 
 internal fun playerClick(action: () -> Unit): () -> Unit =
