@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberCanvasBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
@@ -77,9 +78,30 @@ internal fun GlassBackdropHost(content: @Composable () -> Unit) {
     val enabled = LocalGlassEnabled.current
     val backdrop = rememberLayerBackdrop()
     val colors = MaterialTheme.colorScheme
+    val smooth = LocalGlassSettings.current.smoothMode
+    // A coordinate-independent source lets Android reuse each panel's filtered display list
+    // while scrolling, instead of recapturing a full-screen layer at every new position.
+    val smoothBackdrop =
+        rememberCanvasBackdrop {
+            drawRect(colors.background)
+            drawRect(
+                Brush.radialGradient(
+                    listOf(colors.primaryContainer, Color.Transparent),
+                    Offset(size.width * 0.05f, size.height * 0.2f),
+                    size.width * 0.95f,
+                ),
+            )
+            drawRect(
+                Brush.radialGradient(
+                    listOf(colors.tertiaryContainer, Color.Transparent),
+                    Offset(size.width * 0.95f, size.height * 0.65f),
+                    size.width * 0.9f,
+                ),
+            )
+        }
     Box(Modifier.fillMaxSize()) {
         if (enabled) {
-            Canvas(Modifier.fillMaxSize().then(if (LocalGlassSettings.current.smoothMode) Modifier else Modifier.layerBackdrop(backdrop))) {
+            Canvas(Modifier.fillMaxSize().then(if (smooth) Modifier else Modifier.layerBackdrop(backdrop))) {
                 drawRect(colors.background)
                 drawRect(
                     Brush.radialGradient(
@@ -100,7 +122,18 @@ internal fun GlassBackdropHost(content: @Composable () -> Unit) {
                 )
             }
         }
-        CompositionLocalProvider(LocalGlassBackdrop provides (if (enabled) backdrop else null), content = content)
+        CompositionLocalProvider(
+            LocalGlassBackdrop provides (
+                if (!enabled) {
+                    null
+                } else if (smooth) {
+                    smoothBackdrop
+                } else {
+                    backdrop
+                }
+            ),
+            content = content,
+        )
     }
 }
 
@@ -111,21 +144,31 @@ fun Modifier.glassSurface(
     color: Color,
     tint: Color? = null,
     opacity: Float = 0.48f,
+    frosted: Boolean = false,
 ): Modifier {
     val backdrop = LocalGlassBackdrop.current
     if (!LocalGlassEnabled.current || backdrop == null) return background(color, shape)
     val surfaceTint = tint ?: MaterialTheme.colorScheme.surface
     val settings = LocalGlassSettings.current
     val alpha = (opacity * settings.opacity / 65f * surfaceTint.alpha).coerceIn(0f, 1f)
-    // Small controls and repeated list cells use one cheap paint in smooth mode.
-    // Rectangular bars have no lens rim, avoiding a box around the whole toolbar.
-    if (settings.smoothMode || shape !is CornerBasedShape) {
+    // Only major panels blur in smooth mode. Small controls share a light reflective finish.
+    val rim =
+        Brush.linearGradient(
+            listOf(
+                Color.White.copy(alpha = 0.38f),
+                Color.White.copy(alpha = 0.06f),
+                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f),
+            ),
+        )
+    if ((settings.smoothMode && !frosted) || shape !is CornerBasedShape) {
         val base = if (LocalGlassOverlay.current) background(surfaceTint.copy(alpha = 1f), shape) else this
         val paint =
             base.background(
                 Brush.linearGradient(
                     listOf(
-                        surfaceTint.copy(alpha = (alpha + 0.08f).coerceAtMost(1f)),
+                        androidx.compose.ui.graphics
+                            .lerp(surfaceTint, Color.White, 0.12f)
+                            .copy(alpha = (alpha + 0.08f).coerceAtMost(1f)),
                         surfaceTint.copy(alpha = alpha),
                     ),
                 ),
@@ -134,7 +177,7 @@ fun Modifier.glassSurface(
         return if (shape is CornerBasedShape) {
             paint.border(
                 0.75.dp,
-                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.16f),
+                rim,
                 shape,
             )
         } else {
@@ -146,10 +189,19 @@ fun Modifier.glassSurface(
         backdrop = backdrop,
         shape = { shape },
         effects = {
-            if (settings.blur > 0) blur(settings.blur.dp.toPx())
-            if (settings.refraction > 0) lens((8f * settings.refraction / 100f).dp.toPx(), (12f * settings.refraction / 100f).dp.toPx())
+            val radius = if (settings.smoothMode) settings.blur.coerceAtMost(4) else settings.blur
+            if (radius > 0) blur(radius.dp.toPx())
+            if (!settings.smoothMode &&
+                settings.refraction > 0
+            ) {
+                lens((8f * settings.refraction / 100f).dp.toPx(), (12f * settings.refraction / 100f).dp.toPx())
+            }
         },
         shadow = null,
-        onDrawSurface = { drawRect(surfaceTint.copy(alpha = alpha)) },
-    )
+        highlight = if (settings.smoothMode) null else ({ com.kyant.backdrop.highlight.Highlight.Default }),
+        onDrawSurface = {
+            drawRect(surfaceTint.copy(alpha = if (settings.smoothMode) alpha * 0.8f else alpha))
+            if (settings.smoothMode) drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.08f), Color.Transparent)))
+        },
+    ).then(if (settings.smoothMode) Modifier.border(0.75.dp, rim, shape) else Modifier)
 }

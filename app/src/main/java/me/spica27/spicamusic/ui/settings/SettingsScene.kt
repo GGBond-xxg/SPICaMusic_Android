@@ -143,7 +143,6 @@ class SettingsScene : StackScene() {
         val coverTypeValue by viewModel.dynamicCoverType.collectAsStateWithLifecycle()
         val progressBarStyleValue by viewModel.progressBarStyle.collectAsStateWithLifecycle()
         val finderHeroSourceValue by viewModel.finderHeroSource.collectAsStateWithLifecycle()
-        val glassEffects by viewModel.glassEffects.collectAsStateWithLifecycle()
         val themeColorStyleValue by viewModel.themeColorStyle.collectAsStateWithLifecycle()
         val spectrumTopGlowLabel = stringResource(R.string.dynamic_spectrum_top_glow)
         val spectrumLiquidAuroraLabel = stringResource(R.string.dynamic_spectrum_liquid_aurora)
@@ -386,10 +385,14 @@ class SettingsScene : StackScene() {
                                 onValueChange = viewModel::setThemeColorStyle,
                             )
                             if (themeColorStyleValue == ThemeColorStyle.Glass.value) {
-                                GlassSettingsPanel(
-                                    me.spica27.spicamusic.common.entity.GlassSettings
-                                        .decode(glassEffects),
-                                    viewModel::setGlassEffects,
+                                SettingsItemDivider()
+                                SettingsRow(
+                                    title = stringResource(R.string.glass_effect_settings),
+                                    subtitle = stringResource(R.string.glass_effect_summary),
+                                    icon = Icons.Default.BlurOn,
+                                    selected = false,
+                                    onClick = { path.push(GlassSettingsScene()) },
+                                    trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null) },
                                 )
                             }
                             SettingsItemDivider()
@@ -892,8 +895,11 @@ private fun SettingsSectionCard(
             modifier
                 .fillMaxWidth()
                 .clip(Shapes.ExtraLargeCornerBasedShape)
-                .glassSurface(Shapes.ExtraLargeCornerBasedShape, MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f))
-                .padding(vertical = Spacing.Large),
+                .glassSurface(
+                    Shapes.ExtraLargeCornerBasedShape,
+                    MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f),
+                    frosted = true,
+                ).padding(vertical = Spacing.Large),
     ) {
         Column(
             modifier = Modifier.padding(horizontal = Spacing.Large),

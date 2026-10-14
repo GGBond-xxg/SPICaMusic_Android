@@ -69,6 +69,7 @@ class HomeScene : StackScene() {
         val pageBackground = MaterialTheme.colorScheme.background
         val glass = LocalGlassEnabled.current && !LocalGlassSettings.current.smoothMode
         val backdrop = rememberLayerBackdrop()
+        val floatingBackdrop = if (glass) backdrop else LocalGlassBackdrop.current
         CompositionLocalProvider(
             LocalBottomBarScrollConnection provides bottomBarScrollConnection,
         ) {
@@ -113,7 +114,7 @@ class HomeScene : StackScene() {
                                 ),
                             ),
                 )
-                CompositionLocalProvider(LocalGlassBackdrop provides backdrop, LocalGlassOverlay provides true) {
+                CompositionLocalProvider(LocalGlassBackdrop provides floatingBackdrop, LocalGlassOverlay provides true) {
                     BottomMediaBarV2(bottomBarScrollConnection)
                 }
             }

@@ -735,6 +735,7 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                                             MaterialTheme.colorScheme.surfaceContainerHigh.copy(
                                                 alpha = BOTTOM_FLOATING_CONTAINER_ALPHA,
                                             ),
+                                            frosted = true,
                                         ),
                             )
                             LargeBottomPlayerBar(
@@ -932,6 +933,7 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                                         MaterialTheme.colorScheme.surfaceContainerHigh.copy(
                                             alpha = BOTTOM_FLOATING_CONTAINER_ALPHA,
                                         ),
+                                        frosted = true,
                                     ),
                         )
                         Row(
@@ -1183,6 +1185,7 @@ private fun HomePageSwitcher(modifier: Modifier = Modifier) {
                     MaterialTheme.colorScheme.surfaceContainerHigh.copy(
                         alpha = BOTTOM_FLOATING_CONTAINER_ALPHA,
                     ),
+                    frosted = true,
                 ).drawWithCache {
                     val paddingValues = 6.dp.toPx()
                     val tabWidth = size.width / tabs.size

@@ -2,12 +2,13 @@
 <resources>
     <string name="glass_effect_settings">Glass effects</string>
     <string name="glass_smooth_mode">Smooth mode</string>
-    <string name="glass_smooth_hint">Uses lightweight glass surfaces to reduce GPU load. Turn off for live blur and refraction.</string>
+    <string name="glass_smooth_hint">Light blur, highlights and transparency with less GPU work. Turn off for full blur and refraction.</string>
     <string name="glass_opacity">Tint opacity</string>
     <string name="glass_blur">Blur radius</string>
     <string name="glass_refraction">Refraction strength</string>
-    <string name="glass_apply_hint">Release a slider to apply. Blur and refraction are available with Smooth mode off.</string>
+    <string name="glass_apply_hint">Release a slider to apply. Smooth mode limits blur to 4 and disables refraction.</string>
     <string name="timer_input_title">Custom timer</string>
     <string name="timer_input_minutes">Minutes</string>
     <string name="timer_input_range">Enter 1–240 minutes</string>
+    <string name="glass_effect_summary">Blur, transparency and performance</string>
 </resources>

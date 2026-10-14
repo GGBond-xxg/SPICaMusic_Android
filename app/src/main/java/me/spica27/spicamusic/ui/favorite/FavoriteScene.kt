@@ -1186,6 +1186,7 @@ private fun FavoriteMultiSelectBar(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
             ) {
                 IconButton(onClick = onClose) {
                     Icon(

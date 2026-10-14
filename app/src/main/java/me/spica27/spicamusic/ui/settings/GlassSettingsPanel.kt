@@ -24,7 +24,6 @@ fun GlassSettingsPanel(
 ) {
     var draft by remember(settings) { mutableStateOf(settings) }
     Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(R.string.glass_effect_settings), style = MaterialTheme.typography.titleMedium)
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(Modifier.weight(1f)) {
                 Text(stringResource(R.string.glass_smooth_mode))
@@ -41,11 +40,10 @@ fun GlassSettingsPanel(
         )
         GlassSettingSlider(
             stringResource(R.string.glass_blur),
-            draft.blur,
-            0f..16f,
+            if (draft.smoothMode) draft.blur.coerceAtMost(4) else draft.blur,
+            0f..(if (draft.smoothMode) 4f else 16f),
             { draft = draft.copy(blur = it) },
             { onChange(draft) },
-            enabled = !draft.smoothMode,
         )
         GlassSettingSlider(
             stringResource(R.string.glass_refraction),

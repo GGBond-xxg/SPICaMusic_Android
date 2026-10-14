@@ -120,7 +120,6 @@ import me.spica27.spicamusic.ui.settings.SettingsViewModel
 import me.spica27.spicamusic.ui.theme.LocalGlassBackdrop
 import me.spica27.spicamusic.ui.theme.LocalGlassEnabled
 import me.spica27.spicamusic.ui.theme.LocalGlassOverlay
-import me.spica27.spicamusic.ui.theme.LocalGlassSettings
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
 import me.spica27.spicamusic.ui.theme.glassSurface
@@ -375,7 +374,7 @@ fun ExpandedPlayerScreen(
         )
 
     val playerBackdrop = rememberLayerBackdrop()
-    val glass = LocalGlassEnabled.current && !LocalGlassSettings.current.smoothMode
+    val glass = LocalGlassEnabled.current
     CompositionLocalProvider(LocalGlassBackdrop provides playerBackdrop, LocalGlassOverlay provides false) {
         // Player popups must sample this background, never the home page behind the mini player.
         if (showAudioQualitySheet) {

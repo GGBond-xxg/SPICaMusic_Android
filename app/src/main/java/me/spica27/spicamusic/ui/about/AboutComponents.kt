@@ -141,6 +141,7 @@ internal fun AboutSectionCard(
                     MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f),
                     tint = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f),
                     opacity = 0.7f,
+                    frosted = true,
                 ).padding(vertical = Spacing.Large),
     ) {
         Column(

@@ -80,7 +80,15 @@ class OfflineScene : StackScene() {
                         ),
                         modifier = Modifier.padding(horizontal = Spacing.Large),
                     )
-                    FlowRow(Modifier.padding(horizontal = Spacing.Medium)) {
+                    FlowRow(
+                        Modifier.padding(horizontal = Spacing.Medium),
+                        horizontalArrangement =
+                            androidx.compose.foundation.layout.Arrangement
+                                .spacedBy(Spacing.Small),
+                        verticalArrangement =
+                            androidx.compose.foundation.layout.Arrangement
+                                .spacedBy(Spacing.Small),
+                    ) {
                         listOf(256, 512, 1024, 2048, 4096).forEach { size ->
                             FilterChip(selected = size == limit, onClick = {
                                 change { store.setLimit(size) }
@@ -131,7 +139,14 @@ class OfflineScene : StackScene() {
             if (tracks.isEmpty() && progress.isEmpty()) item { Text(stringResource(R.string.offline_empty)) }
             items(tracks, key = { it.id }) { track ->
                 AboutSectionCard(track.title, subtitle = "${track.artist} · ${Formatter.formatFileSize(context, track.bytes)}") {
-                    FlowRow {
+                    FlowRow(
+                        horizontalArrangement =
+                            androidx.compose.foundation.layout.Arrangement
+                                .spacedBy(Spacing.Small),
+                        verticalArrangement =
+                            androidx.compose.foundation.layout.Arrangement
+                                .spacedBy(Spacing.Small),
+                    ) {
                         TextButton(onClick = {
                             runCatching { player.doAction(PlayerAction.PlayMediaItems(listOf(store.mediaItem(track)))) }.onFailure {
                                 error =

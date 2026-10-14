@@ -38,18 +38,18 @@ fun GlassAlertDialog(
     val glass = LocalGlassEnabled.current
     AlertDialog(
         onDismissRequest,
-        confirmButton,
+        { GlassDialogActions(content = confirmButton) },
         modifier =
             if (glass) {
                 modifier
                     .background(
                         containerColor,
                         shape,
-                    ).glassSurface(shape, containerColor, tint = containerColor, opacity = 0.82f)
+                    ).glassSurface(shape, containerColor, tint = containerColor, opacity = 0.82f, frosted = true)
             } else {
                 modifier
             },
-        dismissButton = dismissButton,
+        dismissButton = dismissButton?.let { { GlassDialogActions(content = it) } },
         icon = icon,
         title = title,
         text = text,
@@ -57,6 +57,15 @@ fun GlassAlertDialog(
         containerColor = if (glass) Color.Transparent else containerColor,
         tonalElevation = if (glass) 0.dp else tonalElevation,
     )
+}
+
+/** Wrap long/localized action labels rather than squeezing adjacent buttons together. */
+@Composable
+fun GlassDialogActions(content: @Composable () -> Unit) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) { content() }
 }
 
 @Composable
@@ -103,7 +112,17 @@ fun GlassCard(
 ) {
     val glass = LocalGlassEnabled.current
     Card(
-        modifier = if (glass) modifier.glassSurface(shape, colors.containerColor, tint = colors.containerColor) else modifier,
+        modifier =
+            if (glass) {
+                modifier.glassSurface(
+                    shape,
+                    colors.containerColor,
+                    tint = colors.containerColor,
+                    frosted = true,
+                )
+            } else {
+                modifier
+            },
         shape = shape,
         colors = if (glass) colors.copy(containerColor = Color.Transparent) else colors,
         content = content,
@@ -125,7 +144,7 @@ fun GlassFilterChip(
         label,
         modifier =
             if (glass) {
-                modifier.glassSurface(
+                modifier.padding(4.dp).glassSurface(
                     CircleShape,
                     MaterialTheme.colorScheme.surfaceContainer,
                     tint = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
@@ -159,9 +178,10 @@ fun GlassAssistChip(
     AssistChip(
         onClick,
         label,
-        modifier = if (glass) modifier.glassSurface(CircleShape, MaterialTheme.colorScheme.surfaceContainer) else modifier,
+        modifier = if (glass) modifier.padding(4.dp).glassSurface(CircleShape, MaterialTheme.colorScheme.surfaceContainer) else modifier,
         enabled = enabled,
         shape = if (glass) CircleShape else AssistChipDefaults.shape,
+        border = if (glass) null else AssistChipDefaults.assistChipBorder(enabled),
         colors =
             if (glass) {
                 AssistChipDefaults.assistChipColors(
@@ -204,6 +224,7 @@ fun GlassModalBottomSheet(
                     containerColor,
                     tint = containerColor,
                     opacity = 0.78f,
+                    frosted = true,
                 ),
             ) {
                 if (dragHandle != null) {
@@ -272,7 +293,7 @@ fun GlassButton(
         onClick = onClick,
         modifier =
             if (glass) {
-                modifier.glassSurface(
+                modifier.padding(4.dp).glassSurface(
                     shape,
                     tint,
                     tint = tint,
@@ -318,7 +339,7 @@ fun GlassFilledTonalButton(
         onClick = onClick,
         modifier =
             if (glass) {
-                modifier.glassSurface(
+                modifier.padding(4.dp).glassSurface(
                     shape,
                     tint,
                     tint = tint,
@@ -364,7 +385,7 @@ fun GlassOutlinedButton(
         onClick = onClick,
         modifier =
             if (glass) {
-                modifier.glassSurface(
+                modifier.padding(4.dp).glassSurface(
                     shape,
                     tint,
                     tint = tint,
@@ -410,7 +431,7 @@ fun GlassTextButton(
         onClick = onClick,
         modifier =
             if (glass) {
-                modifier.glassSurface(
+                modifier.padding(4.dp).glassSurface(
                     shape,
                     tint,
                     tint = tint,
@@ -572,7 +593,7 @@ fun GlassSurface(
 ) {
     val glass = LocalGlassEnabled.current
     Surface(
-        modifier = if (glass) modifier.glassSurface(shape, color, tint = color, opacity = 0.7f) else modifier,
+        modifier = if (glass) modifier.glassSurface(shape, color, tint = color, opacity = 0.7f, frosted = true) else modifier,
         shape = shape,
         color = if (glass) Color.Transparent else color,
         contentColor = contentColor,
@@ -600,7 +621,7 @@ fun GlassSurface(
     val glass = LocalGlassEnabled.current
     Surface(
         onClick,
-        modifier = if (glass) modifier.glassSurface(shape, color, tint = color, opacity = 0.7f) else modifier,
+        modifier = if (glass) modifier.glassSurface(shape, color, tint = color, opacity = 0.7f, frosted = true) else modifier,
         enabled = enabled,
         shape = shape,
         color = if (glass) Color.Transparent else color,
