@@ -80,7 +80,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -109,6 +108,7 @@ import me.spica27.spicamusic.ui.about.AboutScene
 import me.spica27.spicamusic.ui.audioeffects.AudioEffectsScene
 import me.spica27.spicamusic.ui.player.playerHapticStrength
 import me.spica27.spicamusic.ui.theme.AppBackArrow
+import me.spica27.spicamusic.ui.theme.CollapsingBarBackground
 import me.spica27.spicamusic.ui.theme.EaseOutEmphasized
 import me.spica27.spicamusic.ui.theme.GlassBackdropHost
 import me.spica27.spicamusic.ui.theme.LayoutTokens
@@ -655,7 +655,6 @@ private fun SettingsTopBar(
     modifier: Modifier = Modifier,
 ) {
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val backgroundColor = MaterialTheme.colorScheme.background
     val collapse by
         remember(listState) {
             derivedStateOf {
@@ -671,9 +670,9 @@ private fun SettingsTopBar(
         modifier =
             modifier
                 .fillMaxWidth()
-                .height(statusBarTop + 56.dp)
-                .drawBehind { drawRect(color = backgroundColor.copy(alpha = collapse)) },
+                .height(statusBarTop + 56.dp),
     ) {
+        CollapsingBarBackground(Modifier.matchParentSize()) { collapse }
         if (solid) {
             HorizontalDivider(
                 modifier = Modifier.align(Alignment.BottomStart),

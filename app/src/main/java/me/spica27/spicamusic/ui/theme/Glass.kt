@@ -145,6 +145,7 @@ fun Modifier.glassSurface(
     tint: Color? = null,
     opacity: Float = 0.48f,
     frosted: Boolean = false,
+    edgeHighlight: Boolean = true,
 ): Modifier {
     val backdrop = LocalGlassBackdrop.current
     if (!LocalGlassEnabled.current || backdrop == null) return background(color, shape)
@@ -174,7 +175,7 @@ fun Modifier.glassSurface(
                 ),
                 shape,
             )
-        return if (shape is CornerBasedShape) {
+        return if (edgeHighlight && shape is CornerBasedShape) {
             paint.border(
                 0.75.dp,
                 rim,
@@ -198,10 +199,10 @@ fun Modifier.glassSurface(
             }
         },
         shadow = null,
-        highlight = if (settings.smoothMode) null else ({ com.kyant.backdrop.highlight.Highlight.Default }),
+        highlight = if (settings.smoothMode || !edgeHighlight) null else ({ com.kyant.backdrop.highlight.Highlight.Default }),
         onDrawSurface = {
             drawRect(surfaceTint.copy(alpha = if (settings.smoothMode) alpha * 0.8f else alpha))
             if (settings.smoothMode) drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.08f), Color.Transparent)))
         },
-    ).then(if (settings.smoothMode) Modifier.border(0.75.dp, rim, shape) else Modifier)
+    ).then(if (settings.smoothMode && edgeHighlight) Modifier.border(0.75.dp, rim, shape) else Modifier)
 }

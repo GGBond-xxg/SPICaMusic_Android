@@ -84,7 +84,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -129,6 +128,7 @@ import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.scan.ScannerScene
 import me.spica27.spicamusic.ui.settings.MediaLibrarySourceViewModel
 import me.spica27.spicamusic.ui.settings.ScanState
+import me.spica27.spicamusic.ui.theme.CollapsingBarBackground
 import me.spica27.spicamusic.ui.theme.EaseOutEmphasized
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.theme.Shapes
@@ -1059,18 +1059,15 @@ private fun MusicTopBar(
     modifier: Modifier = Modifier,
 ) {
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val backgroundColor = MaterialTheme.colorScheme.background
     val solid by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
     val scope = rememberCoroutineScope()
     Box(
         modifier =
             modifier
                 .fillMaxWidth()
-                .height(statusBarTop + 56.dp)
-                .drawBehind {
-                    drawRect(color = backgroundColor.copy(alpha = mastheadCollapse(listState)))
-                },
+                .height(statusBarTop + 56.dp),
     ) {
+        CollapsingBarBackground(Modifier.matchParentSize()) { mastheadCollapse(listState) }
         if (solid) {
             HorizontalDivider(
                 modifier = Modifier.align(Alignment.BottomStart),

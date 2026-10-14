@@ -28,8 +28,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -213,13 +215,15 @@ fun PlayerProgressSection(
                         .align(Alignment.CenterEnd)
                         .padding(vertical = 4.dp),
             )
+        }
+        Box(Modifier.fillMaxWidth().padding(top = Spacing.Small), contentAlignment = Alignment.Center) {
             onAudioQualityClick?.let { onClick ->
                 Row(
                     modifier =
                         Modifier
-                            .align(Alignment.Center)
                             .then(audioQualityActionModifier)
-                            .height(30.dp)
+                            .widthIn(max = 240.dp)
+                            .heightIn(min = 40.dp)
                             .clip(
                                 CircleShape,
                             ).glassSurface(
@@ -231,8 +235,8 @@ fun PlayerProgressSection(
                                 enabled = audioQualityActionEnabled,
                                 role = Role.Button,
                                 onClick = playerClick(onClick),
-                            ).padding(horizontal = 11.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ).padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
@@ -243,6 +247,8 @@ fun PlayerProgressSection(
                     )
                     Text(
                         text = stringResource(R.string.player_audio_quality_and_effects),
+                        modifier = Modifier.weight(1f),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onTertiaryContainer,
                     )
@@ -667,7 +673,7 @@ fun PlayerTransportControls(
                 Modifier
                     .fillMaxWidth()
                     .height(72.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -776,7 +782,7 @@ fun PlayerTransportControls(
                         tint = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.74f),
                         opacity = 0.7f,
                     ).padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(

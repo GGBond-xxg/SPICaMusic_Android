@@ -84,49 +84,31 @@ fun SPICaMusicTheme(
     glassSettings: GlassSettings = GlassSettings(),
     content: @Composable () -> Unit,
 ) {
-    when (themeColorStyle) {
-        ThemeColorStyle.Textured, ThemeColorStyle.Glass ->
-            DynamicMaterialTheme(
-                seedColor = themeColor,
-                isDark = darkTheme,
-                animate = animateColors,
-                specVersion = ColorSpec.SpecVersion.SPEC_2021,
-                style = PaletteStyle.TonalSpot,
+    // Keep the content at one composition location across all palettes. Moving it
+    // between theme branches destroys remembered navigation and scroll state.
+    val animatedSeedColor =
+        if (animateColors) {
+            animateColorAsState(themeColor, tween(500), label = "flat_theme_seed_color").value
+        } else {
+            themeColor
+        }
+    val flatScheme =
+        remember(animatedSeedColor, darkTheme) {
+            antFlatColorScheme(seedColor = animatedSeedColor, darkTheme = darkTheme)
+        }
+    DynamicMaterialTheme(
+        seedColor = themeColor,
+        isDark = darkTheme,
+        animate = animateColors,
+        specVersion = ColorSpec.SpecVersion.SPEC_2021,
+        style = PaletteStyle.TonalSpot,
+    ) {
+        MaterialTheme(colorScheme = if (themeColorStyle == ThemeColorStyle.Flat) flatScheme else MaterialTheme.colorScheme) {
+            CompositionLocalProvider(
+                LocalGlassEnabled provides (themeColorStyle == ThemeColorStyle.Glass),
+                LocalGlassSettings provides glassSettings,
             ) {
-                CompositionLocalProvider(
-                    LocalGlassEnabled provides (themeColorStyle == ThemeColorStyle.Glass),
-                    LocalGlassSettings provides glassSettings,
-                ) {
-                    GlassSceneContainers { GlassBackdropHost { ProvideAppInteractionIndication(content = content) } }
-                }
-            }
-
-        ThemeColorStyle.Flat -> {
-            // 与质感化的 animate 行为对齐:对种子色做动画,派生色板随之平滑过渡
-            val animatedSeedColor =
-                if (animateColors) {
-                    animateColorAsState(
-                        targetValue = themeColor,
-                        animationSpec = tween(durationMillis = 500),
-                        label = "flat_theme_seed_color",
-                    ).value
-                } else {
-                    themeColor
-                }
-            val colorScheme =
-                remember(animatedSeedColor, darkTheme) {
-                    antFlatColorScheme(
-                        seedColor = animatedSeedColor,
-                        darkTheme = darkTheme,
-                    )
-                }
-            MaterialTheme(colorScheme = colorScheme) {
-                CompositionLocalProvider(
-                    LocalGlassEnabled provides (themeColorStyle == ThemeColorStyle.Glass),
-                    LocalGlassSettings provides glassSettings,
-                ) {
-                    GlassSceneContainers { GlassBackdropHost { ProvideAppInteractionIndication(content = content) } }
-                }
+                GlassSceneContainers { GlassBackdropHost { ProvideAppInteractionIndication(content = content) } }
             }
         }
     }

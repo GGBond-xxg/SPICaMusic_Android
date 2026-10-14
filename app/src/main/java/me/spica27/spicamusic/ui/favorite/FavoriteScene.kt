@@ -84,7 +84,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.TransformOrigin
@@ -114,6 +113,7 @@ import me.spica27.spicamusic.common.entity.getCoverUri
 import me.spica27.spicamusic.ui.dialog.SongMenuScene
 import me.spica27.spicamusic.ui.home.HomeViewModel
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
+import me.spica27.spicamusic.ui.theme.CollapsingBarBackground
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
 import me.spica27.spicamusic.ui.theme.ListItemFadeOutSpec
@@ -504,17 +504,13 @@ private fun FavoriteTopBar(
     modifier: Modifier = Modifier,
 ) {
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val backgroundColor = MaterialTheme.colorScheme.background
     Box(
         modifier =
             modifier
                 .fillMaxWidth()
-                .height(statusBarTop + 56.dp)
-                .drawBehind {
-                    // 背景不透明度在 Draw 阶段跟随滚动，避免每帧重组
-                    drawRect(color = backgroundColor.copy(alpha = mastheadCollapse(listState)))
-                },
+                .height(statusBarTop + 56.dp),
     ) {
+        CollapsingBarBackground(Modifier.matchParentSize()) { mastheadCollapse(listState) }
         // 全页唯一分隔线：顶栏收起后出现
         if (solid) {
             HorizontalDivider(

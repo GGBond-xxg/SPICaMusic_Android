@@ -18,12 +18,14 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -1356,7 +1358,7 @@ private fun PlayerPage(
         Box(
             modifier =
                 Modifier
-                    .height(28.dp)
+                    .heightIn(min = 28.dp)
                     .graphicsLayer {
                         val tagsReveal =
                             calculateFadeAlpha(progressProvider(), TAGS_REVEAL_THRESHOLD)
@@ -1366,7 +1368,7 @@ private fun PlayerPage(
             contentAlignment = Alignment.Center,
         ) {
             if (qualityTags.isNotEmpty()) {
-                Row(
+                FlowRow(
                     modifier =
                         Modifier
                             .clip(
@@ -1385,7 +1387,7 @@ private fun PlayerPage(
                             ).padding(horizontal = Spacing.Medium, vertical = 5.dp)
                             .animateContentSize(),
                     horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall),
                 ) {
                     qualityTags.forEachIndexed { index, tag ->
                         if (index > 0) {
@@ -1429,7 +1431,8 @@ private fun PlayerAudioQualitySheet(
         onDismissRequest = onDismiss,
     ) {
         LazyColumn(
-            modifier = Modifier.fillMaxWidth().height(620.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(max = 620.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.Small),
         ) {
             item(key = "quality_header") {
                 Row(
@@ -1618,7 +1621,7 @@ private fun FeaturedQualityCard(
                 MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.48f)
             },
         shape = Shapes.LargeCornerBasedShape,
-        modifier = modifier.height(174.dp),
+        modifier = modifier.heightIn(min = 174.dp),
     ) {
         Column(
             modifier = Modifier.padding(Spacing.Medium),
@@ -1651,21 +1654,16 @@ private fun FeaturedQualityCard(
                 title,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 englishTitle,
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
             )
             Text(
                 subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
             )
             if (selected) {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
@@ -1716,9 +1714,9 @@ private fun ReferenceQualityRow(
                 Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                FlowRow(
+                    verticalArrangement = Arrangement.spacedBy(Spacing.Small),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
                 ) {
                     Text(
                         text =
@@ -1727,8 +1725,6 @@ private fun ReferenceQualityRow(
                                 if (englishTitle.isNotBlank()) append("  $englishTitle")
                             },
                         style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
                     )
                     membershipLabel?.let { PremiumBadge(it) }
                 }
@@ -1736,8 +1732,6 @@ private fun ReferenceQualityRow(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
             if (selected) SelectedQualityMark()
@@ -2210,6 +2204,7 @@ private fun SongInfo(
             modifier = Modifier.geometrySourceFor(artistTransition),
         ) { artist ->
             Text(
+                modifier = Modifier.fillMaxWidth().basicMarquee(),
                 text = artist,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -25,7 +25,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -80,7 +79,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -114,6 +112,7 @@ import me.spica27.spicamusic.ui.playlist.PlaylistCreatorScene
 import me.spica27.spicamusic.ui.playlistdetail.PlaylistDetailScene
 import me.spica27.spicamusic.ui.scan.ScannerScene
 import me.spica27.spicamusic.ui.settings.MediaLibrarySourceViewModel
+import me.spica27.spicamusic.ui.theme.CollapsingBarBackground
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
@@ -585,7 +584,6 @@ private fun LibraryTopBar(
     modifier: Modifier = Modifier,
 ) {
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val backgroundColor = MaterialTheme.colorScheme.background
     // 布尔量化派生状态放在顶栏自身作用域：翻转只重组顶栏，不波及页面根
     val solid by remember { derivedStateOf { gridState.firstVisibleItemIndex > 0 } }
     // 容器只做绘制不挂任何点击 Modifier：透明态不得拦截刊头与操作行的触摸
@@ -593,11 +591,9 @@ private fun LibraryTopBar(
         modifier =
             modifier
                 .fillMaxWidth()
-                .height(statusBarTop + 56.dp)
-                .drawBehind {
-                    drawRect(color = backgroundColor.copy(alpha = mastheadCollapse(gridState)))
-                },
+                .height(statusBarTop + 56.dp),
     ) {
+        CollapsingBarBackground(Modifier.matchParentSize()) { mastheadCollapse(gridState) }
         // 全页唯一分隔线：顶栏收起后出现
         if (solid) {
             HorizontalDivider(

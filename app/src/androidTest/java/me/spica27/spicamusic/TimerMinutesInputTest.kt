@@ -6,7 +6,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
 import me.spica27.spicamusic.common.entity.ThemeColorStyle
-import me.spica27.spicamusic.ui.player.TimerMinutesDialog
+import me.spica27.spicamusic.ui.player.TimerMinutesEditor
 import me.spica27.spicamusic.ui.theme.SPICaMusicTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -22,7 +22,7 @@ class TimerMinutesInputTest {
         compose.setContent {
             SPICaMusicTheme(themeColor = Color.Blue, themeColorStyle = ThemeColorStyle.Glass) {
                 if (open) {
-                    TimerMinutesDialog(20, {
+                    TimerMinutesEditor(20, {
                         result = it
                         open = false
                     }, { open = false })

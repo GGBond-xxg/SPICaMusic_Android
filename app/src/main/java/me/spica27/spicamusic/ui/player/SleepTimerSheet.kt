@@ -1,7 +1,6 @@
 package me.spica27.spicamusic.ui.player
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -9,7 +8,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -48,6 +49,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -91,13 +93,6 @@ fun SleepTimerSheet(
                 ?.coerceIn(CustomTimerMin, CustomTimerMax)
                 ?: 20,
         )
-    }
-
-    if (editingMinutes) {
-        TimerMinutesDialog(customMinutes, onConfirm = {
-            customMinutes = it
-            editingMinutes = false
-        }, onDismiss = { editingMinutes = false })
     }
 
     fun dismissAfter(action: () -> Unit) {
@@ -170,63 +165,67 @@ fun SleepTimerSheet(
             )
             Spacer(modifier = Modifier.height(Spacing.Large))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
-            ) {
-                SleepTimerPresets.forEach { minutes ->
-                    val selected = durationMs == TimeUnit.MINUTES.toMillis(minutes.toLong())
-                    Column(
-                        modifier =
-                            Modifier
-                                .weight(1f)
-                                .clip(Shapes.ExtraLargeCornerBasedShape)
-                                .glassSurface(
-                                    Shapes.ExtraLargeCornerBasedShape,
-                                    if (selected) {
-                                        MaterialTheme.colorScheme.primaryContainer
-                                    } else {
-                                        MaterialTheme.colorScheme.surfaceContainerHighest
-                                    },
-                                    tint =
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val columns = ((maxWidth.value + 8f) / (56f * LocalDensity.current.fontScale + 8f)).toInt().coerceIn(1, 5)
+                // Round down so pixel rounding cannot push the last preset onto a new row.
+                val presetWidth = ((maxWidth - Spacing.Small * (columns - 1)) / columns).value.toInt().dp
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.Small),
+                    maxItemsInEachRow = columns,
+                ) {
+                    SleepTimerPresets.forEach { minutes ->
+                        val selected = durationMs == TimeUnit.MINUTES.toMillis(minutes.toLong())
+                        Column(
+                            modifier =
+                                Modifier
+                                    .width(presetWidth)
+                                    .clip(Shapes.ExtraLargeCornerBasedShape)
+                                    .glassSurface(
+                                        Shapes.ExtraLargeCornerBasedShape,
                                         if (selected) {
                                             MaterialTheme.colorScheme.primaryContainer
                                         } else {
                                             MaterialTheme.colorScheme.surfaceContainerHighest
                                         },
-                                    opacity = 0.7f,
-                                ).clickable {
-                                    PlayerHaptics.click()
-                                    dismissAfter { onSetTimer(minutes) }
-                                }.padding(vertical = Spacing.Medium),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Text(
-                            text = minutes.toString(),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color =
-                                if (selected) {
-                                    MaterialTheme.colorScheme.onPrimaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface
-                                },
-                        )
-                        Text(
-                            text = stringResource(R.string.sleep_timer_unit_minutes),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                                        tint =
+                                            if (selected) {
+                                                MaterialTheme.colorScheme.primaryContainer
+                                            } else {
+                                                MaterialTheme.colorScheme.surfaceContainerHighest
+                                            },
+                                        opacity = 0.7f,
+                                    ).clickable {
+                                        PlayerHaptics.click()
+                                        dismissAfter { onSetTimer(minutes) }
+                                    }.padding(vertical = Spacing.Medium),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(
+                                text = minutes.toString(),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color =
+                                    if (selected) {
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
+                            )
+                            Text(
+                                text = stringResource(R.string.sleep_timer_unit_minutes),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }
-
             Spacer(modifier = Modifier.height(Spacing.Medium))
             Column(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .animateContentSize(tween(220))
                         .clip(
                             Shapes.ExtraLargeCornerBasedShape,
                         ).glassSurface(
@@ -234,12 +233,20 @@ fun SleepTimerSheet(
                             MaterialTheme.colorScheme.surfaceContainerHigh,
                             tint = MaterialTheme.colorScheme.surfaceContainerHigh,
                             opacity = 0.7f,
-                        ).clickable {
-                            PlayerHaptics.click()
-                            customExpanded = !customExpanded
-                        }.padding(Spacing.Medium),
+                        ).padding(Spacing.Medium),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                FlowRow(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                PlayerHaptics.click()
+                                customExpanded = !customExpanded
+                                editingMinutes = false
+                            }.padding(vertical = Spacing.Small),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.Small),
+                ) {
                     Text(
                         text = stringResource(R.string.sleep_timer_custom),
                         style = MaterialTheme.typography.titleMedium,
@@ -259,40 +266,49 @@ fun SleepTimerSheet(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Spacer(modifier = Modifier.height(Spacing.Medium))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            TimerStepButton(
-                                icon = Icons.Rounded.Remove,
-                                enabled = customMinutes > CustomTimerMin,
-                                onClick = {
-                                    PlayerHaptics.click()
-                                    customMinutes =
-                                        (customMinutes - CustomTimerStep).coerceAtLeast(CustomTimerMin)
-                                },
-                            )
-                            Text(
-                                text = stringResource(R.string.sleep_timer_minutes, customMinutes),
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                modifier =
-                                    Modifier
-                                        .clickable {
-                                            PlayerHaptics.click()
-                                            editingMinutes = true
-                                        }.padding(horizontal = Spacing.Medium, vertical = Spacing.Small),
-                            )
-                            TimerStepButton(
-                                icon = Icons.Rounded.Add,
-                                enabled = customMinutes < CustomTimerMax,
-                                onClick = {
-                                    PlayerHaptics.click()
-                                    customMinutes =
-                                        (customMinutes + CustomTimerStep).coerceAtMost(CustomTimerMax)
-                                },
-                            )
+                        if (editingMinutes) {
+                            TimerMinutesEditor(customMinutes, onConfirm = {
+                                customMinutes = it
+                                editingMinutes = false
+                            }, onDismiss = { editingMinutes = false })
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
+                            ) {
+                                TimerStepButton(
+                                    icon = Icons.Rounded.Remove,
+                                    enabled = customMinutes > CustomTimerMin,
+                                    onClick = {
+                                        PlayerHaptics.click()
+                                        customMinutes =
+                                            (customMinutes - CustomTimerStep).coerceAtLeast(CustomTimerMin)
+                                    },
+                                )
+                                Text(
+                                    text = stringResource(R.string.sleep_timer_minutes, customMinutes),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center,
+                                    modifier =
+                                        Modifier
+                                            .weight(1f)
+                                            .clickable {
+                                                PlayerHaptics.click()
+                                                editingMinutes = true
+                                            }.padding(horizontal = Spacing.Medium, vertical = Spacing.Small),
+                                )
+                                TimerStepButton(
+                                    icon = Icons.Rounded.Add,
+                                    enabled = customMinutes < CustomTimerMax,
+                                    onClick = {
+                                        PlayerHaptics.click()
+                                        customMinutes =
+                                            (customMinutes + CustomTimerStep).coerceAtMost(CustomTimerMax)
+                                    },
+                                )
+                            }
                         }
                         Spacer(modifier = Modifier.height(Spacing.Medium))
                         Button(
@@ -301,8 +317,9 @@ fun SleepTimerSheet(
                                 dismissAfter { onSetTimer(customMinutes) }
                             },
                             modifier = Modifier.fillMaxWidth(),
+                            enabled = !editingMinutes,
                         ) {
-                            Text(stringResource(R.string.sleep_timer_start))
+                            Text(stringResource(R.string.sleep_timer_start), modifier = Modifier.fillMaxWidth())
                         }
                     }
                 }

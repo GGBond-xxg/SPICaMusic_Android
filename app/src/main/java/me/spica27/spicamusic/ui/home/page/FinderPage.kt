@@ -76,7 +76,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -126,6 +125,7 @@ import me.spica27.spicamusic.ui.playlist.AllPlaylistsScene
 import me.spica27.spicamusic.ui.playlistdetail.PlaylistDetailScene
 import me.spica27.spicamusic.ui.search.SearchScene
 import me.spica27.spicamusic.ui.settings.SettingsScene
+import me.spica27.spicamusic.ui.theme.CollapsingBarBackground
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
@@ -773,7 +773,6 @@ private fun FinderTopBar(
     modifier: Modifier = Modifier,
 ) {
     val statusBarTop = stableStatusBarTopPadding()
-    val backgroundColor = MaterialTheme.colorScheme.background
     // 布尔量化派生状态放在顶栏自身作用域：翻转只重组顶栏，不波及页面根
     val solid by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
     // 容器只做绘制不挂任何点击 Modifier：透明态不得拦截刊头与搜索胶囊的触摸
@@ -781,11 +780,9 @@ private fun FinderTopBar(
         modifier =
             modifier
                 .fillMaxWidth()
-                .height(statusBarTop + 56.dp)
-                .drawBehind {
-                    drawRect(color = backgroundColor.copy(alpha = mastheadCollapse(listState)))
-                },
+                .height(statusBarTop + 56.dp),
     ) {
+        CollapsingBarBackground(Modifier.matchParentSize()) { mastheadCollapse(listState) }
         // 全页唯一分隔线：顶栏收起后出现
         if (solid) {
             HorizontalDivider(
