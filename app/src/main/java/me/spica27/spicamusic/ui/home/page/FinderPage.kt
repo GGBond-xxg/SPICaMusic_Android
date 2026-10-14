@@ -124,6 +124,7 @@ import me.spica27.spicamusic.ui.model.PlaylistWithCover
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.playlist.AllPlaylistsScene
 import me.spica27.spicamusic.ui.playlistdetail.PlaylistDetailScene
+import me.spica27.spicamusic.ui.search.SearchPrompt
 import me.spica27.spicamusic.ui.search.SearchScene
 import me.spica27.spicamusic.ui.settings.SettingsScene
 import me.spica27.spicamusic.ui.theme.CollapsingBarBackground
@@ -1044,12 +1045,7 @@ private fun SearchCapsule(
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp),
             )
-            Text(
-                text = stringResource(R.string.finder_search_title),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            SearchPrompt()
         }
     }
 }
@@ -1293,12 +1289,7 @@ private fun FrequentHeroRowsPlaceholder(
                             .size(48.dp)
                             .clip(
                                 Shapes.LargeCornerBasedShape,
-                            ).glassSurface(
-                                Shapes.LargeCornerBasedShape,
-                                MaterialTheme.colorScheme.surfaceContainerHighest,
-                                tint = MaterialTheme.colorScheme.surfaceContainerHighest,
-                                opacity = 0.7f,
-                            ),
+                            ).background(MaterialTheme.colorScheme.surfaceContainerHighest),
                 )
                 Column(
                     modifier = Modifier.weight(1f),

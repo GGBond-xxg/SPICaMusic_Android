@@ -1184,12 +1184,7 @@ private fun PlayerPage(
                                         .fillMaxSize()
                                         .clip(
                                             Shapes.LargeCornerBasedShape,
-                                        ).glassSurface(
-                                            Shapes.LargeCornerBasedShape,
-                                            artworkContainerColor,
-                                            tint = artworkContainerColor,
-                                            opacity = 0.7f,
-                                        ),
+                                        ).background(artworkContainerColor),
                                 containerColor = artworkContainerColor,
                                 contentColor = placeholderContentColor,
                                 contentDescription = stringResource(R.string.cover_placeholder),
@@ -1200,12 +1195,8 @@ private fun PlayerPage(
                                 .fillMaxSize()
                                 .clip(
                                     Shapes.LargeCornerBasedShape,
-                                ).glassSurface(
-                                    Shapes.LargeCornerBasedShape,
-                                    artworkContainerColor,
-                                    tint = artworkContainerColor,
-                                    opacity = 0.7f,
-                                ).clickHighlight {
+                                ).background(artworkContainerColor)
+                                .clickHighlight {
                                     PlayerHaptics.click()
                                     onOpenLyrics()
                                     /*

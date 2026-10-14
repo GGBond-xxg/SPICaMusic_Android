@@ -1060,7 +1060,7 @@ private fun FavoriteSkeletonRows(
                             .size(48.dp)
                             .clip(
                                 Shapes.LargeCornerBasedShape,
-                            ).glassSurface(Shapes.LargeCornerBasedShape, bone, tint = bone, opacity = 0.7f),
+                            ).background(bone),
                 )
                 Column(
                     modifier = Modifier.weight(1f),

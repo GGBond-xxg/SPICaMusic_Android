@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -124,12 +125,7 @@ fun LargeBottomPlayerBar(
                             compositingStrategy = CompositingStrategy.Offscreen,
                         ).size(48.dp)
                         .clip(coverShape)
-                        .glassSurface(
-                            coverShape,
-                            MaterialTheme.colorScheme.tertiaryContainer,
-                            tint = MaterialTheme.colorScheme.tertiaryContainer,
-                            opacity = 0.7f,
-                        )
+                        .background(MaterialTheme.colorScheme.tertiaryContainer)
                 Box(modifier = resolvedCoverModifier) {
                     StableAudioCover(
                         uri = artworkUri,

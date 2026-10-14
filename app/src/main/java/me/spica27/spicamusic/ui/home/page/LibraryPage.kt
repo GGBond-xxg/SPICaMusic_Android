@@ -25,6 +25,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -1075,12 +1076,7 @@ private fun LibraryCloudPlaylistCard(
                     .aspectRatio(1f)
                     .clip(
                         Shapes.ExtraLargeCornerBasedShape,
-                    ).glassSurface(
-                        Shapes.ExtraLargeCornerBasedShape,
-                        MaterialTheme.colorScheme.surfaceContainerHigh,
-                        tint = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        opacity = 0.7f,
-                    ),
+                    ).background(MaterialTheme.colorScheme.surfaceContainerHigh),
             placeHolder = {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(Icons.Default.LibraryMusic, null, tint = MaterialTheme.colorScheme.primary)

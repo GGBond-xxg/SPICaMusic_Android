@@ -10,6 +10,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -572,12 +573,7 @@ private fun PlaylistItemRow(
                         .size(64.dp)
                         .clip(
                             MaterialTheme.shapes.medium,
-                        ).glassSurface(
-                            MaterialTheme.shapes.medium,
-                            MaterialTheme.colorScheme.surface,
-                            tint = MaterialTheme.colorScheme.surface,
-                            opacity = 0.7f,
-                        ),
+                        ).background(MaterialTheme.colorScheme.surface),
                 success = { state, painter ->
                     ShowOnIdleContent(true, delayMillis = 125) {
                         Image(painter, contentDescription = null, contentScale = ContentScale.Crop)

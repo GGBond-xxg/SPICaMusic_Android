@@ -75,7 +75,6 @@ import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.navkit.scene.StackScene
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.ui.theme.EqualHeightActionRow
-import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.AudioCover
 import org.drinkless.tdlib.TdApi
 import org.koin.compose.viewmodel.koinViewModel
@@ -1053,12 +1052,7 @@ private fun CloudSongRow(
                     .size(46.dp)
                     .clip(
                         RoundedCornerShape(16.dp),
-                    ).glassSurface(
-                        RoundedCornerShape(16.dp),
-                        MaterialTheme.colorScheme.surfaceContainerHigh,
-                        tint = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        opacity = 0.7f,
-                    ),
+                    ).background(MaterialTheme.colorScheme.surfaceContainerHigh),
             contentAlignment = Alignment.Center,
         ) {
             AudioCover(

@@ -456,7 +456,7 @@ private fun SongMenuContent(
                         ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Surface(
+                androidx.compose.material3.Surface(
                     modifier =
                         Modifier
                             .size(68.dp)

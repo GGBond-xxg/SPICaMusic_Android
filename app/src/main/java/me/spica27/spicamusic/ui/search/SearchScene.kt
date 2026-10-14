@@ -182,13 +182,7 @@ class SearchScene(
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp),
             )
-            Text(
-                text = stringResource(R.string.finder_search_title),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
+            SearchPrompt()
         }
     }
 
@@ -640,8 +634,9 @@ private fun SearchInputField(
                     .weight(1f)
                     .focusRequester(focusRequester),
             textStyle =
-                MaterialTheme.typography.bodyLarge.copy(
+                MaterialTheme.typography.bodyMedium.copy(
                     color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Medium,
                 ),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             singleLine = true,
@@ -650,12 +645,7 @@ private fun SearchInputField(
             decorationBox = { innerTextField ->
                 Box(contentAlignment = Alignment.CenterStart) {
                     if (query.isEmpty()) {
-                        Text(
-                            text = stringResource(R.string.search_songs_albums_artists),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            maxLines = 1,
-                        )
+                        SearchPrompt()
                     }
                     innerTextField()
                 }
@@ -1452,7 +1442,7 @@ private fun SearchSkeletonRow(
                 Modifier
                     .size(56.dp)
                     .clip(Shapes.LargeCornerBasedShape)
-                    .glassSurface(Shapes.LargeCornerBasedShape, bone, tint = bone, opacity = 0.7f),
+                    .background(bone),
         )
         Column(
             modifier = Modifier.weight(1f),

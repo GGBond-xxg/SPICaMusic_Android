@@ -231,7 +231,7 @@ class SongInfoScene private constructor(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    Surface(
+                    androidx.compose.material3.Surface(
                         modifier = Modifier.size(72.dp),
                         shape = RoundedCornerShape(20.dp),
                         tonalElevation = 3.dp,

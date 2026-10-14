@@ -488,12 +488,7 @@ private fun LyricsHeader(
                         },
                     ).clip(
                         Shapes.ExtraSmallCornerBasedShape,
-                    ).glassSurface(
-                        Shapes.ExtraSmallCornerBasedShape,
-                        MaterialTheme.colorScheme.tertiaryContainer,
-                        tint = MaterialTheme.colorScheme.tertiaryContainer,
-                        opacity = 0.7f,
-                    ),
+                    ).background(MaterialTheme.colorScheme.tertiaryContainer),
         ) {
             if (artworkPainter != null) {
                 Image(

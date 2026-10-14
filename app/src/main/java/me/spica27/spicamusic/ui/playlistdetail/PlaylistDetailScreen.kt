@@ -1646,7 +1646,7 @@ private fun SongSkeletonRow(modifier: Modifier = Modifier) {
             Modifier
                 .size(48.dp)
                 .clip(Shapes.SmallCornerBasedShape)
-                .glassSurface(Shapes.SmallCornerBasedShape, bone, tint = bone, opacity = 0.7f),
+                .background(bone),
         )
         Column(
             modifier = Modifier.weight(1f),

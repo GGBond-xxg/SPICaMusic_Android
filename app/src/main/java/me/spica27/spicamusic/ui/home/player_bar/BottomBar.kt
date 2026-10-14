@@ -970,12 +970,7 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                                         .aspectRatio(1f)
                                         .clip(
                                             coverShape,
-                                        ).glassSurface(
-                                            coverShape,
-                                            MaterialTheme.colorScheme.tertiaryContainer,
-                                            tint = MaterialTheme.colorScheme.tertiaryContainer,
-                                            opacity = 0.7f,
-                                        ),
+                                        ).background(MaterialTheme.colorScheme.tertiaryContainer),
                                 placeHolder = {
                                     MusicCoverPlaceholder(
                                         modifier = Modifier.fillMaxSize(),
