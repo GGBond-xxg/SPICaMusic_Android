@@ -69,7 +69,6 @@ class HomeScene : StackScene() {
         val backdrop = rememberLayerBackdrop()
         CompositionLocalProvider(
             LocalBottomBarScrollConnection provides bottomBarScrollConnection,
-            LocalGlassBackdrop provides backdrop,
         ) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -112,7 +111,9 @@ class HomeScene : StackScene() {
                                 ),
                             ),
                 )
-                BottomMediaBarV2(bottomBarScrollConnection)
+                CompositionLocalProvider(LocalGlassBackdrop provides backdrop) {
+                    BottomMediaBarV2(bottomBarScrollConnection)
+                }
             }
         }
     }

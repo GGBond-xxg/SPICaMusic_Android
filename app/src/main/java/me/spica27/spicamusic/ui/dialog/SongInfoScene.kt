@@ -40,13 +40,10 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonColors
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -79,7 +76,11 @@ import me.spica27.spicamusic.common.entity.Song
 import me.spica27.spicamusic.common.entity.getAlbumCoverUri
 import me.spica27.spicamusic.common.entity.getCoverUri
 import me.spica27.spicamusic.ui.player.formatTime
+import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.CoverFallback
+import me.spica27.spicamusic.ui.theme.GlassButton as Button
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
+import me.spica27.spicamusic.ui.theme.GlassSurface as Surface
 
 class SongInfoScene private constructor(
     private val details: SongInfoDetails,
@@ -212,8 +213,14 @@ class SongInfoScene private constructor(
                             Modifier
                                 .width(44.dp)
                                 .height(5.dp)
-                                .clip(RoundedCornerShape(50))
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)),
+                                .clip(
+                                    RoundedCornerShape(50),
+                                ).glassSurface(
+                                    RoundedCornerShape(50),
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
+                                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
+                                    opacity = 0.7f,
+                                ),
                     )
                 }
                 Row(

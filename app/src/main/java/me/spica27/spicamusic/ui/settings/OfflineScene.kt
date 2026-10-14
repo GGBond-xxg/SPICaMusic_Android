@@ -4,11 +4,8 @@ import android.text.format.Formatter
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,6 +30,9 @@ import me.spica27.spicamusic.ui.about.AboutScaffold
 import me.spica27.spicamusic.ui.about.AboutSectionCard
 import me.spica27.spicamusic.ui.theme.Spacing
 import org.koin.compose.koinInject
+import me.spica27.spicamusic.ui.theme.GlassAlertDialog as AlertDialog
+import me.spica27.spicamusic.ui.theme.GlassFilterChip as FilterChip
+import me.spica27.spicamusic.ui.theme.GlassTextButton as TextButton
 
 @UnstableApi
 class OfflineScene : StackScene() {

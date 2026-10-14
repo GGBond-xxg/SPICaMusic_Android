@@ -36,7 +36,6 @@ import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -72,6 +71,7 @@ import me.spica27.spicamusic.common.entity.getCoverUri
 import me.spica27.spicamusic.ui.dialog.SongMenuScene
 import me.spica27.spicamusic.ui.home.HomeViewModel
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
+import me.spica27.spicamusic.ui.theme.appPageBackground
 import me.spica27.spicamusic.ui.widget.CoverFallback
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
 import me.spica27.spicamusic.utils.calculateLuminance
@@ -79,6 +79,7 @@ import me.spica27.spicamusic.utils.rememberDominantColorFromUri
 import org.koin.compose.viewmodel.koinActivityViewModel
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
 
 // ── 滚动驱动常量（像素）──────────────────────────────────────────────────────
 private const val SCROLL_ART_RANGE = 480f
@@ -189,7 +190,7 @@ fun ArtistDetailScreen(artist: Artist) {
     Box(
         Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .appPageBackground(),
     ) {
         // 主色调渐变背景
         Box(

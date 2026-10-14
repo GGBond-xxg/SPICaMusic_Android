@@ -128,6 +128,8 @@ import me.spica27.spicamusic.ui.settings.SettingsScene
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
+import me.spica27.spicamusic.ui.theme.appPageBackground
+import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.AudioCover
 import me.spica27.spicamusic.ui.widget.PlaylistCoverView
 import me.spica27.spicamusic.ui.widget.PreloadPlaylistCovers
@@ -374,7 +376,7 @@ fun FinderPage() {
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
+                .appPageBackground(),
     ) {
         LazyColumn(
             state = listState,
@@ -833,9 +835,14 @@ private fun FinderTopBar(
                 Row(
                     modifier =
                         Modifier
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary)
-                            .clickHighlight(onClick = onSearchClick)
+                            .clip(
+                                CircleShape,
+                            ).glassSurface(
+                                CircleShape,
+                                MaterialTheme.colorScheme.primary,
+                                tint = MaterialTheme.colorScheme.primary,
+                                opacity = 0.7f,
+                            ).clickHighlight(onClick = onSearchClick)
                             .padding(horizontal = Spacing.Medium, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall),
@@ -935,9 +942,14 @@ private fun FrequentHeroPlaceholder(modifier: Modifier = Modifier) {
                 .fillMaxWidth()
                 .height(344.dp)
                 .padding(horizontal = LayoutTokens.MusicHeaderHorizontalPadding)
-                .clip(Shapes.ExtraLarge1CornerBasedShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                .background(
+                .clip(
+                    Shapes.ExtraLarge1CornerBasedShape,
+                ).glassSurface(
+                    Shapes.ExtraLarge1CornerBasedShape,
+                    MaterialTheme.colorScheme.surfaceContainerLow,
+                    tint = MaterialTheme.colorScheme.surfaceContainerLow,
+                    opacity = 0.7f,
+                ).background(
                     Brush.verticalGradient(
                         0f to MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.32f),
                         1f to Color.Transparent,
@@ -965,8 +977,14 @@ private fun FrequentHeroPlaceholder(modifier: Modifier = Modifier) {
                 modifier =
                     Modifier
                         .size(48.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                        .clip(
+                            CircleShape,
+                        ).glassSurface(
+                            CircleShape,
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+                            opacity = 0.7f,
+                        ),
             )
         }
         FrequentHeroRowsPlaceholder()
@@ -975,8 +993,14 @@ private fun FrequentHeroPlaceholder(modifier: Modifier = Modifier) {
                 Modifier
                     .fillMaxWidth()
                     .height(36.dp)
-                    .clip(Shapes.MediumCornerBasedShape)
-                    .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f)),
+                    .clip(
+                        Shapes.MediumCornerBasedShape,
+                    ).glassSurface(
+                        Shapes.MediumCornerBasedShape,
+                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
+                        tint = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
+                        opacity = 0.7f,
+                    ),
         )
     }
 }
@@ -1008,7 +1032,7 @@ private fun SearchCapsule(
                     .geometrySource(transition)
                     .graphicsLayer {
                         alpha = if (transition.shouldShowSource()) 1f else 0f
-                    }.background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    }.glassSurface(CircleShape, MaterialTheme.colorScheme.surfaceContainerHigh)
                     .clickHighlight(interactionSource = interactionSource, onClick = onClick)
                     .padding(horizontal = Spacing.Large),
             verticalAlignment = Alignment.CenterVertically,
@@ -1096,9 +1120,14 @@ private fun FrequentHeroCard(
                         .graphicsLayer {
                             scaleX = pressScale
                             scaleY = pressScale
-                        }.clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
-                        .clickHighlight(interactionSource = interactionSource, onClick = onPlayAll),
+                        }.clip(
+                            CircleShape,
+                        ).glassSurface(
+                            CircleShape,
+                            MaterialTheme.colorScheme.primary,
+                            tint = MaterialTheme.colorScheme.primary,
+                            opacity = 0.7f,
+                        ).clickHighlight(interactionSource = interactionSource, onClick = onPlayAll),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -1263,8 +1292,14 @@ private fun FrequentHeroRowsPlaceholder(
                     modifier =
                         Modifier
                             .size(48.dp)
-                            .clip(Shapes.LargeCornerBasedShape)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                            .clip(
+                                Shapes.LargeCornerBasedShape,
+                            ).glassSurface(
+                                Shapes.LargeCornerBasedShape,
+                                MaterialTheme.colorScheme.surfaceContainerHighest,
+                                tint = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                opacity = 0.7f,
+                            ),
                 )
                 Column(
                     modifier = Modifier.weight(1f),
@@ -1275,16 +1310,28 @@ private fun FrequentHeroRowsPlaceholder(
                             Modifier
                                 .fillMaxWidth(0.62f)
                                 .height(12.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)),
+                                .clip(
+                                    CircleShape,
+                                ).glassSurface(
+                                    CircleShape,
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                    opacity = 0.7f,
+                                ),
                     )
                     Box(
                         modifier =
                             Modifier
                                 .fillMaxWidth(0.42f)
                                 .height(9.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f)),
+                                .clip(
+                                    CircleShape,
+                                ).glassSurface(
+                                    CircleShape,
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f),
+                                    opacity = 0.7f,
+                                ),
                     )
                 }
             }
@@ -1306,9 +1353,14 @@ private fun FavoritesCard(
             modifier
                 .fillMaxWidth()
                 .padding(horizontal = LayoutTokens.MusicHeaderHorizontalPadding)
-                .clip(Shapes.ExtraLargeCornerBasedShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                .padding(Spacing.Medium),
+                .clip(
+                    Shapes.ExtraLargeCornerBasedShape,
+                ).glassSurface(
+                    Shapes.ExtraLargeCornerBasedShape,
+                    MaterialTheme.colorScheme.surfaceContainerLow,
+                    tint = MaterialTheme.colorScheme.surfaceContainerLow,
+                    opacity = 0.7f,
+                ).padding(Spacing.Medium),
         verticalArrangement = Arrangement.spacedBy(Spacing.Medium),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall)) {
@@ -1406,9 +1458,14 @@ private fun FinderActionPill(
                 .graphicsLayer {
                     scaleX = pressScale
                     scaleY = pressScale
-                }.clip(Shapes.MediumCornerBasedShape)
-                .background(MaterialTheme.colorScheme.secondaryContainer)
-                .clickHighlight(interactionSource = interactionSource, onClick = onClick)
+                }.clip(
+                    Shapes.MediumCornerBasedShape,
+                ).glassSurface(
+                    Shapes.MediumCornerBasedShape,
+                    MaterialTheme.colorScheme.secondaryContainer,
+                    tint = MaterialTheme.colorScheme.secondaryContainer,
+                    opacity = 0.7f,
+                ).clickHighlight(interactionSource = interactionSource, onClick = onClick)
                 .padding(horizontal = Spacing.Medium, vertical = Spacing.Small),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement =
@@ -1538,8 +1595,14 @@ private fun CloudPlaylistRail(
                         Modifier
                             .fillMaxWidth()
                             .aspectRatio(1f)
-                            .clip(Shapes.ExtraLargeCornerBasedShape)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                            .clip(
+                                Shapes.ExtraLargeCornerBasedShape,
+                            ).glassSurface(
+                                Shapes.ExtraLargeCornerBasedShape,
+                                MaterialTheme.colorScheme.surfaceContainerHigh,
+                                tint = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                opacity = 0.7f,
+                            ),
                     placeHolder = {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Icon(
@@ -1703,8 +1766,14 @@ private fun CloudUserPlaylistRail(
                         Modifier
                             .fillMaxWidth()
                             .aspectRatio(1f)
-                            .clip(Shapes.ExtraLargeCornerBasedShape)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                            .clip(
+                                Shapes.ExtraLargeCornerBasedShape,
+                            ).glassSurface(
+                                Shapes.ExtraLargeCornerBasedShape,
+                                MaterialTheme.colorScheme.surfaceContainerHigh,
+                                tint = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                opacity = 0.7f,
+                            ),
                     placeHolder = {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Icon(Icons.Default.LibraryMusic, null)
@@ -1837,8 +1906,14 @@ private fun FinderEmptyRow(
             modifier =
                 Modifier
                     .size(44.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                    .clip(
+                        CircleShape,
+                    ).glassSurface(
+                        CircleShape,
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        opacity = 0.7f,
+                    ),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -1902,9 +1977,14 @@ private fun SectionHeader(
                 modifier =
                     Modifier
                         .padding(start = Spacing.Small)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                        .clickHighlight(onClick = onActionClick)
+                        .clip(
+                            CircleShape,
+                        ).glassSurface(
+                            CircleShape,
+                            MaterialTheme.colorScheme.surfaceContainerHigh,
+                            tint = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            opacity = 0.7f,
+                        ).clickHighlight(onClick = onActionClick)
                         .padding(horizontal = Spacing.Medium, vertical = Spacing.ExtraSmall),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall),
@@ -1951,8 +2031,9 @@ private fun UtilityEntryRow(
             modifier =
                 Modifier
                     .size(44.dp)
-                    .clip(CircleShape)
-                    .background(badgeColor.copy(alpha = 0.12f)),
+                    .clip(
+                        CircleShape,
+                    ).glassSurface(CircleShape, badgeColor.copy(alpha = 0.12f), tint = badgeColor.copy(alpha = 0.12f), opacity = 0.7f),
             contentAlignment = Alignment.Center,
         ) {
             Icon(

@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package me.spica27.spicamusic.ui.audioeffects
 
 import androidx.compose.foundation.layout.Arrangement
@@ -12,19 +14,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Equalizer
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,6 +33,14 @@ import me.spica27.navkit.scene.StackScene
 import me.spica27.spicamusic.R
 import org.koin.compose.viewmodel.koinViewModel
 import java.util.Locale
+import me.spica27.spicamusic.ui.theme.GlassCard as Card
+import me.spica27.spicamusic.ui.theme.GlassFilterChip as FilterChip
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
+import me.spica27.spicamusic.ui.theme.GlassScaffold as Scaffold
+import me.spica27.spicamusic.ui.theme.GlassSlider as Slider
+import me.spica27.spicamusic.ui.theme.GlassSwitch as Switch
+import me.spica27.spicamusic.ui.theme.GlassTextButton as TextButton
+import me.spica27.spicamusic.ui.theme.GlassTopAppBar as TopAppBar
 
 class EqualizerScene : StackScene() {
     @OptIn(ExperimentalMaterial3Api::class)

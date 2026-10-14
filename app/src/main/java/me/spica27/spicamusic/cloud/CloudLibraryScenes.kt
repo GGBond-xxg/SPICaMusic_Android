@@ -35,20 +35,11 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -78,10 +69,20 @@ import androidx.paging.compose.itemKey
 import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.navkit.scene.StackScene
 import me.spica27.spicamusic.R
+import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.AudioCover
 import org.drinkless.tdlib.TdApi
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
+import me.spica27.spicamusic.ui.theme.GlassButton as Button
+import me.spica27.spicamusic.ui.theme.GlassFilledTonalButton as FilledTonalButton
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
+import me.spica27.spicamusic.ui.theme.GlassOutlinedButton as OutlinedButton
+import me.spica27.spicamusic.ui.theme.GlassOutlinedTextField as OutlinedTextField
+import me.spica27.spicamusic.ui.theme.GlassScaffold as Scaffold
+import me.spica27.spicamusic.ui.theme.GlassSurface as Surface
+import me.spica27.spicamusic.ui.theme.GlassTextButton as TextButton
+import me.spica27.spicamusic.ui.theme.GlassTopAppBar as TopAppBar
 
 class CloudLibraryScene : StackScene() {
     @Composable
@@ -1041,8 +1042,14 @@ private fun CloudSongRow(
             modifier =
                 Modifier
                     .size(46.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(16.dp)),
+                    .clip(
+                        RoundedCornerShape(16.dp),
+                    ).glassSurface(
+                        RoundedCornerShape(16.dp),
+                        MaterialTheme.colorScheme.surfaceContainerHigh,
+                        tint = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        opacity = 0.7f,
+                    ),
             contentAlignment = Alignment.Center,
         ) {
             AudioCover(

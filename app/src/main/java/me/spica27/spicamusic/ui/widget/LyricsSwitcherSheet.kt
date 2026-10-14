@@ -21,7 +21,6 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -38,6 +37,8 @@ import com.google.common.collect.ImmutableList
 import me.spcia.lyric_core.entity.SongLyrics
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.common.entity.LyricItem
+import me.spica27.spicamusic.ui.theme.glassSurface
+import me.spica27.spicamusic.ui.theme.GlassModalBottomSheet as ModalBottomSheet
 
 /**
  * 歌词切换选择面板
@@ -192,7 +193,7 @@ fun LyricsSwitcherSheet(
                                     .padding(horizontal = 4.dp)
                                     .size(if (isSelected) 8.dp else 6.dp)
                                     .clip(CircleShape)
-                                    .background(color),
+                                    .glassSurface(CircleShape, color, tint = color, opacity = 0.7f),
                         )
                     }
                 }

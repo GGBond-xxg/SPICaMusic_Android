@@ -7,13 +7,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,6 +24,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.spica27.spicamusic.R
 import org.koin.compose.koinInject
+import me.spica27.spicamusic.ui.theme.GlassAlertDialog as AlertDialog
+import me.spica27.spicamusic.ui.theme.GlassCard as Card
+import me.spica27.spicamusic.ui.theme.GlassOutlinedButton as OutlinedButton
+import me.spica27.spicamusic.ui.theme.GlassSwitch as Switch
+import me.spica27.spicamusic.ui.theme.GlassTextButton as TextButton
 
 @Composable
 internal fun KugouRewardsCard(

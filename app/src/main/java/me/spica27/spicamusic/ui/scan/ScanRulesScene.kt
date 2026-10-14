@@ -27,10 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -59,8 +56,12 @@ import me.spica27.spicamusic.R
 import me.spica27.spicamusic.feature.library.domain.ScanFormats
 import me.spica27.spicamusic.ui.settings.MediaLibrarySourceViewModel
 import me.spica27.spicamusic.ui.theme.Spacing
+import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.clickHighlight
 import org.koin.compose.viewmodel.koinActivityViewModel
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
+import me.spica27.spicamusic.ui.theme.GlassOutlinedTextField as OutlinedTextField
+import me.spica27.spicamusic.ui.theme.GlassSurface as Surface
 
 /**
  * 扫描规则配置：底部弹层（与 ScanFoldersScene 同一套呈现），
@@ -147,9 +148,14 @@ class ScanRulesScene : DialogScene() {
                             .padding(top = 10.dp)
                             .width(44.dp)
                             .height(4.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f))
-                            .align(Alignment.CenterHorizontally),
+                            .clip(
+                                CircleShape,
+                            ).glassSurface(
+                                CircleShape,
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f),
+                                tint = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f),
+                                opacity = 0.7f,
+                            ).align(Alignment.CenterHorizontally),
                 )
 
                 Row(
@@ -423,7 +429,7 @@ private fun ScanRuleChip(
         modifier =
             modifier
                 .clip(CircleShape)
-                .background(containerColor)
+                .glassSurface(CircleShape, containerColor, tint = containerColor, opacity = 0.7f)
                 .clickHighlight(onClick = onClick)
                 .padding(horizontal = Spacing.Large, vertical = Spacing.Small),
         contentAlignment = Alignment.Center,

@@ -58,11 +58,8 @@ import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -101,12 +98,17 @@ import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
 import me.spica27.spicamusic.ui.theme.ListItemFadeOutSpec
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
+import me.spica27.spicamusic.ui.theme.appPageBackground
+import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.AudioCover
 import me.spica27.spicamusic.ui.widget.clickHighlight
 import me.spica27.spicamusic.ui.widget.combinedClickHighlight
 import me.spica27.spicamusic.ui.widget.materialSharedAxisZ
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
 import org.koin.androidx.compose.koinViewModel
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
+import me.spica27.spicamusic.ui.theme.GlassSurface as Surface
+import me.spica27.spicamusic.ui.theme.GlassTextButton as TextButton
 
 /**
  * 已忽略歌曲管理
@@ -170,7 +172,7 @@ private fun IgnoredSongsScreenContent() {
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
+                .appPageBackground(),
     ) {
         LazyColumn(
             state = listState,
@@ -466,9 +468,14 @@ private fun IgnoredSongsMasthead(
                 Row(
                     modifier =
                         Modifier
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                            .clickHighlight(onClick = onToggleMultiSelect)
+                            .clip(
+                                CircleShape,
+                            ).glassSurface(
+                                CircleShape,
+                                MaterialTheme.colorScheme.surfaceContainerHigh,
+                                tint = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                opacity = 0.7f,
+                            ).clickHighlight(onClick = onToggleMultiSelect)
                             .padding(horizontal = Spacing.Medium, vertical = Spacing.ExtraSmall),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall),
@@ -558,9 +565,14 @@ private fun IgnoredSearchPill(
         modifier =
             modifier
                 .height(44.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .padding(start = Spacing.Large, end = Spacing.ExtraSmall),
+                .clip(
+                    CircleShape,
+                ).glassSurface(
+                    CircleShape,
+                    MaterialTheme.colorScheme.surfaceContainerHigh,
+                    tint = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    opacity = 0.7f,
+                ).padding(start = Spacing.Large, end = Spacing.ExtraSmall),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -635,12 +647,20 @@ private fun IgnoredSongRow(
                 .fillMaxWidth()
                 .padding(horizontal = LayoutTokens.MusicHeaderHorizontalPadding, vertical = Spacing.Small)
                 .clip(Shapes.MediumCornerBasedShape)
-                .background(
+                .glassSurface(
+                    Shapes.MediumCornerBasedShape,
                     if (isSelected) {
                         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
                     } else {
                         Color.Transparent
                     },
+                    tint =
+                        if (isSelected) {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                        } else {
+                            Color.Transparent
+                        },
+                    opacity = 0.7f,
                 ).combinedClickHighlight(
                     onClick = onClick,
                     onLongClick = onLongClick,
@@ -774,8 +794,9 @@ private fun IgnoredSkeletonRows(
                     modifier =
                         Modifier
                             .size(48.dp)
-                            .clip(Shapes.LargeCornerBasedShape)
-                            .background(bone),
+                            .clip(
+                                Shapes.LargeCornerBasedShape,
+                            ).glassSurface(Shapes.LargeCornerBasedShape, bone, tint = bone, opacity = 0.7f),
                 )
                 Column(
                     modifier = Modifier.weight(1f),
@@ -786,16 +807,18 @@ private fun IgnoredSkeletonRows(
                             Modifier
                                 .fillMaxWidth(0.55f)
                                 .height(14.dp)
-                                .clip(Shapes.SmallCornerBasedShape)
-                                .background(bone),
+                                .clip(
+                                    Shapes.SmallCornerBasedShape,
+                                ).glassSurface(Shapes.SmallCornerBasedShape, bone, tint = bone, opacity = 0.7f),
                     )
                     Box(
                         modifier =
                             Modifier
                                 .fillMaxWidth(0.32f)
                                 .height(10.dp)
-                                .clip(Shapes.SmallCornerBasedShape)
-                                .background(bone),
+                                .clip(
+                                    Shapes.SmallCornerBasedShape,
+                                ).glassSurface(Shapes.SmallCornerBasedShape, bone, tint = bone, opacity = 0.7f),
                     )
                 }
                 Box(
@@ -803,8 +826,9 @@ private fun IgnoredSkeletonRows(
                         Modifier
                             .width(36.dp)
                             .height(10.dp)
-                            .clip(Shapes.SmallCornerBasedShape)
-                            .background(bone),
+                            .clip(
+                                Shapes.SmallCornerBasedShape,
+                            ).glassSurface(Shapes.SmallCornerBasedShape, bone, tint = bone, opacity = 0.7f),
                 )
             }
         }
@@ -841,8 +865,14 @@ private fun IgnoredEmptyState(
                     .graphicsLayer {
                         translationY = bob * 5.dp.toPx()
                         rotationZ = bob * 6f
-                    }.clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                    }.clip(
+                        CircleShape,
+                    ).glassSurface(
+                        CircleShape,
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        opacity = 0.7f,
+                    ),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -942,9 +972,14 @@ private fun MultiSelectActionPill(
     Row(
         modifier =
             modifier
-                .clip(Shapes.MediumCornerBasedShape)
-                .background(if (enabled) container else container.copy(alpha = 0.45f))
-                .clickHighlight(enabled = enabled, onClick = onClick)
+                .clip(
+                    Shapes.MediumCornerBasedShape,
+                ).glassSurface(
+                    Shapes.MediumCornerBasedShape,
+                    if (enabled) container else container.copy(alpha = 0.45f),
+                    tint = if (enabled) container else container.copy(alpha = 0.45f),
+                    opacity = 0.7f,
+                ).clickHighlight(enabled = enabled, onClick = onClick)
                 .padding(horizontal = Spacing.Small, vertical = Spacing.Small),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,

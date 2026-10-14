@@ -8,7 +8,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,7 +25,6 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,9 +44,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
 import me.spica27.spicamusic.R
+import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.MusicCoverPlaceholder
 import me.spica27.spicamusic.ui.widget.StableAudioCover
 import me.spica27.spicamusic.utils.albumCoverFallbackUri
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
 
 /**
  * 底部迷你播放条
@@ -124,8 +124,11 @@ fun LargeBottomPlayerBar(
                             compositingStrategy = CompositingStrategy.Offscreen,
                         ).size(48.dp)
                         .clip(coverShape)
-                        .background(
+                        .glassSurface(
+                            coverShape,
                             MaterialTheme.colorScheme.tertiaryContainer,
+                            tint = MaterialTheme.colorScheme.tertiaryContainer,
+                            opacity = 0.7f,
                         )
                 Box(modifier = resolvedCoverModifier) {
                     StableAudioCover(
@@ -212,16 +215,28 @@ fun LargeBottomPlayerBar(
                                 Modifier
                                     .fillMaxWidth(0.72f)
                                     .height(12.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)),
+                                    .clip(
+                                        CircleShape,
+                                    ).glassSurface(
+                                        CircleShape,
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                        opacity = 0.7f,
+                                    ),
                         )
                         Box(
                             modifier =
                                 Modifier
                                     .fillMaxWidth(0.48f)
                                     .height(9.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f)),
+                                    .clip(
+                                        CircleShape,
+                                    ).glassSurface(
+                                        CircleShape,
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f),
+                                        opacity = 0.7f,
+                                    ),
                         )
                     }
                 }

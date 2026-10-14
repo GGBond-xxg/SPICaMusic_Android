@@ -66,7 +66,6 @@ import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -133,12 +132,15 @@ import me.spica27.spicamusic.ui.theme.EaseOutEmphasized
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
+import me.spica27.spicamusic.ui.theme.appPageBackground
+import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.AudioCover
 import me.spica27.spicamusic.ui.widget.clickHighlight
 import me.spica27.spicamusic.ui.widget.combinedClickHighlight
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
 import org.koin.compose.viewmodel.koinActivityViewModel
 import java.util.concurrent.TimeUnit
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
 
 private val MastheadCollapseDistance = 140.dp
 
@@ -653,7 +655,7 @@ fun MusicPage() {
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
+                .appPageBackground(),
     ) {
         LazyColumn(
             state = listState,
@@ -1112,9 +1114,14 @@ private fun MusicTopBar(
                 Row(
                     modifier =
                         Modifier
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary)
-                            .clickHighlight(onClick = {
+                            .clip(
+                                CircleShape,
+                            ).glassSurface(
+                                CircleShape,
+                                MaterialTheme.colorScheme.primary,
+                                tint = MaterialTheme.colorScheme.primary,
+                                opacity = 0.7f,
+                            ).clickHighlight(onClick = {
                                 scope.launch {
                                     listState.animateScrollToItem(0)
                                 }
@@ -1257,7 +1264,7 @@ private fun MusicTabChip(
                     scaleX = pressScale
                     scaleY = pressScale
                 }.clip(Shapes.LargeCornerBasedShape)
-                .background(container)
+                .glassSurface(Shapes.LargeCornerBasedShape, container, tint = container, opacity = 0.7f)
                 .clickHighlight(interactionSource = interactionSource, onClick = onClick)
                 .padding(horizontal = Spacing.Small, vertical = Spacing.Small),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1293,9 +1300,14 @@ private fun MusicSearchBar(
                 .fillMaxWidth()
                 .padding(horizontal = LayoutTokens.MusicHeaderHorizontalPadding)
                 .height(52.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .padding(start = Spacing.Large, end = Spacing.Small),
+                .clip(
+                    CircleShape,
+                ).glassSurface(
+                    CircleShape,
+                    MaterialTheme.colorScheme.surfaceContainerHigh,
+                    tint = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    opacity = 0.7f,
+                ).padding(start = Spacing.Large, end = Spacing.Small),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
     ) {
@@ -1410,9 +1422,14 @@ private fun MusicSectionHeader(
                 Box(
                     modifier =
                         Modifier
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer)
-                            .clickHighlight(
+                            .clip(
+                                CircleShape,
+                            ).glassSurface(
+                                CircleShape,
+                                MaterialTheme.colorScheme.primaryContainer,
+                                tint = MaterialTheme.colorScheme.primaryContainer,
+                                opacity = 0.7f,
+                            ).clickHighlight(
                                 onClickLabel = refreshContentDescription,
                                 onClick = {
                                     if (!refreshing) onRefresh()
@@ -1441,9 +1458,14 @@ private fun MusicSectionHeader(
                     modifier =
                         Modifier
                             .popupMenuAnchor(sourceAnchor)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer)
-                            .clickHighlight(
+                            .clip(
+                                CircleShape,
+                            ).glassSurface(
+                                CircleShape,
+                                MaterialTheme.colorScheme.primaryContainer,
+                                tint = MaterialTheme.colorScheme.primaryContainer,
+                                opacity = 0.7f,
+                            ).clickHighlight(
                                 onClickLabel = stringResource(R.string.music_source_selector_cd),
                                 onClick = onSourceClick,
                             ).padding(Spacing.Small),
@@ -1461,9 +1483,14 @@ private fun MusicSectionHeader(
                 modifier =
                     Modifier
                         .popupMenuAnchor(sortAnchor)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer)
-                        .clickHighlight(
+                        .clip(
+                            CircleShape,
+                        ).glassSurface(
+                            CircleShape,
+                            MaterialTheme.colorScheme.primaryContainer,
+                            tint = MaterialTheme.colorScheme.primaryContainer,
+                            opacity = 0.7f,
+                        ).clickHighlight(
                             onClickLabel = stringResource(R.string.music_sort_cd),
                             onClick = onSortClick,
                         ).padding(Spacing.Small),
@@ -1507,12 +1534,20 @@ private fun MusicSongRow(
                 .fillMaxWidth()
                 .padding(horizontal = LayoutTokens.MusicHeaderHorizontalPadding)
                 .clip(Shapes.ExtraLargeCornerBasedShape)
-                .background(
+                .glassSurface(
+                    Shapes.ExtraLargeCornerBasedShape,
                     if (isPlaying) {
                         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
                     } else {
                         MaterialTheme.colorScheme.surfaceContainerLow
                     },
+                    tint =
+                        if (isPlaying) {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerLow
+                        },
+                    opacity = 0.7f,
                 ).combinedClickHighlight(
                     onClick = {
                         onClick()
@@ -1608,9 +1643,14 @@ private fun MusicAlbumRow(
             modifier
                 .fillMaxWidth()
                 .padding(horizontal = LayoutTokens.MusicHeaderHorizontalPadding)
-                .clip(Shapes.ExtraLargeCornerBasedShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                .clickHighlight(onClick = onClick)
+                .clip(
+                    Shapes.ExtraLargeCornerBasedShape,
+                ).glassSurface(
+                    Shapes.ExtraLargeCornerBasedShape,
+                    MaterialTheme.colorScheme.surfaceContainerLow,
+                    tint = MaterialTheme.colorScheme.surfaceContainerLow,
+                    opacity = 0.7f,
+                ).clickHighlight(onClick = onClick)
                 .padding(Spacing.Small),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
@@ -1659,9 +1699,14 @@ private fun MusicArtistRow(
             modifier
                 .fillMaxWidth()
                 .padding(horizontal = LayoutTokens.MusicHeaderHorizontalPadding)
-                .clip(Shapes.ExtraLargeCornerBasedShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                .clickHighlight(onClick = onClick)
+                .clip(
+                    Shapes.ExtraLargeCornerBasedShape,
+                ).glassSurface(
+                    Shapes.ExtraLargeCornerBasedShape,
+                    MaterialTheme.colorScheme.surfaceContainerLow,
+                    tint = MaterialTheme.colorScheme.surfaceContainerLow,
+                    opacity = 0.7f,
+                ).clickHighlight(onClick = onClick)
                 .padding(Spacing.Small),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
@@ -1696,9 +1741,14 @@ private fun MusicArtistRow(
             tint = MaterialTheme.colorScheme.primary,
             modifier =
                 Modifier
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer)
-                    .padding(Spacing.Small)
+                    .clip(
+                        CircleShape,
+                    ).glassSurface(
+                        CircleShape,
+                        MaterialTheme.colorScheme.primaryContainer,
+                        tint = MaterialTheme.colorScheme.primaryContainer,
+                        opacity = 0.7f,
+                    ).padding(Spacing.Small)
                     .size(18.dp),
         )
     }
@@ -1717,9 +1767,14 @@ private fun MusicEmptyState(
             modifier
                 .fillMaxWidth()
                 .padding(horizontal = LayoutTokens.MusicHeaderHorizontalPadding)
-                .clip(Shapes.ExtraLarge1CornerBasedShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                .padding(Spacing.ExtraLarge),
+                .clip(
+                    Shapes.ExtraLarge1CornerBasedShape,
+                ).glassSurface(
+                    Shapes.ExtraLarge1CornerBasedShape,
+                    MaterialTheme.colorScheme.surfaceContainerLow,
+                    tint = MaterialTheme.colorScheme.surfaceContainerLow,
+                    opacity = 0.7f,
+                ).padding(Spacing.ExtraLarge),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.Small),
     ) {
@@ -1727,8 +1782,14 @@ private fun MusicEmptyState(
             modifier =
                 Modifier
                     .size(56.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                    .clip(
+                        CircleShape,
+                    ).glassSurface(
+                        CircleShape,
+                        MaterialTheme.colorScheme.primaryContainer,
+                        tint = MaterialTheme.colorScheme.primaryContainer,
+                        opacity = 0.7f,
+                    ),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -1756,9 +1817,14 @@ private fun MusicEmptyState(
                 modifier =
                     Modifier
                         .padding(top = Spacing.Small)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
-                        .clickHighlight(onClick = onActionClick)
+                        .clip(
+                            CircleShape,
+                        ).glassSurface(
+                            CircleShape,
+                            MaterialTheme.colorScheme.primary,
+                            tint = MaterialTheme.colorScheme.primary,
+                            opacity = 0.7f,
+                        ).clickHighlight(onClick = onActionClick)
                         .padding(horizontal = Spacing.Large, vertical = Spacing.Small),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall),

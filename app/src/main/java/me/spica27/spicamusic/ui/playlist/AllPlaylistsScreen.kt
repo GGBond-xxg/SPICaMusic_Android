@@ -1,7 +1,6 @@
 package me.spica27.spicamusic.ui.playlist
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Arrangement
@@ -21,11 +20,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -43,10 +39,14 @@ import me.spica27.spicamusic.ui.playlistdetail.PlaylistDetailScene
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
+import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.PlaylistCoverView
 import me.spica27.spicamusic.ui.widget.PreloadPlaylistCovers
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
 import org.koin.compose.viewmodel.koinActivityViewModel
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
+import me.spica27.spicamusic.ui.theme.GlassScaffold as Scaffold
+import me.spica27.spicamusic.ui.theme.GlassTopAppBar as TopAppBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -186,9 +186,14 @@ private fun AllPlaylistsEmptyState(modifier: Modifier = Modifier) {
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(Shapes.ExtraLargeCornerBasedShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .padding(Spacing.Large),
+                    .clip(
+                        Shapes.ExtraLargeCornerBasedShape,
+                    ).glassSurface(
+                        Shapes.ExtraLargeCornerBasedShape,
+                        MaterialTheme.colorScheme.surfaceContainer,
+                        tint = MaterialTheme.colorScheme.surfaceContainer,
+                        opacity = 0.7f,
+                    ).padding(Spacing.Large),
             verticalArrangement = Arrangement.spacedBy(Spacing.Small),
         ) {
             Text(

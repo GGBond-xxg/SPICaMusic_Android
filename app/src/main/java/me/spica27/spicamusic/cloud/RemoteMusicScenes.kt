@@ -40,23 +40,12 @@ import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -99,11 +88,24 @@ import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.playlist.PlaylistViewModel
 import me.spica27.spicamusic.ui.playlistdetail.PlaylistCloudSongRow
 import me.spica27.spicamusic.ui.theme.Shapes
+import me.spica27.spicamusic.ui.theme.appPageBackground
+import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.AudioCover
 import me.spica27.spicamusic.ui.widget.StableAudioCover
 import org.koin.compose.viewmodel.koinActivityViewModel
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
+import me.spica27.spicamusic.ui.theme.GlassAlertDialog as AlertDialog
+import me.spica27.spicamusic.ui.theme.GlassButton as Button
+import me.spica27.spicamusic.ui.theme.GlassDropdownMenu as DropdownMenu
+import me.spica27.spicamusic.ui.theme.GlassFilledTonalButton as FilledTonalButton
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
+import me.spica27.spicamusic.ui.theme.GlassOutlinedButton as OutlinedButton
+import me.spica27.spicamusic.ui.theme.GlassOutlinedTextField as OutlinedTextField
+import me.spica27.spicamusic.ui.theme.GlassScaffold as Scaffold
+import me.spica27.spicamusic.ui.theme.GlassSurface as Surface
+import me.spica27.spicamusic.ui.theme.GlassTextButton as TextButton
+import me.spica27.spicamusic.ui.theme.GlassTopAppBar as TopAppBar
 
 private fun RemoteSong.remoteMediaId(
     provider: RemoteMusicProvider,
@@ -1717,12 +1719,20 @@ private fun RemoteSongRow(
                 .fillMaxWidth()
                 .padding(horizontal = if (playlistStyle) 12.dp else 0.dp)
                 .clip(Shapes.MediumCornerBasedShape)
-                .background(
+                .glassSurface(
+                    Shapes.MediumCornerBasedShape,
                     if (isPlaying || isPending) {
                         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.30f)
                     } else {
                         androidx.compose.ui.graphics.Color.Transparent
                     },
+                    tint =
+                        if (isPlaying || isPending) {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.30f)
+                        } else {
+                            androidx.compose.ui.graphics.Color.Transparent
+                        },
+                    opacity = 0.7f,
                 ).clickable(onClick = onClick)
                 .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1818,7 +1828,7 @@ private fun RemoteSceneScaffold(
     actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
 ) {
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Box(Modifier.fillMaxSize().appPageBackground()) {
         if (playlistAppearance && headerVisible) {
             Box(
                 Modifier.fillMaxWidth().height(400.dp).background(

@@ -92,7 +92,7 @@ fun SPICaMusicTheme(
                 style = PaletteStyle.TonalSpot,
             ) {
                 CompositionLocalProvider(LocalGlassEnabled provides (themeColorStyle == ThemeColorStyle.Glass)) {
-                    GlassBackdropHost { ProvideAppInteractionIndication(content = content) }
+                    GlassSceneContainers { GlassBackdropHost { ProvideAppInteractionIndication(content = content) } }
                 }
             }
 
@@ -117,7 +117,7 @@ fun SPICaMusicTheme(
                 }
             MaterialTheme(colorScheme = colorScheme) {
                 CompositionLocalProvider(LocalGlassEnabled provides (themeColorStyle == ThemeColorStyle.Glass)) {
-                    GlassBackdropHost { ProvideAppInteractionIndication(content = content) }
+                    GlassSceneContainers { GlassBackdropHost { ProvideAppInteractionIndication(content = content) } }
                 }
             }
         }

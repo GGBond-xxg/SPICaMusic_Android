@@ -8,12 +8,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -53,6 +50,9 @@ import me.spica27.spicamusic.ui.widget.encodeLyricsCustomFonts
 import me.spica27.spicamusic.ui.widget.importLyricsFont
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinActivityViewModel
+import me.spica27.spicamusic.ui.theme.GlassAlertDialog as AlertDialog
+import me.spica27.spicamusic.ui.theme.GlassOutlinedTextField as OutlinedTextField
+import me.spica27.spicamusic.ui.theme.GlassTextButton as TextButton
 
 /**
  * 歌词面板

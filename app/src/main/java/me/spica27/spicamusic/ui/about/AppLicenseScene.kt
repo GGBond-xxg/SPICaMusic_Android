@@ -1,6 +1,5 @@
 package me.spica27.spicamusic.ui.about
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -14,6 +13,7 @@ import me.spica27.navkit.scene.StackScene
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
+import me.spica27.spicamusic.ui.theme.glassSurface
 
 /** 应用自身的 MIT 许可证全文。许可证文本按惯例保持英文原文。 */
 private val MIT_LICENSE_TEXT =
@@ -54,9 +54,14 @@ class AppLicenseScene : StackScene() {
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .clip(Shapes.ExtraLargeCornerBasedShape)
-                            .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f))
-                            .padding(Spacing.Large),
+                            .clip(
+                                Shapes.ExtraLargeCornerBasedShape,
+                            ).glassSurface(
+                                Shapes.ExtraLargeCornerBasedShape,
+                                MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f),
+                                tint = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f),
+                                opacity = 0.7f,
+                            ).padding(Spacing.Large),
                 )
             }
         }

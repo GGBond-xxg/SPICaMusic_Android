@@ -26,13 +26,10 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Remove
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -60,9 +57,13 @@ import kotlinx.coroutines.launch
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
+import me.spica27.spicamusic.ui.theme.glassSurface
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlin.math.ceil
+import me.spica27.spicamusic.ui.theme.GlassButton as Button
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
+import me.spica27.spicamusic.ui.theme.GlassModalBottomSheet as ModalBottomSheet
 
 private val SleepTimerPresets = listOf(15, 30, 45, 60, 90)
 private const val CustomTimerMin = 5
@@ -122,8 +123,14 @@ fun SleepTimerSheet(
                     Modifier
                         .padding(top = Spacing.Small, bottom = Spacing.ExtraSmall)
                         .size(width = 36.dp, height = 4.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)),
+                        .clip(
+                            CircleShape,
+                        ).glassSurface(
+                            CircleShape,
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                            opacity = 0.7f,
+                        ),
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -166,12 +173,20 @@ fun SleepTimerSheet(
                             Modifier
                                 .weight(1f)
                                 .clip(Shapes.ExtraLargeCornerBasedShape)
-                                .background(
+                                .glassSurface(
+                                    Shapes.ExtraLargeCornerBasedShape,
                                     if (selected) {
                                         MaterialTheme.colorScheme.primaryContainer
                                     } else {
                                         MaterialTheme.colorScheme.surfaceContainerHighest
                                     },
+                                    tint =
+                                        if (selected) {
+                                            MaterialTheme.colorScheme.primaryContainer
+                                        } else {
+                                            MaterialTheme.colorScheme.surfaceContainerHighest
+                                        },
+                                    opacity = 0.7f,
                                 ).clickable {
                                     PlayerHaptics.click()
                                     dismissAfter { onSetTimer(minutes) }
@@ -204,9 +219,14 @@ fun SleepTimerSheet(
                     Modifier
                         .fillMaxWidth()
                         .animateContentSize(tween(220))
-                        .clip(Shapes.ExtraLargeCornerBasedShape)
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                        .clickable {
+                        .clip(
+                            Shapes.ExtraLargeCornerBasedShape,
+                        ).glassSurface(
+                            Shapes.ExtraLargeCornerBasedShape,
+                            MaterialTheme.colorScheme.surfaceContainerHigh,
+                            tint = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            opacity = 0.7f,
+                        ).clickable {
                             PlayerHaptics.click()
                             customExpanded = !customExpanded
                         }.padding(Spacing.Medium),
@@ -405,7 +425,18 @@ private fun TimerStepButton(
     IconButton(
         onClick = playerClick(onClick),
         enabled = enabled,
-        modifier = Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerHighest),
+        modifier =
+            Modifier
+                .size(
+                    48.dp,
+                ).clip(
+                    CircleShape,
+                ).glassSurface(
+                    CircleShape,
+                    MaterialTheme.colorScheme.surfaceContainerHighest,
+                    tint = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    opacity = 0.7f,
+                ),
     ) {
         Icon(icon, null)
     }

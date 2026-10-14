@@ -19,11 +19,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBackIos
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -41,6 +38,10 @@ import me.spica27.spicamusic.R
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
+import me.spica27.spicamusic.ui.theme.glassSurface
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
+import me.spica27.spicamusic.ui.theme.GlassScaffold as Scaffold
+import me.spica27.spicamusic.ui.theme.GlassTopAppBar as TopAppBar
 
 /**
  * 关于相关页面共用的脚手架：透明 TopAppBar + 渐变背景 + LazyColumn。
@@ -133,9 +134,14 @@ internal fun AboutSectionCard(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clip(Shapes.ExtraLargeCornerBasedShape)
-                .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f))
-                .padding(vertical = Spacing.Large),
+                .clip(
+                    Shapes.ExtraLargeCornerBasedShape,
+                ).glassSurface(
+                    Shapes.ExtraLargeCornerBasedShape,
+                    MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f),
+                    tint = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f),
+                    opacity = 0.7f,
+                ).padding(vertical = Spacing.Large),
     ) {
         Column(
             modifier = Modifier.padding(horizontal = Spacing.Large),
@@ -186,8 +192,14 @@ internal fun AboutRow(
             modifier =
                 Modifier
                     .size(46.dp)
-                    .clip(Shapes.LargeCornerBasedShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    .clip(
+                        Shapes.LargeCornerBasedShape,
+                    ).glassSurface(
+                        Shapes.LargeCornerBasedShape,
+                        MaterialTheme.colorScheme.surfaceContainerHigh,
+                        tint = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        opacity = 0.7f,
+                    ),
             contentAlignment = Alignment.Center,
         ) {
             Icon(

@@ -34,7 +34,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -85,10 +84,12 @@ import me.spica27.spicamusic.R
 import me.spica27.spicamusic.common.entity.LyricItem
 import me.spica27.spicamusic.common.entity.findPlayingIndex
 import me.spica27.spicamusic.ui.theme.Shapes
+import me.spica27.spicamusic.ui.theme.glassSurface
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
 
 // ==================== 常量 ====================
 private object LyricUIConstants {
@@ -1068,9 +1069,14 @@ private fun SeekPreview(
         Box(
             modifier =
                 Modifier
-                    .clip(Shapes.ExtraLarge1CornerBasedShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f))
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .clip(
+                        Shapes.ExtraLarge1CornerBasedShape,
+                    ).glassSurface(
+                        Shapes.ExtraLarge1CornerBasedShape,
+                        MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f),
+                        tint = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f),
+                        opacity = 0.7f,
+                    ).padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
             Text(
                 text = timeText,

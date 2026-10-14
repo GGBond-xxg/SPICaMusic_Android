@@ -8,7 +8,6 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -41,9 +40,7 @@ import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -66,8 +63,11 @@ import me.spcia.lyric_core.entity.SongLyrics
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.ui.player.PlayerHaptics
 import me.spica27.spicamusic.ui.player.playerClick
+import me.spica27.spicamusic.ui.theme.glassSurface
 import java.util.Locale
 import kotlin.math.roundToInt
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
+import me.spica27.spicamusic.ui.theme.GlassModalBottomSheet as ModalBottomSheet
 
 /** 顶部编辑按钮打开的歌词工具面板。所有二级选项都在当前面板内下拉展开。 */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -227,8 +227,14 @@ fun LyricsEditorSheet(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                            .clip(
+                                RoundedCornerShape(20.dp),
+                            ).glassSurface(
+                                RoundedCornerShape(20.dp),
+                                MaterialTheme.colorScheme.surfaceContainerHighest,
+                                tint = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                opacity = 0.7f,
+                            ),
                 ) {
                     DropdownChoice(
                         title = stringResource(R.string.default_font),
@@ -284,8 +290,14 @@ fun LyricsEditorSheet(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                                .clip(
+                                    RoundedCornerShape(20.dp),
+                                ).glassSurface(
+                                    RoundedCornerShape(20.dp),
+                                    MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    tint = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    opacity = 0.7f,
+                                ),
                     ) {
                         lyricSources.forEachIndexed { index, source ->
                             if (index > 0) DropdownDivider()
@@ -361,9 +373,14 @@ private fun ExpandableEditorSection(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                    .clickable(onClick = playerClick(onToggle))
+                    .clip(
+                        RoundedCornerShape(20.dp),
+                    ).glassSurface(
+                        RoundedCornerShape(20.dp),
+                        MaterialTheme.colorScheme.surfaceContainerHighest,
+                        tint = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        opacity = 0.7f,
+                    ).clickable(onClick = playerClick(onToggle))
                     .padding(horizontal = 14.dp, vertical = 13.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -410,9 +427,14 @@ private fun StepperRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                .padding(6.dp),
+                .clip(
+                    RoundedCornerShape(24.dp),
+                ).glassSurface(
+                    RoundedCornerShape(24.dp),
+                    MaterialTheme.colorScheme.surfaceContainerHighest,
+                    tint = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    opacity = 0.7f,
+                ).padding(6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -444,9 +466,14 @@ private fun ActiveLineScaleRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                .padding(6.dp),
+                .clip(
+                    RoundedCornerShape(24.dp),
+                ).glassSurface(
+                    RoundedCornerShape(24.dp),
+                    MaterialTheme.colorScheme.surfaceContainerHighest,
+                    tint = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    opacity = 0.7f,
+                ).padding(6.dp),
         horizontalArrangement = Arrangement.spacedBy(5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -582,8 +609,9 @@ private fun AlignmentOption(
     Column(
         modifier =
             modifier
-                .clip(RoundedCornerShape(18.dp))
-                .background(containerColor)
+                .clip(
+                    RoundedCornerShape(18.dp),
+                ).glassSurface(RoundedCornerShape(18.dp), containerColor, tint = containerColor, opacity = 0.7f)
                 .selectable(selected = selected, role = Role.RadioButton, onClick = playerClick(onClick))
                 .padding(vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

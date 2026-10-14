@@ -38,14 +38,11 @@ import androidx.compose.material.icons.filled.ClearAll
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.LocationSearching
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -84,10 +81,14 @@ import me.spica27.spicamusic.ui.player.PlayerViewModel
 import me.spica27.spicamusic.ui.player.formatTime
 import me.spica27.spicamusic.ui.player.playerClick
 import me.spica27.spicamusic.ui.playlistdetail.RenameDialog
+import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.ShowOnIdleContent
 import me.spica27.spicamusic.ui.widget.combinedClickHighlight
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.floor
+import me.spica27.spicamusic.ui.theme.GlassAlertDialog as AlertDialog
+import me.spica27.spicamusic.ui.theme.GlassButton as Button
+import me.spica27.spicamusic.ui.theme.GlassTextButton as TextButton
 
 /**
  * 当前播放列表页面
@@ -150,7 +151,7 @@ fun CurrentPlaylistPage(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .glassSurface(androidx.compose.ui.graphics.RectangleShape, MaterialTheme.colorScheme.surfaceContainer)
                     .animateContentSize()
                     .padding(vertical = 12.dp, horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -640,8 +641,14 @@ private fun PlaylistItemRow(
                     Modifier
                         .fillMaxHeight()
                         .aspectRatio(1f)
-                        .clip(MaterialTheme.shapes.medium)
-                        .background(MaterialTheme.colorScheme.surface),
+                        .clip(
+                            MaterialTheme.shapes.medium,
+                        ).glassSurface(
+                            MaterialTheme.shapes.medium,
+                            MaterialTheme.colorScheme.surface,
+                            tint = MaterialTheme.colorScheme.surface,
+                            opacity = 0.7f,
+                        ),
                 success = { state, painter ->
                     ShowOnIdleContent(true, delayMillis = 125) {
                         Image(painter, contentDescription = null, contentScale = ContentScale.Crop)

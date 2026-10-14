@@ -35,16 +35,10 @@ import androidx.compose.material.icons.filled.MusicOff
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.SportsMartialArts
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -82,10 +76,17 @@ import me.spica27.spicamusic.ui.albumdetail.AlbumDetailScene
 import me.spica27.spicamusic.ui.artistdetail.ArtistDetailScene
 import me.spica27.spicamusic.ui.playlist.PlaylistCreatorScene
 import me.spica27.spicamusic.ui.playlist.PlaylistViewModel
+import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.CoverFallback
 import org.koin.compose.viewmodel.koinActivityViewModel
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
+import me.spica27.spicamusic.ui.theme.GlassAlertDialog as AlertDialog
+import me.spica27.spicamusic.ui.theme.GlassButton as Button
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
+import me.spica27.spicamusic.ui.theme.GlassOutlinedTextField as OutlinedTextField
+import me.spica27.spicamusic.ui.theme.GlassSurface as Surface
+import me.spica27.spicamusic.ui.theme.GlassTextButton as TextButton
 
 class SongMenuScene(
     val song: Song,
@@ -417,9 +418,14 @@ private fun SongMenuContent(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                    .background(MaterialTheme.colorScheme.surface)
-                    .navigationBarsPadding()
+                    .clip(
+                        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                    ).glassSurface(
+                        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                        MaterialTheme.colorScheme.surface,
+                        tint = MaterialTheme.colorScheme.surface,
+                        opacity = 0.7f,
+                    ).navigationBarsPadding()
                     .padding(bottom = 12.dp),
         ) {
             Box(
@@ -428,9 +434,14 @@ private fun SongMenuContent(
                         .padding(top = 10.dp)
                         .width(44.dp)
                         .height(4.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f))
-                        .align(Alignment.CenterHorizontally),
+                        .clip(
+                            RoundedCornerShape(50),
+                        ).glassSurface(
+                            RoundedCornerShape(50),
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f),
+                            tint = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f),
+                            opacity = 0.7f,
+                        ).align(Alignment.CenterHorizontally),
             )
             Row(
                 modifier =

@@ -54,10 +54,8 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -120,6 +118,8 @@ import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
 import me.spica27.spicamusic.ui.theme.ListItemFadeOutSpec
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
+import me.spica27.spicamusic.ui.theme.appPageBackground
+import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.AudioCover
 import me.spica27.spicamusic.ui.widget.AudioQualityBadges
 import me.spica27.spicamusic.ui.widget.StableAudioCover
@@ -129,6 +129,8 @@ import me.spica27.spicamusic.ui.widget.materialSharedAxisZ
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.viewmodel.koinActivityViewModel
+import me.spica27.spicamusic.ui.theme.GlassDropdownMenu as DropdownMenu
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
 
 /** 首屏入场节拍（与刊头页共用的节奏） */
 private const val ENTRANCE_STAGGER_MILLIS = 55L
@@ -321,7 +323,7 @@ class SearchScene(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background),
+                    .appPageBackground(),
         ) {
             SearchHeader(
                 query = searchKey,
@@ -518,9 +520,14 @@ private fun SearchProviderPicker(
             modifier =
                 Modifier
                     .size(52.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.secondaryContainer)
-                    .clickHighlight(onClick = { expanded = true }),
+                    .clip(
+                        CircleShape,
+                    ).glassSurface(
+                        CircleShape,
+                        MaterialTheme.colorScheme.secondaryContainer,
+                        tint = MaterialTheme.colorScheme.secondaryContainer,
+                        opacity = 0.7f,
+                    ).clickHighlight(onClick = { expanded = true }),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -554,12 +561,20 @@ private fun SearchProviderPicker(
                         Modifier
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(
+                            .glassSurface(
+                                RoundedCornerShape(16.dp),
                                 if (source == selectedSource) {
                                     MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
                                 } else {
                                     Color.Transparent
                                 },
+                                tint =
+                                    if (source == selectedSource) {
+                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+                                    } else {
+                                        Color.Transparent
+                                    },
+                                opacity = 0.7f,
                             ),
                     onClick = {
                         expanded = false
@@ -605,7 +620,7 @@ private fun SearchInputField(
                     },
                 ).graphicsLayer {
                     alpha = if (geometryTransition?.shouldShowTarget() != false) 1f else 0f
-                }.background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                }.glassSurface(CircleShape, MaterialTheme.colorScheme.surfaceContainerHigh)
                 .padding(start = Spacing.Large, end = Spacing.Small),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
@@ -665,8 +680,11 @@ private fun SearchInputField(
                             Modifier
                                 .size(24.dp)
                                 .clip(CircleShape)
-                                .background(
+                                .glassSurface(
+                                    CircleShape,
                                     MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f),
+                                    opacity = 0.7f,
                                 ),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -876,8 +894,14 @@ private fun SearchGroupHeader(
             modifier =
                 Modifier
                     .size(28.dp)
-                    .clip(Shapes.SmallCornerBasedShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                    .clip(
+                        Shapes.SmallCornerBasedShape,
+                    ).glassSurface(
+                        Shapes.SmallCornerBasedShape,
+                        MaterialTheme.colorScheme.primaryContainer,
+                        tint = MaterialTheme.colorScheme.primaryContainer,
+                        opacity = 0.7f,
+                    ),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -912,12 +936,20 @@ private fun SearchSongItem(
             modifier
                 .fillMaxWidth()
                 .clip(Shapes.ExtraLargeCornerBasedShape)
-                .background(
+                .glassSurface(
+                    Shapes.ExtraLargeCornerBasedShape,
                     if (isPlaying) {
                         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
                     } else {
                         MaterialTheme.colorScheme.surfaceContainerLow
                     },
+                    tint =
+                        if (isPlaying) {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerLow
+                        },
+                    opacity = 0.7f,
                 ).combinedClickHighlight(onLongClick = onMore, onClick = onPlay)
                 .padding(Spacing.Small),
         verticalAlignment = Alignment.CenterVertically,
@@ -995,12 +1027,20 @@ private fun SearchRemoteSongItem(
             modifier
                 .fillMaxWidth()
                 .clip(Shapes.ExtraLargeCornerBasedShape)
-                .background(
+                .glassSurface(
+                    Shapes.ExtraLargeCornerBasedShape,
                     if (isPlaying) {
                         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
                     } else {
                         MaterialTheme.colorScheme.surfaceContainerLow
                     },
+                    tint =
+                        if (isPlaying) {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerLow
+                        },
+                    opacity = 0.7f,
                 ).combinedClickHighlight(onLongClick = onMore, onClick = onPlay)
                 .padding(Spacing.Small),
         verticalAlignment = Alignment.CenterVertically,
@@ -1160,8 +1200,14 @@ private fun SearchIdleHint(
                             .graphicsLayer {
                                 translationY = bob * 5.dp.toPx()
                                 rotationZ = bob * 6f
-                            }.clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                            }.clip(
+                                CircleShape,
+                            ).glassSurface(
+                                CircleShape,
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                opacity = 0.7f,
+                            ),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
@@ -1296,8 +1342,14 @@ private fun SearchNoResultHint(
                     .graphicsLayer {
                         translationY = bob * 5.dp.toPx()
                         rotationZ = bob * 6f
-                    }.clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                    }.clip(
+                        CircleShape,
+                    ).glassSurface(
+                        CircleShape,
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        opacity = 0.7f,
+                    ),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -1383,9 +1435,14 @@ private fun SearchSkeletonRow(
             modifier
                 .fillMaxWidth()
                 .graphicsLayer { alpha = alphaProvider() }
-                .clip(Shapes.ExtraLargeCornerBasedShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                .padding(Spacing.Small),
+                .clip(
+                    Shapes.ExtraLargeCornerBasedShape,
+                ).glassSurface(
+                    Shapes.ExtraLargeCornerBasedShape,
+                    MaterialTheme.colorScheme.surfaceContainerLow,
+                    tint = MaterialTheme.colorScheme.surfaceContainerLow,
+                    opacity = 0.7f,
+                ).padding(Spacing.Small),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
     ) {
@@ -1394,7 +1451,7 @@ private fun SearchSkeletonRow(
                 Modifier
                     .size(56.dp)
                     .clip(Shapes.LargeCornerBasedShape)
-                    .background(bone),
+                    .glassSurface(Shapes.LargeCornerBasedShape, bone, tint = bone, opacity = 0.7f),
         )
         Column(
             modifier = Modifier.weight(1f),
@@ -1406,7 +1463,7 @@ private fun SearchSkeletonRow(
                         .fillMaxWidth(0.55f)
                         .height(14.dp)
                         .clip(Shapes.SmallCornerBasedShape)
-                        .background(bone),
+                        .glassSurface(Shapes.SmallCornerBasedShape, bone, tint = bone, opacity = 0.7f),
             )
             Box(
                 modifier =
@@ -1414,7 +1471,7 @@ private fun SearchSkeletonRow(
                         .fillMaxWidth(0.32f)
                         .height(10.dp)
                         .clip(Shapes.SmallCornerBasedShape)
-                        .background(bone),
+                        .glassSurface(Shapes.SmallCornerBasedShape, bone, tint = bone, opacity = 0.7f),
             )
         }
         Box(
@@ -1423,7 +1480,7 @@ private fun SearchSkeletonRow(
                     .width(24.dp)
                     .height(10.dp)
                     .clip(Shapes.SmallCornerBasedShape)
-                    .background(bone),
+                    .glassSurface(Shapes.SmallCornerBasedShape, bone, tint = bone, opacity = 0.7f),
         )
     }
 }

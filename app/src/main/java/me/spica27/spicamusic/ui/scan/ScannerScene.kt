@@ -59,9 +59,7 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -102,10 +100,14 @@ import me.spica27.spicamusic.ui.settings.ScanState
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
+import me.spica27.spicamusic.ui.theme.appPageBackground
+import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.clickHighlight
 import me.spica27.spicamusic.ui.widget.materialSharedAxisZ
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
 import org.koin.compose.viewmodel.koinActivityViewModel
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
+import me.spica27.spicamusic.ui.theme.GlassSurface as Surface
 
 /**
  * 扫描音乐页：刊头大标题 + 状态面板 + 扫描配置入口 + 常驻底部操作区。
@@ -197,7 +199,7 @@ private fun ScannerScreenContent() {
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
+                .appPageBackground(),
     ) {
         LazyColumn(
             state = listState,
@@ -526,8 +528,9 @@ private fun StatusCard(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clip(Shapes.ExtraLargeCornerBasedShape)
-                .background(color)
+                .clip(
+                    Shapes.ExtraLargeCornerBasedShape,
+                ).glassSurface(Shapes.ExtraLargeCornerBasedShape, color, tint = color, opacity = 0.7f)
                 .padding(Spacing.Large),
     ) {
         content()
@@ -546,7 +549,7 @@ private fun StatusIconBadge(
             Modifier
                 .size(46.dp)
                 .clip(Shapes.LargeCornerBasedShape)
-                .background(container),
+                .glassSurface(Shapes.LargeCornerBasedShape, container, tint = container, opacity = 0.7f),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -827,9 +830,14 @@ private fun ScanResultTile(
     Column(
         modifier =
             modifier
-                .clip(Shapes.LargeCornerBasedShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.72f))
-                .padding(vertical = Spacing.Medium),
+                .clip(
+                    Shapes.LargeCornerBasedShape,
+                ).glassSurface(
+                    Shapes.LargeCornerBasedShape,
+                    MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.72f),
+                    tint = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.72f),
+                    opacity = 0.7f,
+                ).padding(vertical = Spacing.Medium),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall),
     ) {
@@ -912,8 +920,14 @@ private fun ScannerSetupSection(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(Shapes.ExtraLargeCornerBasedShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f)),
+                    .clip(
+                        Shapes.ExtraLargeCornerBasedShape,
+                    ).glassSurface(
+                        Shapes.ExtraLargeCornerBasedShape,
+                        MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f),
+                        tint = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f),
+                        opacity = 0.7f,
+                    ),
         ) {
             ScannerSetupRow(
                 icon = Icons.Default.Tune,
@@ -1155,9 +1169,14 @@ private fun ScannerActionPill(
         modifier =
             modifier
                 .height(52.dp)
-                .clip(Shapes.MediumCornerBasedShape)
-                .background(if (enabled) container else container.copy(alpha = 0.45f))
-                .clickHighlight(enabled = enabled, onClick = onClick),
+                .clip(
+                    Shapes.MediumCornerBasedShape,
+                ).glassSurface(
+                    Shapes.MediumCornerBasedShape,
+                    if (enabled) container else container.copy(alpha = 0.45f),
+                    tint = if (enabled) container else container.copy(alpha = 0.45f),
+                    opacity = 0.7f,
+                ).clickHighlight(enabled = enabled, onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {

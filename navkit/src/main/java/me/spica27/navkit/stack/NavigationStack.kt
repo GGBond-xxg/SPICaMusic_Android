@@ -346,7 +346,7 @@ private fun SceneContainer(
         LocalViewModelStoreOwner provides sceneOwner
     ) {
         Box(modifier = sceneModifier) {
-            scene.Content()
+            LocalSceneContainer.current(scene) { scene.Content() }
         }
     }
 }

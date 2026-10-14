@@ -52,17 +52,13 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -99,6 +95,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.linc.amplituda.Amplituda
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -119,8 +117,11 @@ import me.spica27.spicamusic.player.api.PlayMode
 import me.spica27.spicamusic.ui.player.pages.CurrentPlaylistPage
 import me.spica27.spicamusic.ui.player.scene.LyricsPlayerPage
 import me.spica27.spicamusic.ui.settings.SettingsViewModel
+import me.spica27.spicamusic.ui.theme.LocalGlassBackdrop
+import me.spica27.spicamusic.ui.theme.LocalGlassEnabled
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
+import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.FluidMusicBackground
 import me.spica27.spicamusic.ui.widget.MusicCoverPlaceholder
 import me.spica27.spicamusic.ui.widget.ShowOnIdleContent
@@ -146,6 +147,11 @@ import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 import androidx.compose.ui.util.lerp as floatLerp
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
+import me.spica27.spicamusic.ui.theme.GlassModalBottomSheet as ModalBottomSheet
+import me.spica27.spicamusic.ui.theme.GlassScaffold as Scaffold
+import me.spica27.spicamusic.ui.theme.GlassSurface as Surface
+import me.spica27.spicamusic.ui.theme.GlassTopAppBar as TopAppBar
 
 // ============================================
 // 常量定义
@@ -384,429 +390,440 @@ fun ExpandedPlayerScreen(
             label = "PreparedPlayerBackdropColor",
         )
 
-    Box(
-        modifier =
-            modifier
-                // Keep the same stable base layer as upstream. FluidMusicBackground owns the
-                // artwork/color transition; a second cover-colored layer here changes earlier
-                // than the artwork and is visible as a white/solid-color flash between songs.
-                .background(MaterialTheme.colorScheme.surface)
-                .fillMaxSize()
-                .then(
-                    if (artworkMorphState != null) {
-                        Modifier.playerArtworkMorphRoot(artworkMorphState)
-                    } else {
-                        Modifier
-                    },
-                ),
-    ) {
-        // 流动背景（仅前台时启用，节省电量）
-        FluidMusicBackground(
+    val playerBackdrop = rememberLayerBackdrop()
+    val glass = LocalGlassEnabled.current
+    CompositionLocalProvider(LocalGlassBackdrop provides playerBackdrop) {
+        Box(
             modifier =
-                Modifier
-                    .fillMaxSize(),
-            coverColor = coverColor,
-            isDarkMode = MaterialTheme.colorScheme.surface.luminance() < 0.5f,
-            coverUri = { playerArtworkUri },
-            active = dynamicEffectsActive && isAppInForeground,
-            visibilityProgressProvider = {
-                val morph = morphProgressProvider()
-                ((morph - 0.04f) / 0.46f).coerceIn(0f, 1f)
-            },
-        )
-
-        // 内容层
-        VerticalPager(
-            modifier =
-                Modifier
+                modifier
+                    // Keep the same stable base layer as upstream. FluidMusicBackground owns the
+                    // artwork/color transition; a second cover-colored layer here changes earlier
+                    // than the artwork and is visible as a white/solid-color flash between songs.
+                    .background(MaterialTheme.colorScheme.surface)
                     .fillMaxSize()
                     .then(
-                        if (
-                            pagerState.currentPage == 0 &&
-                            lyricsPagerState.currentPage == 0 &&
-                            !lyricsPagerState.isScrollInProgress
-                        ) {
-                            dragToCollapseModifier
+                        if (artworkMorphState != null) {
+                            Modifier.playerArtworkMorphRoot(artworkMorphState)
                         } else {
                             Modifier
                         },
-                    ).graphicsLayer {
-                        val morph = morphProgressProvider()
-                        // 所有前景控件共用一个 fade-through 进度，不再逐项错峰出现。
-                        alpha = unifiedPlayerContentAlpha(morph)
-                    },
-            state = pagerState,
-            key = { it },
-            overscrollEffect = rememberIOSOverScrollEffect(orientation = Orientation.Vertical),
-            userScrollEnabled = lyricsPagerState.currentPage == 0,
-            flingBehavior =
-                PagerDefaults.flingBehavior(
-                    state = pagerState,
-                    snapPositionalThreshold = .2f,
-                ),
+                    ),
         ) {
-            if (it == 0) {
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .playerLyricsMorphRoot(lyricsMorphState),
-                ) {
-                    HorizontalPager(
-                        state = lyricsPagerState,
-                        modifier = Modifier.fillMaxSize(),
-                        key = { page -> page },
-                        beyondViewportPageCount = 1,
-                        overscrollEffect = null,
-                        flingBehavior =
-                            PagerDefaults.flingBehavior(
-                                state = lyricsPagerState,
-                                snapPositionalThreshold = .24f,
-                            ),
-                    ) { horizontalPage ->
-                        if (horizontalPage == 0) {
-                            Column(
-                                modifier =
-                                    Modifier
-                                        .fillMaxSize()
-                                        .statusBarsPadding(),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                            ) {
-                                // 顶部工具栏
-                                TopBar(
-                                    modifier = Modifier,
-                                    onCollapse = onCollapse,
-                                    progressProvider = { 1f },
-                                    showNavigationButton = false,
-                                )
+            // 流动背景（仅前台时启用，节省电量）
+            FluidMusicBackground(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .then(if (glass) Modifier.layerBackdrop(playerBackdrop) else Modifier),
+                coverColor = coverColor,
+                isDarkMode = MaterialTheme.colorScheme.surface.luminance() < 0.5f,
+                coverUri = { playerArtworkUri },
+                active = dynamicEffectsActive && isAppInForeground,
+                visibilityProgressProvider = {
+                    val morph = morphProgressProvider()
+                    ((morph - 0.04f) / 0.46f).coerceIn(0f, 1f)
+                },
+            )
 
-                                // 水平 Pager 内容区域
-                                // 播放器页面
-                                ShowOnIdleContent(
-                                    modifier = Modifier.weight(1f),
-                                    visible = preloadContent || isActive,
-                                ) {
-                                    PlayerPage(
-                                        playerViewModel = viewModel,
-                                        isSeekingState = isSeekingState,
-                                        currentMediaItem = { currentMediaItem },
-                                        audioQualityInfo = audioQualityInfo,
-                                        onAudioQualityClick = { showAudioQualitySheet = true },
-                                        onPlaybackSourceClick =
-                                            if (audioQualityInfo.cloudProvider != null) {
-                                                {
-                                                    showPlaybackSourceDialog = true
-                                                    viewModel.refreshPlaybackSources()
-                                                }
-                                            } else {
-                                                null
-                                            },
-                                        realPositionProvider = { positionState.value.toFloat() },
-                                        seekPositionProvider = { seekValueState.floatValue },
-                                        duration = duration,
-                                        isPlaying = isPlaying,
-                                        isLike = songLikeState,
-                                        playMode = playMode,
-                                        onValueChange = {
-                                            isSeekingState = true
-                                            seekValueState.floatValue = it * duration
-                                        },
-                                        onValueChangeFinished = {
-                                            viewModel.seekTo(seekValueState.floatValue.toLong())
-                                            isSeekingState = false
-                                        },
-                                        onPlayPauseClick = { viewModel.togglePlayPause() },
-                                        onPreviousClick = { viewModel.skipToPrevious() },
-                                        onNextClick = { viewModel.skipToNext() },
-                                        onPlayModeClick = { viewModel.togglePlayMode() },
-                                        onFavoriteClick = {
-                                            viewModel.toggleLikeCurrentSong()
-                                        },
-                                        onOpenLyrics = {
-                                            coroutineScope.launch {
-                                                lyricsPagerState.animateScrollToPage(
-                                                    1,
-                                                    animationSpec =
-                                                        tween(
-                                                            durationMillis = 300,
-                                                            easing = EaseOutCubic,
-                                                        ),
-                                                )
-                                            }
-                                        },
-                                        onPlaybackVisualsChanged = { style, amplitudes ->
-                                            lyricsProgressBarStyle = style
-                                            lyricsAmplitudes = amplitudes
-                                        },
-                                        onArtworkPainterReady = { painter ->
-                                            lyricsArtworkPainter = painter
-                                            onSharedArtworkPainterReady(painter)
-                                        },
-                                        onArtworkPainterFailed = {
-                                            lyricsArtworkPainter = null
-                                        },
-                                        artworkPainter = lyricsArtworkPainter,
-                                        progressProvider = { 1f },
-                                        morphProgressProvider = morphProgressProvider,
-                                        artworkMorphState = artworkMorphState,
-                                        artworkMorphInFlightProvider = artworkMorphInFlightProvider,
-                                        lyricsMorphState = lyricsMorphState,
-                                        lyricsTransitionProgressProvider = lyricsTransitionProgressProvider,
-                                        playbackSectionHeight = sharedPlaybackHeight,
-                                        isAppInForeground = isAppInForeground,
-                                        enableHeavyEffects = dynamicEffectsActive,
-                                        modifier = Modifier.fillMaxSize(),
-                                    )
-                                }
-                            }
-                        } else {
-                            LyricsPlayerPage(
-                                modifier = Modifier.fillMaxSize(),
-                                heroArtworkUri = currentMediaItem?.mediaMetadata?.artworkUri,
-                                artworkPainter = lyricsArtworkPainter,
-                                transitionProgressProvider = lyricsTransitionProgressProvider,
-                                artworkModifier =
-                                    Modifier
-                                        .playerLyricsMorphTarget(
-                                            lyricsMorphState,
-                                            lyricsTransitionProgressProvider,
-                                        ).graphicsLayer {
-                                            val transitionProgress = lyricsTransitionProgressProvider()
-                                            alpha =
-                                                if (
-                                                    !lyricsMorphState.isReady ||
-                                                    transitionProgress >=
-                                                    LYRICS_ARTWORK_TARGET_HANDOFF
-                                                ) {
-                                                    1f
-                                                } else {
-                                                    0f
-                                                }
-                                        },
-                                showNavigationButton = false,
-                                showLyricsEditor = showLyricsEditor,
-                                onLyricsEditorDismiss = { showLyricsEditor = false },
-                                onBack = {
-                                    coroutineScope.launch {
-                                        lyricsPagerState.animateScrollToPage(
-                                            0,
-                                            animationSpec =
-                                                tween(
-                                                    durationMillis = 300,
-                                                    easing = EaseOutCubic,
-                                                ),
-                                        )
-                                    }
-                                },
-                            )
-                        }
-                    }
+            // 内容层
+            VerticalPager(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .then(
+                            if (
+                                pagerState.currentPage == 0 &&
+                                lyricsPagerState.currentPage == 0 &&
+                                !lyricsPagerState.isScrollInProgress
+                            ) {
+                                dragToCollapseModifier
+                            } else {
+                                Modifier
+                            },
+                        ).graphicsLayer {
+                            val morph = morphProgressProvider()
+                            // 所有前景控件共用一个 fade-through 进度，不再逐项错峰出现。
+                            alpha = unifiedPlayerContentAlpha(morph)
+                        },
+                state = pagerState,
+                key = { it },
+                overscrollEffect = rememberIOSOverScrollEffect(orientation = Orientation.Vertical),
+                userScrollEnabled = lyricsPagerState.currentPage == 0,
+                flingBehavior =
+                    PagerDefaults.flingBehavior(
+                        state = pagerState,
+                        snapPositionalThreshold = .2f,
+                    ),
+            ) {
+                if (it == 0) {
                     Box(
                         modifier =
                             Modifier
-                                .align(Alignment.BottomCenter)
-                                .fillMaxWidth()
-                                .navigationBarsPadding()
-                                .padding(horizontal = Spacing.ExtraLarge)
-                                .padding(bottom = Spacing.Large)
-                                .graphicsLayer {
-                                    val progress = lyricsTransitionProgressProvider()
-                                    val travel = smoothStepProgress(progress)
-                                    translationY = travel * SHARED_PLAYBACK_TRAVEL_DP.dp.toPx()
-                                },
+                                .fillMaxSize()
+                                .playerLyricsMorphRoot(lyricsMorphState),
                     ) {
-                        PlayerPlaybackBottomSection(
-                            progressKey = mediaId,
-                            progress =
-                                if (duration > 0L) {
-                                    (seekValueState.floatValue / duration).coerceIn(0f, 1f)
-                                } else {
-                                    0f
-                                },
-                            currentPosition = positionState.value,
-                            duration = duration,
-                            isPlaying = isPlaying,
-                            progressAnimationActive =
-                                isPlaying && dynamicEffectsActive && isAppInForeground,
-                            isSeeking = isSeekingState,
-                            playMode = playMode,
-                            isLike = songLikeState,
-                            progressBarStyle = lyricsProgressBarStyle,
-                            fftDrawData = viewModel.fftDrawData,
-                            amplitudes = lyricsAmplitudes,
-                            onProgressChange = {
-                                isSeekingState = true
-                                seekValueState.floatValue = it * duration
-                            },
-                            onProgressChangeFinished = {
-                                viewModel.seekTo(seekValueState.floatValue.toLong())
-                                isSeekingState = false
-                            },
-                            onAudioQualityClick = { showAudioQualitySheet = true },
-                            audioQualityActionEnabled = lyricsTransitionProgressProvider() < 0.5f,
-                            onPlayPauseClick = viewModel::togglePlayPause,
-                            onPreviousClick = viewModel::skipToPrevious,
-                            onNextClick = viewModel::skipToNext,
-                            onPlayModeClick = viewModel::togglePlayMode,
-                            onFavoriteClick = viewModel::toggleLikeCurrentSong,
-                            sleepTimerRemainingMs = sleepTimerRemainingMs,
-                            sleepTimerDurationMs = sleepTimerDurationMs,
-                            onSleepTimerSet = viewModel::setSleepTimer,
-                            onSleepTimerCancel = viewModel::cancelSleepTimer,
-                            showControls = true,
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .onGloballyPositioned { coordinates ->
-                                        if (sharedPlaybackHeightPx != coordinates.size.height) {
-                                            sharedPlaybackHeightPx = coordinates.size.height
-                                        }
-                                    },
-                            controlsModifier =
-                                Modifier.graphicsLayer {
-                                    val progress = lyricsTransitionProgressProvider()
-                                    val exit = smoothStepProgress(progress)
-                                    alpha = 1f - exit
-                                    translationY = exit * SHARED_CONTROLS_EXIT_DP.dp.toPx()
-                                    scaleX = 1f - exit * 0.035f
-                                    scaleY = 1f - exit * 0.035f
-                                },
-                            audioQualityActionModifier =
-                                Modifier.graphicsLayer {
-                                    val progress = lyricsTransitionProgressProvider()
-                                    val exit = smoothStepProgress(progress)
-                                    alpha = 1f - exit
-                                    translationY = exit * SHARED_CONTROLS_EXIT_DP.dp.toPx()
-                                    scaleX = 1f - exit * 0.035f
-                                    scaleY = 1f - exit * 0.035f
-                                },
-                        )
-                    }
-                    PlayerLyricsArtworkMorphOverlay(
-                        state = lyricsMorphState,
-                        artworkUri = currentMediaItem?.mediaMetadata?.artworkUri,
-                        artworkPainter = lyricsArtworkPainter,
-                        progressProvider = lyricsTransitionProgressProvider,
-                    )
-                    IconButton(
-                        onClick = {
-                            PlayerHaptics.click()
-                            if (lyricsTransitionProgressProvider() > 0.5f) {
-                                coroutineScope.launch {
-                                    lyricsPagerState.animateScrollToPage(
-                                        0,
-                                        animationSpec = tween(durationMillis = 300, easing = EaseOutCubic),
+                        HorizontalPager(
+                            state = lyricsPagerState,
+                            modifier = Modifier.fillMaxSize(),
+                            key = { page -> page },
+                            beyondViewportPageCount = 1,
+                            overscrollEffect = null,
+                            flingBehavior =
+                                PagerDefaults.flingBehavior(
+                                    state = lyricsPagerState,
+                                    snapPositionalThreshold = .24f,
+                                ),
+                        ) { horizontalPage ->
+                            if (horizontalPage == 0) {
+                                Column(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxSize()
+                                            .statusBarsPadding(),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                ) {
+                                    // 顶部工具栏
+                                    TopBar(
+                                        modifier = Modifier,
+                                        onCollapse = onCollapse,
+                                        progressProvider = { 1f },
+                                        showNavigationButton = false,
                                     )
+
+                                    // 水平 Pager 内容区域
+                                    // 播放器页面
+                                    ShowOnIdleContent(
+                                        modifier = Modifier.weight(1f),
+                                        visible = preloadContent || isActive,
+                                    ) {
+                                        PlayerPage(
+                                            playerViewModel = viewModel,
+                                            isSeekingState = isSeekingState,
+                                            currentMediaItem = { currentMediaItem },
+                                            audioQualityInfo = audioQualityInfo,
+                                            onAudioQualityClick = { showAudioQualitySheet = true },
+                                            onPlaybackSourceClick =
+                                                if (audioQualityInfo.cloudProvider != null) {
+                                                    {
+                                                        showPlaybackSourceDialog = true
+                                                        viewModel.refreshPlaybackSources()
+                                                    }
+                                                } else {
+                                                    null
+                                                },
+                                            realPositionProvider = { positionState.value.toFloat() },
+                                            seekPositionProvider = { seekValueState.floatValue },
+                                            duration = duration,
+                                            isPlaying = isPlaying,
+                                            isLike = songLikeState,
+                                            playMode = playMode,
+                                            onValueChange = {
+                                                isSeekingState = true
+                                                seekValueState.floatValue = it * duration
+                                            },
+                                            onValueChangeFinished = {
+                                                viewModel.seekTo(seekValueState.floatValue.toLong())
+                                                isSeekingState = false
+                                            },
+                                            onPlayPauseClick = { viewModel.togglePlayPause() },
+                                            onPreviousClick = { viewModel.skipToPrevious() },
+                                            onNextClick = { viewModel.skipToNext() },
+                                            onPlayModeClick = { viewModel.togglePlayMode() },
+                                            onFavoriteClick = {
+                                                viewModel.toggleLikeCurrentSong()
+                                            },
+                                            onOpenLyrics = {
+                                                coroutineScope.launch {
+                                                    lyricsPagerState.animateScrollToPage(
+                                                        1,
+                                                        animationSpec =
+                                                            tween(
+                                                                durationMillis = 300,
+                                                                easing = EaseOutCubic,
+                                                            ),
+                                                    )
+                                                }
+                                            },
+                                            onPlaybackVisualsChanged = { style, amplitudes ->
+                                                lyricsProgressBarStyle = style
+                                                lyricsAmplitudes = amplitudes
+                                            },
+                                            onArtworkPainterReady = { painter ->
+                                                lyricsArtworkPainter = painter
+                                                onSharedArtworkPainterReady(painter)
+                                            },
+                                            onArtworkPainterFailed = {
+                                                lyricsArtworkPainter = null
+                                            },
+                                            artworkPainter = lyricsArtworkPainter,
+                                            progressProvider = { 1f },
+                                            morphProgressProvider = morphProgressProvider,
+                                            artworkMorphState = artworkMorphState,
+                                            artworkMorphInFlightProvider = artworkMorphInFlightProvider,
+                                            lyricsMorphState = lyricsMorphState,
+                                            lyricsTransitionProgressProvider = lyricsTransitionProgressProvider,
+                                            playbackSectionHeight = sharedPlaybackHeight,
+                                            isAppInForeground = isAppInForeground,
+                                            enableHeavyEffects = dynamicEffectsActive,
+                                            modifier = Modifier.fillMaxSize(),
+                                        )
+                                    }
                                 }
                             } else {
-                                onCollapse()
-                            }
-                        },
-                        modifier =
-                            Modifier
-                                .align(Alignment.TopStart)
-                                .statusBarsPadding()
-                                .padding(start = Spacing.Large, top = 12.dp)
-                                .size(48.dp),
-                        colors =
-                            IconButtonDefaults.iconButtonColors().copy(
-                                containerColor = Color.Transparent,
-                                contentColor = MaterialTheme.colorScheme.onSurface,
-                            ),
-                    ) {
-                        Box(
-                            modifier =
-                                Modifier
-                                    .size(42.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.surfaceContainer),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.KeyboardArrowDown,
-                                contentDescription = stringResource(R.string.back),
-                                modifier =
-                                    Modifier
-                                        .size(28.dp)
-                                        .graphicsLayer {
-                                            rotationZ = 90f * lyricsTransitionProgressProvider()
-                                        },
-                            )
-                        }
-                    }
-                    MorphingPlayerTopAction(
-                        transitionProgressProvider = lyricsTransitionProgressProvider,
-                        onPlaylistClick = {
-                            coroutineScope.launch {
-                                pagerState.animateScrollToPage(
-                                    1,
-                                    animationSpec = tween(durationMillis = 300, easing = EaseOutCubic),
-                                )
-                            }
-                        },
-                        onLyricsEditorClick = { showLyricsEditor = true },
-                        modifier =
-                            Modifier
-                                .align(Alignment.TopEnd)
-                                .statusBarsPadding()
-                                .padding(end = Spacing.Large, top = 12.dp),
-                    )
-                }
-            } else {
-                // 播放列表
-                Scaffold(
-                    topBar = {
-                        @OptIn(ExperimentalMaterial3Api::class)
-                        TopAppBar(
-                            colors =
-                                TopAppBarDefaults.topAppBarColors().copy(
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                    titleContentColor = MaterialTheme.colorScheme.onSurface,
-                                    actionIconContentColor = MaterialTheme.colorScheme.onSurface,
-                                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                    subtitleContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                ),
-                            navigationIcon = {
-                                IconButton(
-                                    onClick = {
-                                        PlayerHaptics.click()
+                                LyricsPlayerPage(
+                                    modifier = Modifier.fillMaxSize(),
+                                    heroArtworkUri = currentMediaItem?.mediaMetadata?.artworkUri,
+                                    artworkPainter = lyricsArtworkPainter,
+                                    transitionProgressProvider = lyricsTransitionProgressProvider,
+                                    artworkModifier =
+                                        Modifier
+                                            .playerLyricsMorphTarget(
+                                                lyricsMorphState,
+                                                lyricsTransitionProgressProvider,
+                                            ).graphicsLayer {
+                                                val transitionProgress = lyricsTransitionProgressProvider()
+                                                alpha =
+                                                    if (
+                                                        !lyricsMorphState.isReady ||
+                                                        transitionProgress >=
+                                                        LYRICS_ARTWORK_TARGET_HANDOFF
+                                                    ) {
+                                                        1f
+                                                    } else {
+                                                        0f
+                                                    }
+                                            },
+                                    showNavigationButton = false,
+                                    showLyricsEditor = showLyricsEditor,
+                                    onLyricsEditorDismiss = { showLyricsEditor = false },
+                                    onBack = {
                                         coroutineScope.launch {
-                                            pagerState.animateScrollToPage(
+                                            lyricsPagerState.animateScrollToPage(
                                                 0,
                                                 animationSpec =
                                                     tween(
-                                                        durationMillis = 550,
+                                                        durationMillis = 300,
                                                         easing = EaseOutCubic,
                                                     ),
                                             )
                                         }
                                     },
-                                    colors =
-                                        IconButtonDefaults.iconButtonColors().copy(
-                                            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                                            contentColor = MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
+                        }
+                        Box(
+                            modifier =
+                                Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth()
+                                    .navigationBarsPadding()
+                                    .padding(horizontal = Spacing.ExtraLarge)
+                                    .padding(bottom = Spacing.Large)
+                                    .graphicsLayer {
+                                        val progress = lyricsTransitionProgressProvider()
+                                        val travel = smoothStepProgress(progress)
+                                        translationY = travel * SHARED_PLAYBACK_TRAVEL_DP.dp.toPx()
+                                    },
+                        ) {
+                            PlayerPlaybackBottomSection(
+                                progressKey = mediaId,
+                                progress =
+                                    if (duration > 0L) {
+                                        (seekValueState.floatValue / duration).coerceIn(0f, 1f)
+                                    } else {
+                                        0f
+                                    },
+                                currentPosition = positionState.value,
+                                duration = duration,
+                                isPlaying = isPlaying,
+                                progressAnimationActive =
+                                    isPlaying && dynamicEffectsActive && isAppInForeground,
+                                isSeeking = isSeekingState,
+                                playMode = playMode,
+                                isLike = songLikeState,
+                                progressBarStyle = lyricsProgressBarStyle,
+                                fftDrawData = viewModel.fftDrawData,
+                                amplitudes = lyricsAmplitudes,
+                                onProgressChange = {
+                                    isSeekingState = true
+                                    seekValueState.floatValue = it * duration
+                                },
+                                onProgressChangeFinished = {
+                                    viewModel.seekTo(seekValueState.floatValue.toLong())
+                                    isSeekingState = false
+                                },
+                                onAudioQualityClick = { showAudioQualitySheet = true },
+                                audioQualityActionEnabled = lyricsTransitionProgressProvider() < 0.5f,
+                                onPlayPauseClick = viewModel::togglePlayPause,
+                                onPreviousClick = viewModel::skipToPrevious,
+                                onNextClick = viewModel::skipToNext,
+                                onPlayModeClick = viewModel::togglePlayMode,
+                                onFavoriteClick = viewModel::toggleLikeCurrentSong,
+                                sleepTimerRemainingMs = sleepTimerRemainingMs,
+                                sleepTimerDurationMs = sleepTimerDurationMs,
+                                onSleepTimerSet = viewModel::setSleepTimer,
+                                onSleepTimerCancel = viewModel::cancelSleepTimer,
+                                showControls = true,
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .onGloballyPositioned { coordinates ->
+                                            if (sharedPlaybackHeightPx != coordinates.size.height) {
+                                                sharedPlaybackHeightPx = coordinates.size.height
+                                            }
+                                        },
+                                controlsModifier =
+                                    Modifier.graphicsLayer {
+                                        val progress = lyricsTransitionProgressProvider()
+                                        val exit = smoothStepProgress(progress)
+                                        alpha = 1f - exit
+                                        translationY = exit * SHARED_CONTROLS_EXIT_DP.dp.toPx()
+                                        scaleX = 1f - exit * 0.035f
+                                        scaleY = 1f - exit * 0.035f
+                                    },
+                                audioQualityActionModifier =
+                                    Modifier.graphicsLayer {
+                                        val progress = lyricsTransitionProgressProvider()
+                                        val exit = smoothStepProgress(progress)
+                                        alpha = 1f - exit
+                                        translationY = exit * SHARED_CONTROLS_EXIT_DP.dp.toPx()
+                                        scaleX = 1f - exit * 0.035f
+                                        scaleY = 1f - exit * 0.035f
+                                    },
+                            )
+                        }
+                        PlayerLyricsArtworkMorphOverlay(
+                            state = lyricsMorphState,
+                            artworkUri = currentMediaItem?.mediaMetadata?.artworkUri,
+                            artworkPainter = lyricsArtworkPainter,
+                            progressProvider = lyricsTransitionProgressProvider,
+                        )
+                        IconButton(
+                            onClick = {
+                                PlayerHaptics.click()
+                                if (lyricsTransitionProgressProvider() > 0.5f) {
+                                    coroutineScope.launch {
+                                        lyricsPagerState.animateScrollToPage(
+                                            0,
+                                            animationSpec = tween(durationMillis = 300, easing = EaseOutCubic),
+                                        )
+                                    }
+                                } else {
+                                    onCollapse()
+                                }
+                            },
+                            modifier =
+                                Modifier
+                                    .align(Alignment.TopStart)
+                                    .statusBarsPadding()
+                                    .padding(start = Spacing.Large, top = 12.dp)
+                                    .size(48.dp),
+                            colors =
+                                IconButtonDefaults.iconButtonColors().copy(
+                                    containerColor = Color.Transparent,
+                                    contentColor = MaterialTheme.colorScheme.onSurface,
+                                ),
+                        ) {
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .size(42.dp)
+                                        .clip(
+                                            CircleShape,
+                                        ).glassSurface(
+                                            CircleShape,
+                                            MaterialTheme.colorScheme.surfaceContainer,
+                                            tint = MaterialTheme.colorScheme.surfaceContainer,
+                                            opacity = 0.7f,
                                         ),
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.KeyboardArrowDown,
-                                        contentDescription = stringResource(R.string.back),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                                    contentDescription = stringResource(R.string.back),
+                                    modifier =
+                                        Modifier
+                                            .size(28.dp)
+                                            .graphicsLayer {
+                                                rotationZ = 90f * lyricsTransitionProgressProvider()
+                                            },
+                                )
+                            }
+                        }
+                        MorphingPlayerTopAction(
+                            transitionProgressProvider = lyricsTransitionProgressProvider,
+                            onPlaylistClick = {
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(
+                                        1,
+                                        animationSpec = tween(durationMillis = 300, easing = EaseOutCubic),
                                     )
                                 }
                             },
-                            title = {
-                                Text(stringResource(R.string.now_playinglist))
-                            },
+                            onLyricsEditorClick = { showLyricsEditor = true },
+                            modifier =
+                                Modifier
+                                    .align(Alignment.TopEnd)
+                                    .statusBarsPadding()
+                                    .padding(end = Spacing.Large, top = 12.dp),
                         )
-                    },
-                ) {
-                    ShowOnIdleContent(true) {
-                        Box(
-                            modifier = Modifier.padding(it),
-                        ) {
-                            CurrentPlaylistPage(
-                                modifier = Modifier.fillMaxSize(),
-//                        scrollBehavior = scrollBehavior,
+                    }
+                } else {
+                    // 播放列表
+                    Scaffold(
+                        topBar = {
+                            @OptIn(ExperimentalMaterial3Api::class)
+                            TopAppBar(
+                                colors =
+                                    TopAppBarDefaults.topAppBarColors().copy(
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                        titleContentColor = MaterialTheme.colorScheme.onSurface,
+                                        actionIconContentColor = MaterialTheme.colorScheme.onSurface,
+                                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                        subtitleContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    ),
+                                navigationIcon = {
+                                    IconButton(
+                                        onClick = {
+                                            PlayerHaptics.click()
+                                            coroutineScope.launch {
+                                                pagerState.animateScrollToPage(
+                                                    0,
+                                                    animationSpec =
+                                                        tween(
+                                                            durationMillis = 550,
+                                                            easing = EaseOutCubic,
+                                                        ),
+                                                )
+                                            }
+                                        },
+                                        colors =
+                                            IconButtonDefaults.iconButtonColors().copy(
+                                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                                contentColor = MaterialTheme.colorScheme.onSurface,
+                                            ),
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.KeyboardArrowDown,
+                                            contentDescription = stringResource(R.string.back),
+                                        )
+                                    }
+                                },
+                                title = {
+                                    Text(stringResource(R.string.now_playinglist))
+                                },
                             )
+                        },
+                    ) {
+                        ShowOnIdleContent(true) {
+                            Box(
+                                modifier = Modifier.padding(it),
+                            ) {
+                                CurrentPlaylistPage(
+                                    modifier = Modifier.fillMaxSize(),
+//                        scrollBehavior = scrollBehavior,
+                                )
+                            }
                         }
                     }
                 }
@@ -869,8 +886,14 @@ private fun TopBar(
                     modifier =
                         Modifier
                             .size(42.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceContainer),
+                            .clip(
+                                CircleShape,
+                            ).glassSurface(
+                                CircleShape,
+                                MaterialTheme.colorScheme.surfaceContainer,
+                                tint = MaterialTheme.colorScheme.surfaceContainer,
+                                opacity = 0.7f,
+                            ),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
@@ -904,9 +927,14 @@ private fun MorphingPlayerTopAction(
         modifier =
             modifier
                 .size(42.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceContainer)
-                .clickable {
+                .clip(
+                    CircleShape,
+                ).glassSurface(
+                    CircleShape,
+                    MaterialTheme.colorScheme.surfaceContainer,
+                    tint = MaterialTheme.colorScheme.surfaceContainer,
+                    opacity = 0.7f,
+                ).clickable {
                     PlayerHaptics.click()
                     if (showsEditor) onLyricsEditorClick() else onPlaylistClick()
                 },
@@ -1146,8 +1174,14 @@ private fun PlayerPage(
                                 modifier =
                                     Modifier
                                         .fillMaxSize()
-                                        .clip(Shapes.LargeCornerBasedShape)
-                                        .background(artworkContainerColor),
+                                        .clip(
+                                            Shapes.LargeCornerBasedShape,
+                                        ).glassSurface(
+                                            Shapes.LargeCornerBasedShape,
+                                            artworkContainerColor,
+                                            tint = artworkContainerColor,
+                                            opacity = 0.7f,
+                                        ),
                                 containerColor = artworkContainerColor,
                                 contentColor = placeholderContentColor,
                                 contentDescription = stringResource(R.string.cover_placeholder),
@@ -1156,9 +1190,14 @@ private fun PlayerPage(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .clip(Shapes.LargeCornerBasedShape)
-                                .background(artworkContainerColor)
-                                .clickHighlight {
+                                .clip(
+                                    Shapes.LargeCornerBasedShape,
+                                ).glassSurface(
+                                    Shapes.LargeCornerBasedShape,
+                                    artworkContainerColor,
+                                    tint = artworkContainerColor,
+                                    opacity = 0.7f,
+                                ).clickHighlight {
                                     PlayerHaptics.click()
                                     onOpenLyrics()
                                     /*
@@ -1324,9 +1363,14 @@ private fun PlayerPage(
                 Row(
                     modifier =
                         Modifier
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.tertiaryContainer)
-                            .then(
+                            .clip(
+                                CircleShape,
+                            ).glassSurface(
+                                CircleShape,
+                                MaterialTheme.colorScheme.tertiaryContainer,
+                                tint = MaterialTheme.colorScheme.tertiaryContainer,
+                                opacity = 0.7f,
+                            ).then(
                                 if (onPlaybackSourceClick != null) {
                                     Modifier.clickHighlight(onClick = playerClick(onPlaybackSourceClick))
                                 } else {
@@ -1583,8 +1627,14 @@ private fun FeaturedQualityCard(
                     modifier =
                         Modifier
                             .size(42.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                            .clip(
+                                CircleShape,
+                            ).glassSurface(
+                                CircleShape,
+                                MaterialTheme.colorScheme.surfaceContainerHighest,
+                                tint = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                opacity = 0.7f,
+                            ),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -1647,8 +1697,14 @@ private fun ReferenceQualityRow(
                 modifier =
                     Modifier
                         .size(46.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)),
+                        .clip(
+                            CircleShape,
+                        ).glassSurface(
+                            CircleShape,
+                            MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                            tint = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                            opacity = 0.7f,
+                        ),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -1745,12 +1801,20 @@ private fun PlaybackSourceDialog(
                             Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(18.dp))
-                                .background(
+                                .glassSurface(
+                                    RoundedCornerShape(18.dp),
                                     if (option.isCurrent) {
                                         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                                     } else {
                                         Color.Transparent
                                     },
+                                    tint =
+                                        if (option.isCurrent) {
+                                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                        } else {
+                                            Color.Transparent
+                                        },
+                                    opacity = 0.7f,
                                 ).clickHighlight(onClick = {
                                     PlayerHaptics.click()
                                     onSelect(option)
@@ -1783,8 +1847,9 @@ private fun SelectedQualityMark() {
         modifier =
             Modifier
                 .size(30.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary),
+                .clip(
+                    CircleShape,
+                ).glassSurface(CircleShape, MaterialTheme.colorScheme.primary, tint = MaterialTheme.colorScheme.primary, opacity = 0.7f),
         contentAlignment = Alignment.Center,
     ) {
         Icon(

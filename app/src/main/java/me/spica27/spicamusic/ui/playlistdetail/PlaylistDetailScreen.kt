@@ -75,25 +75,16 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -166,6 +157,8 @@ import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
 import me.spica27.spicamusic.ui.theme.ListItemFadeOutSpec
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
+import me.spica27.spicamusic.ui.theme.appPageBackground
+import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.AudioCover
 import me.spica27.spicamusic.ui.widget.CoverFallback
 import me.spica27.spicamusic.ui.widget.PlaylistCoverView
@@ -180,6 +173,15 @@ import org.koin.core.parameter.parametersOf
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import kotlin.math.min
+import me.spica27.spicamusic.ui.theme.GlassAlertDialog as AlertDialog
+import me.spica27.spicamusic.ui.theme.GlassButton as Button
+import me.spica27.spicamusic.ui.theme.GlassDropdownMenu as DropdownMenu
+import me.spica27.spicamusic.ui.theme.GlassFilledTonalButton as FilledTonalButton
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
+import me.spica27.spicamusic.ui.theme.GlassModalBottomSheet as ModalBottomSheet
+import me.spica27.spicamusic.ui.theme.GlassOutlinedTextField as OutlinedTextField
+import me.spica27.spicamusic.ui.theme.GlassSurface as Surface
+import me.spica27.spicamusic.ui.theme.GlassTextButton as TextButton
 
 // ── 布局尺寸常量（全部 dp，px 一律在 draw/layout 阶段经 density 换算）──────────
 private val HEADER_HEIGHT = 56.dp // 固定顶栏内容区高度（不含状态栏）
@@ -347,7 +349,7 @@ fun PlaylistDetailScreen(
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .appPageBackground(),
     ) {
         val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
@@ -1014,9 +1016,14 @@ private fun SearchTopBar(
                 Modifier
                     .weight(1f)
                     .height(48.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .padding(start = Spacing.Large, end = Spacing.Small),
+                    .clip(
+                        CircleShape,
+                    ).glassSurface(
+                        CircleShape,
+                        MaterialTheme.colorScheme.surfaceContainerHigh,
+                        tint = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        opacity = 0.7f,
+                    ).padding(start = Spacing.Large, end = Spacing.Small),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
         ) {
@@ -1076,8 +1083,11 @@ private fun SearchTopBar(
                                 Modifier
                                     .size(24.dp)
                                     .clip(CircleShape)
-                                    .background(
+                                    .glassSurface(
+                                        CircleShape,
                                         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f),
+                                        opacity = 0.7f,
                                     ),
                             contentAlignment = Alignment.Center,
                         ) {
@@ -1277,9 +1287,14 @@ private fun SortHintCapsule(modifier: Modifier = Modifier) {
     Row(
         modifier =
             modifier
-                .clip(Shapes.LargeCornerBasedShape)
-                .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f))
-                .padding(horizontal = Spacing.Large, vertical = Spacing.Medium),
+                .clip(
+                    Shapes.LargeCornerBasedShape,
+                ).glassSurface(
+                    Shapes.LargeCornerBasedShape,
+                    MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                    tint = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                    opacity = 0.7f,
+                ).padding(horizontal = Spacing.Large, vertical = Spacing.Medium),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
     ) {
@@ -1362,8 +1377,14 @@ private fun FloatingHintIcon(
                 .graphicsLayer {
                     translationY = bob * 5.dp.toPx()
                     rotationZ = bob * 6f
-                }.clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                }.clip(
+                    CircleShape,
+                ).glassSurface(
+                    CircleShape,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    opacity = 0.7f,
+                ),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -1399,8 +1420,9 @@ internal fun PlaylistCloudSongRow(
             modifier
                 .fillMaxWidth()
                 .padding(horizontal = Spacing.Medium)
-                .clip(Shapes.MediumCornerBasedShape)
-                .background(rowBackground)
+                .clip(
+                    Shapes.MediumCornerBasedShape,
+                ).glassSurface(Shapes.MediumCornerBasedShape, rowBackground, tint = rowBackground, opacity = 0.7f)
                 .combinedClickHighlight(onClick = onClick, onLongClick = onLongClick)
                 .padding(horizontal = Spacing.Small, vertical = Spacing.Small),
         verticalAlignment = Alignment.CenterVertically,
@@ -1483,8 +1505,9 @@ private fun PlaylistSongRow(
                 .fillMaxWidth()
                 .padding(horizontal = Spacing.Medium)
                 .shadow(dragElevation, Shapes.MediumCornerBasedShape)
-                .clip(Shapes.MediumCornerBasedShape)
-                .background(rowBackground)
+                .clip(
+                    Shapes.MediumCornerBasedShape,
+                ).glassSurface(Shapes.MediumCornerBasedShape, rowBackground, tint = rowBackground, opacity = 0.7f)
                 .combinedClickHighlight(
                     enabled = !isReorderEnabled,
                     onClick = onClick,
@@ -1604,9 +1627,14 @@ private fun SongSkeletonRow(modifier: Modifier = Modifier) {
                 .fillMaxWidth()
                 .padding(horizontal = Spacing.Medium)
                 .graphicsLayer { alpha = breath }
-                .clip(Shapes.MediumCornerBasedShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                .padding(horizontal = Spacing.Small, vertical = Spacing.Small),
+                .clip(
+                    Shapes.MediumCornerBasedShape,
+                ).glassSurface(
+                    Shapes.MediumCornerBasedShape,
+                    MaterialTheme.colorScheme.surfaceContainerLow,
+                    tint = MaterialTheme.colorScheme.surfaceContainerLow,
+                    opacity = 0.7f,
+                ).padding(horizontal = Spacing.Small, vertical = Spacing.Small),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
     ) {
@@ -1614,7 +1642,7 @@ private fun SongSkeletonRow(modifier: Modifier = Modifier) {
             Modifier
                 .size(48.dp)
                 .clip(Shapes.SmallCornerBasedShape)
-                .background(bone),
+                .glassSurface(Shapes.SmallCornerBasedShape, bone, tint = bone, opacity = 0.7f),
         )
         Column(
             modifier = Modifier.weight(1f),
@@ -1625,14 +1653,14 @@ private fun SongSkeletonRow(modifier: Modifier = Modifier) {
                     .fillMaxWidth(0.55f)
                     .height(14.dp)
                     .clip(Shapes.SmallCornerBasedShape)
-                    .background(bone),
+                    .glassSurface(Shapes.SmallCornerBasedShape, bone, tint = bone, opacity = 0.7f),
             )
             Box(
                 Modifier
                     .fillMaxWidth(0.32f)
                     .height(10.dp)
                     .clip(Shapes.SmallCornerBasedShape)
-                    .background(bone),
+                    .glassSurface(Shapes.SmallCornerBasedShape, bone, tint = bone, opacity = 0.7f),
             )
         }
     }
@@ -1704,7 +1732,7 @@ private fun SearchOverlay(
             modifier
                 .fillMaxSize()
                 .padding(top = topPadding)
-                .background(MaterialTheme.colorScheme.background)
+                .appPageBackground()
                 // 兜底消费点击，防手势穿透到下层浏览列表
                 .pointerInput(Unit) { detectTapGestures { } }
                 .drawBehind {
@@ -1858,12 +1886,20 @@ private fun SearchResultRow(
             modifier
                 .fillMaxWidth()
                 .clip(Shapes.MediumCornerBasedShape)
-                .background(
+                .glassSurface(
+                    Shapes.MediumCornerBasedShape,
                     if (isPlaying) {
                         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
                     } else {
                         MaterialTheme.colorScheme.surfaceContainerLow
                     },
+                    tint =
+                        if (isPlaying) {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerLow
+                        },
+                    opacity = 0.7f,
                 ).combinedClickHighlight(onLongClick = onMore, onClick = onPlay)
                 .padding(horizontal = Spacing.Small, vertical = Spacing.Small),
         verticalAlignment = Alignment.CenterVertically,

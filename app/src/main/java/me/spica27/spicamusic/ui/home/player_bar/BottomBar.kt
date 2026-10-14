@@ -49,7 +49,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -125,6 +124,7 @@ import me.spica27.spicamusic.utils.albumCoverFallbackUri
 import org.koin.compose.viewmodel.koinActivityViewModel
 import kotlin.math.roundToInt
 import androidx.compose.ui.util.lerp as floatLerp
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
 
 /** 播放器面板的两个锚点状态 */
 private enum class PlayerSheetValue { Collapsed, Expanded }
@@ -390,10 +390,16 @@ fun BottomMediaBar(bottomBarScrollConnection: BottomBarScrollConnection = LocalB
                                                 animatedVisibilityScope = this@AnimatedContent,
                                             ).size(56.dp)
                                             .clip(CircleShape)
-                                            .background(
+                                            .glassSurface(
+                                                CircleShape,
                                                 MaterialTheme.colorScheme.tertiary.copy(
                                                     alpha = BOTTOM_FLOATING_CONTAINER_ALPHA,
                                                 ),
+                                                tint =
+                                                    MaterialTheme.colorScheme.tertiary.copy(
+                                                        alpha = BOTTOM_FLOATING_CONTAINER_ALPHA,
+                                                    ),
+                                                opacity = 0.7f,
                                             ).clickable {
                                                 navigationPath.push(SearchScene())
                                             },
@@ -433,10 +439,16 @@ fun BottomMediaBar(bottomBarScrollConnection: BottomBarScrollConnection = LocalB
                                         resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
                                     ).size(56.dp)
                                     .clip(CircleShape)
-                                    .background(
+                                    .glassSurface(
+                                        CircleShape,
                                         MaterialTheme.colorScheme.primaryContainer.copy(
                                             alpha = BOTTOM_FLOATING_CONTAINER_ALPHA,
                                         ),
+                                        tint =
+                                            MaterialTheme.colorScheme.primaryContainer.copy(
+                                                alpha = BOTTOM_FLOATING_CONTAINER_ALPHA,
+                                            ),
+                                        opacity = 0.7f,
                                     ),
                         ) {
                             Icon(
@@ -524,10 +536,16 @@ fun BottomMediaBar(bottomBarScrollConnection: BottomBarScrollConnection = LocalB
                                         animatedVisibilityScope = this@AnimatedContent,
                                     ).size(56.dp)
                                     .clip(CircleShape)
-                                    .background(
+                                    .glassSurface(
+                                        CircleShape,
                                         MaterialTheme.colorScheme.tertiary.copy(
                                             alpha = BOTTOM_FLOATING_CONTAINER_ALPHA,
                                         ),
+                                        tint =
+                                            MaterialTheme.colorScheme.tertiary.copy(
+                                                alpha = BOTTOM_FLOATING_CONTAINER_ALPHA,
+                                            ),
+                                        opacity = 0.7f,
                                     ),
                         ) {
                             Icon(
@@ -948,8 +966,14 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                                             animatedVisibilityScope = this@AnimatedContent,
                                         ).fillMaxHeight()
                                         .aspectRatio(1f)
-                                        .clip(coverShape)
-                                        .background(MaterialTheme.colorScheme.tertiaryContainer),
+                                        .clip(
+                                            coverShape,
+                                        ).glassSurface(
+                                            coverShape,
+                                            MaterialTheme.colorScheme.tertiaryContainer,
+                                            tint = MaterialTheme.colorScheme.tertiaryContainer,
+                                            opacity = 0.7f,
+                                        ),
                                 placeHolder = {
                                     MusicCoverPlaceholder(
                                         modifier = Modifier.fillMaxSize(),

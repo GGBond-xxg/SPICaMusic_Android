@@ -3,7 +3,6 @@ package me.spica27.spicamusic.ui.about
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.widget.Toast
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +29,7 @@ import me.spica27.navkit.scene.StackScene
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
+import me.spica27.spicamusic.ui.theme.glassSurface
 
 class OpenSourceLicensesScene : StackScene() {
     @Composable
@@ -85,9 +85,14 @@ private fun LibraryCard(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clip(Shapes.ExtraLargeCornerBasedShape)
-                .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f))
-                .clickable(onClick = onClick)
+                .clip(
+                    Shapes.ExtraLargeCornerBasedShape,
+                ).glassSurface(
+                    Shapes.ExtraLargeCornerBasedShape,
+                    MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f),
+                    tint = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f),
+                    opacity = 0.7f,
+                ).clickable(onClick = onClick)
                 .padding(horizontal = Spacing.Large, vertical = Spacing.Medium),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
@@ -110,9 +115,14 @@ private fun LibraryCard(
             Box(
                 modifier =
                     Modifier
-                        .clip(Shapes.SmallCornerBasedShape)
-                        .background(MaterialTheme.colorScheme.secondaryContainer)
-                        .padding(horizontal = Spacing.Small, vertical = 2.dp),
+                        .clip(
+                            Shapes.SmallCornerBasedShape,
+                        ).glassSurface(
+                            Shapes.SmallCornerBasedShape,
+                            MaterialTheme.colorScheme.secondaryContainer,
+                            tint = MaterialTheme.colorScheme.secondaryContainer,
+                            opacity = 0.7f,
+                        ).padding(horizontal = Spacing.Small, vertical = 2.dp),
             ) {
                 Text(
                     text = library.license,

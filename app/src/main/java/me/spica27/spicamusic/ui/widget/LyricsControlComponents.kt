@@ -1,6 +1,5 @@
 package me.spica27.spicamusic.ui.widget
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +21,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import me.spica27.spicamusic.ui.theme.Shapes
+import me.spica27.spicamusic.ui.theme.glassSurface
 
 object LyricsControlDefaults {
     val surfaceColor
@@ -47,7 +47,7 @@ fun LyricsCircleButton(
             modifier
                 .size(size)
                 .clip(CircleShape)
-                .background(containerColor)
+                .glassSurface(CircleShape, containerColor, tint = containerColor, opacity = 0.7f)
                 .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -76,7 +76,7 @@ fun LyricsPill(
         modifier =
             modifier
                 .clip(shape)
-                .background(containerColor)
+                .glassSurface(shape, containerColor, tint = containerColor, opacity = 0.7f)
                 .then(clickableModifier)
                 .padding(horizontal = horizontalPadding, vertical = verticalPadding),
         verticalAlignment = Alignment.CenterVertically,
@@ -96,7 +96,7 @@ fun LyricsBadge(
         modifier =
             modifier
                 .clip(CircleShape)
-                .background(containerColor)
+                .glassSurface(CircleShape, containerColor, tint = containerColor, opacity = 0.7f)
                 .padding(horizontal = 10.dp, vertical = 4.dp),
     ) {
         Text(

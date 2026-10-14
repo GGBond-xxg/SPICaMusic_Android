@@ -68,10 +68,7 @@ import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -123,6 +120,9 @@ import me.spica27.spicamusic.ui.widget.clickHighlight
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.roundToInt
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
+import me.spica27.spicamusic.ui.theme.GlassSlider as Slider
+import me.spica27.spicamusic.ui.theme.GlassSwitch as Switch
 
 class SettingsScene : StackScene() {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -792,8 +792,14 @@ private fun SettingsHeroCard(
                     modifier =
                         Modifier
                             .size(56.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f)),
+                            .clip(
+                                CircleShape,
+                            ).glassSurface(
+                                CircleShape,
+                                MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f),
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f),
+                                opacity = 0.7f,
+                            ),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
@@ -854,9 +860,14 @@ private fun SettingsPill(label: String) {
             color = MaterialTheme.colorScheme.onPrimaryContainer,
             modifier =
                 Modifier
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.10f))
-                    .padding(horizontal = Spacing.Medium, vertical = Spacing.Small),
+                    .clip(
+                        CircleShape,
+                    ).glassSurface(
+                        CircleShape,
+                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.10f),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.10f),
+                        opacity = 0.7f,
+                    ).padding(horizontal = Spacing.Medium, vertical = Spacing.Small),
         )
     }
 }
@@ -1046,8 +1057,9 @@ private fun SettingsRow(
             modifier =
                 Modifier
                     .size(46.dp)
-                    .clip(Shapes.LargeCornerBasedShape)
-                    .background(iconBackground),
+                    .clip(
+                        Shapes.LargeCornerBasedShape,
+                    ).glassSurface(Shapes.LargeCornerBasedShape, iconBackground, tint = iconBackground, opacity = 0.7f),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -1118,8 +1130,9 @@ private fun InlineOptionCard(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(Shapes.MediumCornerBasedShape)
-                .background(background)
+                .clip(
+                    Shapes.MediumCornerBasedShape,
+                ).glassSurface(Shapes.MediumCornerBasedShape, background, tint = background, opacity = 0.7f)
                 .clickHighlight(onClick = onClick)
                 .padding(horizontal = Spacing.Medium, vertical = Spacing.Medium),
         verticalAlignment = Alignment.CenterVertically,
@@ -1152,8 +1165,14 @@ private fun InlineOptionCard(
                 modifier =
                     Modifier
                         .size(22.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
+                        .clip(
+                            CircleShape,
+                        ).glassSurface(
+                            CircleShape,
+                            MaterialTheme.colorScheme.primary,
+                            tint = MaterialTheme.colorScheme.primary,
+                            opacity = 0.7f,
+                        ),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(

@@ -20,12 +20,10 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.SystemUpdate
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +49,9 @@ import me.spica27.spicamusic.BuildConfig
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
+import me.spica27.spicamusic.ui.theme.glassSurface
+import me.spica27.spicamusic.ui.theme.GlassAlertDialog as AlertDialog
+import me.spica27.spicamusic.ui.theme.GlassTextButton as TextButton
 
 /** 当前项目、源项目与云端串流参考项目的 GitHub 地址。 */
 internal const val PROJECT_HOME_URL = "https://github.com/GGBond-xxg/SPICaMusic_Android"
@@ -347,9 +348,14 @@ private fun AboutHeroCard(modifier: Modifier = Modifier) {
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier =
                     Modifier
-                        .clip(androidx.compose.foundation.shape.CircleShape)
-                        .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.10f))
-                        .padding(horizontal = Spacing.Medium, vertical = Spacing.Small),
+                        .clip(
+                            androidx.compose.foundation.shape.CircleShape,
+                        ).glassSurface(
+                            androidx.compose.foundation.shape.CircleShape,
+                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.10f),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.10f),
+                            opacity = 0.7f,
+                        ).padding(horizontal = Spacing.Medium, vertical = Spacing.Small),
             )
         }
     }

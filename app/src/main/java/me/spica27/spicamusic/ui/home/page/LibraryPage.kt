@@ -65,7 +65,6 @@ import androidx.compose.material.icons.filled.Scanner
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -117,6 +116,8 @@ import me.spica27.spicamusic.ui.settings.MediaLibrarySourceViewModel
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
+import me.spica27.spicamusic.ui.theme.appPageBackground
+import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.AudioCover
 import me.spica27.spicamusic.ui.widget.PlaylistCoverView
 import me.spica27.spicamusic.ui.widget.PreloadPlaylistCovers
@@ -125,6 +126,7 @@ import me.spica27.spicamusic.ui.widget.materialSharedAxisZ
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
 import org.koin.compose.viewmodel.koinActivityViewModel
 import java.util.concurrent.TimeUnit
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
 
 /**
  * 资料库页面
@@ -199,7 +201,7 @@ fun LibraryPage() {
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
+                .appPageBackground(),
     ) {
         LazyVerticalGrid(
             state = gridState,
@@ -642,9 +644,14 @@ private fun LibraryTopBar(
                 Row(
                     modifier =
                         Modifier
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary)
-                            .clickHighlight(onClick = onCreateClick)
+                            .clip(
+                                CircleShape,
+                            ).glassSurface(
+                                CircleShape,
+                                MaterialTheme.colorScheme.primary,
+                                tint = MaterialTheme.colorScheme.primary,
+                                opacity = 0.7f,
+                            ).clickHighlight(onClick = onCreateClick)
                             .padding(horizontal = Spacing.Medium, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall),
@@ -726,9 +733,14 @@ private fun NeteaseAccountSummaryCard(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clip(Shapes.ExtraLargeCornerBasedShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                .padding(Spacing.Large),
+                .clip(
+                    Shapes.ExtraLargeCornerBasedShape,
+                ).glassSurface(
+                    Shapes.ExtraLargeCornerBasedShape,
+                    MaterialTheme.colorScheme.surfaceContainerLow,
+                    tint = MaterialTheme.colorScheme.surfaceContainerLow,
+                    opacity = 0.7f,
+                ).padding(Spacing.Large),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
     ) {
@@ -736,8 +748,14 @@ private fun NeteaseAccountSummaryCard(
             modifier =
                 Modifier
                     .size(56.dp)
-                    .clip(Shapes.LargeCornerBasedShape)
-                    .background(MaterialTheme.colorScheme.tertiaryContainer),
+                    .clip(
+                        Shapes.LargeCornerBasedShape,
+                    ).glassSurface(
+                        Shapes.LargeCornerBasedShape,
+                        MaterialTheme.colorScheme.tertiaryContainer,
+                        tint = MaterialTheme.colorScheme.tertiaryContainer,
+                        opacity = 0.7f,
+                    ),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -768,9 +786,14 @@ private fun NeteaseAccountSummaryCard(
         Box(
             modifier =
                 Modifier
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.secondaryContainer)
-                    .clickHighlight(onClick = onManageClick)
+                    .clip(
+                        CircleShape,
+                    ).glassSurface(
+                        CircleShape,
+                        MaterialTheme.colorScheme.secondaryContainer,
+                        tint = MaterialTheme.colorScheme.secondaryContainer,
+                        opacity = 0.7f,
+                    ).clickHighlight(onClick = onManageClick)
                     .padding(horizontal = Spacing.Large, vertical = Spacing.Small),
             contentAlignment = Alignment.Center,
         ) {
@@ -844,7 +867,7 @@ private fun LibraryCommandPill(
                     scaleX = pressScale
                     scaleY = pressScale
                 }.clip(CircleShape)
-                .background(container)
+                .glassSurface(CircleShape, container, tint = container, opacity = 0.7f)
                 .clickHighlight(interactionSource = interactionSource, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -878,9 +901,14 @@ private fun InaccessibleFoldersNotice(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clip(Shapes.ExtraLargeCornerBasedShape)
-                .background(MaterialTheme.colorScheme.errorContainer)
-                .clickHighlight(onClick = onClick)
+                .clip(
+                    Shapes.ExtraLargeCornerBasedShape,
+                ).glassSurface(
+                    Shapes.ExtraLargeCornerBasedShape,
+                    MaterialTheme.colorScheme.errorContainer,
+                    tint = MaterialTheme.colorScheme.errorContainer,
+                    opacity = 0.7f,
+                ).clickHighlight(onClick = onClick)
                 .padding(horizontal = Spacing.Large, vertical = Spacing.Medium),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
@@ -915,9 +943,14 @@ private fun WeeklyStatsStrip(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clip(Shapes.ExtraLargeCornerBasedShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                .padding(Spacing.Large),
+                .clip(
+                    Shapes.ExtraLargeCornerBasedShape,
+                ).glassSurface(
+                    Shapes.ExtraLargeCornerBasedShape,
+                    MaterialTheme.colorScheme.surfaceContainerLow,
+                    tint = MaterialTheme.colorScheme.surfaceContainerLow,
+                    opacity = 0.7f,
+                ).padding(Spacing.Large),
         verticalArrangement = Arrangement.spacedBy(Spacing.Medium),
     ) {
         Text(
@@ -1040,8 +1073,14 @@ private fun LibraryCloudPlaylistCard(
                 Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
-                    .clip(Shapes.ExtraLargeCornerBasedShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    .clip(
+                        Shapes.ExtraLargeCornerBasedShape,
+                    ).glassSurface(
+                        Shapes.ExtraLargeCornerBasedShape,
+                        MaterialTheme.colorScheme.surfaceContainerHigh,
+                        tint = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        opacity = 0.7f,
+                    ),
             placeHolder = {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(Icons.Default.LibraryMusic, null, tint = MaterialTheme.colorScheme.primary)
@@ -1096,8 +1135,14 @@ private fun PlaylistsEmptyState(modifier: Modifier = Modifier) {
                     .graphicsLayer {
                         translationY = bob * 5.dp.toPx()
                         rotationZ = bob * 6f
-                    }.clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                    }.clip(
+                        CircleShape,
+                    ).glassSurface(
+                        CircleShape,
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        opacity = 0.7f,
+                    ),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -1148,8 +1193,14 @@ private fun SourcesSectionHeader(
                     modifier =
                         Modifier
                             .size(8.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.error),
+                            .clip(
+                                CircleShape,
+                            ).glassSurface(
+                                CircleShape,
+                                MaterialTheme.colorScheme.error,
+                                tint = MaterialTheme.colorScheme.error,
+                                opacity = 0.7f,
+                            ),
                 )
             }
         }
@@ -1182,9 +1233,14 @@ private fun FolderSubHeader(
         Row(
             modifier =
                 Modifier
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .clickHighlight(onClick = onAddClick)
+                    .clip(
+                        CircleShape,
+                    ).glassSurface(
+                        CircleShape,
+                        MaterialTheme.colorScheme.surfaceContainerHigh,
+                        tint = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        opacity = 0.7f,
+                    ).clickHighlight(onClick = onAddClick)
                     .padding(horizontal = Spacing.Medium, vertical = Spacing.ExtraSmall),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall),
@@ -1251,8 +1307,9 @@ private fun FolderRow(
             modifier =
                 Modifier
                     .size(44.dp)
-                    .clip(CircleShape)
-                    .background(badgeColor.copy(alpha = 0.12f)),
+                    .clip(
+                        CircleShape,
+                    ).glassSurface(CircleShape, badgeColor.copy(alpha = 0.12f), tint = badgeColor.copy(alpha = 0.12f), opacity = 0.7f),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -1296,9 +1353,14 @@ private fun FolderRow(
                     color = MaterialTheme.colorScheme.onErrorContainer,
                     modifier =
                         Modifier
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.errorContainer)
-                            .clickHighlight(onClick = onReAuthorize)
+                            .clip(
+                                CircleShape,
+                            ).glassSurface(
+                                CircleShape,
+                                MaterialTheme.colorScheme.errorContainer,
+                                tint = MaterialTheme.colorScheme.errorContainer,
+                                opacity = 0.7f,
+                            ).clickHighlight(onClick = onReAuthorize)
                             .padding(horizontal = Spacing.Medium, vertical = Spacing.ExtraSmall),
                 )
             } else {
@@ -1363,8 +1425,9 @@ private fun IgnoredSongsEntryRow(
             modifier =
                 Modifier
                     .size(44.dp)
-                    .clip(CircleShape)
-                    .background(badgeColor.copy(alpha = 0.12f)),
+                    .clip(
+                        CircleShape,
+                    ).glassSurface(CircleShape, badgeColor.copy(alpha = 0.12f), tint = badgeColor.copy(alpha = 0.12f), opacity = 0.7f),
             contentAlignment = Alignment.Center,
         ) {
             Icon(

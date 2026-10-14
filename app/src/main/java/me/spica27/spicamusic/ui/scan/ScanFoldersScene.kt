@@ -29,12 +29,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOff
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -62,8 +58,13 @@ import me.spica27.spicamusic.feature.library.domain.ScanFolder
 import me.spica27.spicamusic.ui.settings.MediaLibrarySourceViewModel
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
+import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.materialSharedAxisZ
 import org.koin.compose.viewmodel.koinActivityViewModel
+import me.spica27.spicamusic.ui.theme.GlassButton as Button
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
+import me.spica27.spicamusic.ui.theme.GlassOutlinedButton as OutlinedButton
+import me.spica27.spicamusic.ui.theme.GlassSurface as Surface
 
 class ScanFoldersScene : DialogScene() {
     @Composable
@@ -159,9 +160,14 @@ class ScanFoldersScene : DialogScene() {
                             .padding(top = 10.dp)
                             .width(44.dp)
                             .height(4.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f))
-                            .align(Alignment.CenterHorizontally),
+                            .clip(
+                                CircleShape,
+                            ).glassSurface(
+                                CircleShape,
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f),
+                                tint = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f),
+                                opacity = 0.7f,
+                            ).align(Alignment.CenterHorizontally),
                 )
 
                 Row(
@@ -358,8 +364,9 @@ private fun ScanFolderRow(
                 modifier =
                     Modifier
                         .size(44.dp)
-                        .clip(CircleShape)
-                        .background(badgeColor.copy(alpha = 0.12f)),
+                        .clip(
+                            CircleShape,
+                        ).glassSurface(CircleShape, badgeColor.copy(alpha = 0.12f), tint = badgeColor.copy(alpha = 0.12f), opacity = 0.7f),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(

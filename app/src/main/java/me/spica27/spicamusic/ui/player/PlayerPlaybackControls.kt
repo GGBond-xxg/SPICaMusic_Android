@@ -45,7 +45,6 @@ import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -71,12 +70,15 @@ import kotlinx.coroutines.flow.StateFlow
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.common.entity.ProgressBarStyle
 import me.spica27.spicamusic.player.api.PlayMode
+import me.spica27.spicamusic.ui.theme.LocalGlassEnabled
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
+import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.audio_seekbar.AudioDynamicWaveSlider
 import me.spica27.spicamusic.ui.widget.audio_seekbar.AudioWaveSlider
 import me.spica27.spicamusic.ui.widget.audio_seekbar.ExpressiveWavySlider
 import me.spica27.spicamusic.ui.widget.audio_seekbar.SongStructureWaveSlider
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
 
 private val PlayerProgressTrackHeight = 64.dp
 
@@ -218,9 +220,14 @@ fun PlayerProgressSection(
                             .align(Alignment.Center)
                             .then(audioQualityActionModifier)
                             .height(30.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.tertiaryContainer)
-                            .clickable(
+                            .clip(
+                                CircleShape,
+                            ).glassSurface(
+                                CircleShape,
+                                MaterialTheme.colorScheme.tertiaryContainer,
+                                tint = MaterialTheme.colorScheme.tertiaryContainer,
+                                opacity = 0.7f,
+                            ).clickable(
                                 enabled = audioQualityActionEnabled,
                                 role = Role.Button,
                                 onClick = playerClick(onClick),
@@ -494,7 +501,7 @@ private fun LegacyPlayerTransportControls(
                             scaleX = playScale
                             scaleY = playScale
                         }.clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
+                        .then(if (LocalGlassEnabled.current) Modifier else Modifier.background(MaterialTheme.colorScheme.primary)),
             ) {
                 AnimatedContent(
                     targetState = isPlaying,
@@ -509,7 +516,7 @@ private fun LegacyPlayerTransportControls(
                             } else {
                                 stringResource(R.string.play)
                             },
-                        tint = MaterialTheme.colorScheme.onPrimary,
+                        tint = if (LocalGlassEnabled.current) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(44.dp),
                     )
                 }
@@ -668,9 +675,14 @@ fun PlayerTransportControls(
                     Modifier
                         .weight(previousWeight)
                         .fillMaxSize()
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.secondaryContainer)
-                        .clickable(role = Role.Button) {
+                        .clip(
+                            CircleShape,
+                        ).glassSurface(
+                            CircleShape,
+                            MaterialTheme.colorScheme.secondaryContainer,
+                            tint = MaterialTheme.colorScheme.secondaryContainer,
+                            opacity = 0.7f,
+                        ).clickable(role = Role.Button) {
                             PlayerHaptics.click()
                             activeButton = TransportButtonType.Previous
                             onPreviousClick()
@@ -691,8 +703,12 @@ fun PlayerTransportControls(
                         .weight(playPauseWeight)
                         .fillMaxSize()
                         .clip(RoundedCornerShape(playPauseCorner))
-                        .background(MaterialTheme.colorScheme.primary)
-                        .clickable(role = Role.Button) {
+                        .glassSurface(
+                            RoundedCornerShape(playPauseCorner),
+                            MaterialTheme.colorScheme.primary,
+                            tint = MaterialTheme.colorScheme.primaryContainer,
+                            opacity = 0.65f,
+                        ).clickable(role = Role.Button) {
                             PlayerHaptics.click()
                             activeButton = TransportButtonType.PlayPause
                             onPlayPauseClick()
@@ -712,7 +728,7 @@ fun PlayerTransportControls(
                             } else {
                                 stringResource(R.string.play)
                             },
-                        tint = MaterialTheme.colorScheme.onPrimary,
+                        tint = if (LocalGlassEnabled.current) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(38.dp),
                     )
                 }
@@ -723,9 +739,14 @@ fun PlayerTransportControls(
                     Modifier
                         .weight(nextWeight)
                         .fillMaxSize()
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.secondaryContainer)
-                        .clickable(role = Role.Button) {
+                        .clip(
+                            CircleShape,
+                        ).glassSurface(
+                            CircleShape,
+                            MaterialTheme.colorScheme.secondaryContainer,
+                            tint = MaterialTheme.colorScheme.secondaryContainer,
+                            opacity = 0.7f,
+                        ).clickable(role = Role.Button) {
                             PlayerHaptics.click()
                             activeButton = TransportButtonType.Next
                             onNextClick()
@@ -747,9 +768,14 @@ fun PlayerTransportControls(
                     .fillMaxWidth()
                     .height(54.dp)
                     .padding(horizontal = 24.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.74f))
-                    .padding(4.dp),
+                    .clip(
+                        CircleShape,
+                    ).glassSurface(
+                        CircleShape,
+                        MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.74f),
+                        tint = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.74f),
+                        opacity = 0.7f,
+                    ).padding(4.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -759,12 +785,20 @@ fun PlayerTransportControls(
                         .weight(1f)
                         .fillMaxSize()
                         .clip(CircleShape)
-                        .background(
+                        .glassSurface(
+                            CircleShape,
                             if (playMode == PlayMode.SHUFFLE) {
                                 MaterialTheme.colorScheme.primaryContainer
                             } else {
                                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)
                             },
+                            tint =
+                                if (playMode == PlayMode.SHUFFLE) {
+                                    MaterialTheme.colorScheme.primaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)
+                                },
+                            opacity = 0.7f,
                         ).clickable(role = Role.Button, onClick = playerClick(onPlayModeClick)),
                 contentAlignment = Alignment.Center,
             ) {
@@ -798,12 +832,20 @@ fun PlayerTransportControls(
                         .weight(1f)
                         .fillMaxSize()
                         .clip(CircleShape)
-                        .background(
+                        .glassSurface(
+                            CircleShape,
                             if (isLike) {
                                 MaterialTheme.colorScheme.tertiaryContainer
                             } else {
                                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)
                             },
+                            tint =
+                                if (isLike) {
+                                    MaterialTheme.colorScheme.tertiaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)
+                                },
+                            opacity = 0.7f,
                         ).clickable(role = Role.Button, onClick = playerClick(onFavoriteClick)),
                 contentAlignment = Alignment.Center,
             ) {
@@ -832,12 +874,20 @@ fun PlayerTransportControls(
                         .weight(1f)
                         .fillMaxSize()
                         .clip(CircleShape)
-                        .background(
+                        .glassSurface(
+                            CircleShape,
                             if (sleepTimerRemainingMs != null) {
                                 MaterialTheme.colorScheme.primaryContainer
                             } else {
                                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)
                             },
+                            tint =
+                                if (sleepTimerRemainingMs != null) {
+                                    MaterialTheme.colorScheme.primaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)
+                                },
+                            opacity = 0.7f,
                         ).clickable(role = Role.Button) {
                             PlayerHaptics.click()
                             showSleepTimerDialog = true

@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package me.spica27.spicamusic.ui.audioeffects
 
 import androidx.compose.animation.AnimatedVisibility
@@ -8,7 +10,6 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,11 +31,8 @@ import androidx.compose.material.icons.filled.SwapCalls
 import androidx.compose.material.icons.filled.Usb
 import androidx.compose.material.icons.filled.VolumeDown
 import androidx.compose.material.icons.filled.Waves
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -63,8 +61,12 @@ import me.spica27.spicamusic.ui.about.AboutSectionCard
 import me.spica27.spicamusic.ui.settings.SettingsViewModel
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
+import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.clickHighlight
 import org.koin.compose.viewmodel.koinViewModel
+import me.spica27.spicamusic.ui.theme.GlassFilterChip as FilterChip
+import me.spica27.spicamusic.ui.theme.GlassSlider as Slider
+import me.spica27.spicamusic.ui.theme.GlassSwitch as Switch
 
 /**
  * 音效设置页。
@@ -312,8 +314,14 @@ private fun AudioSelectRow(
             modifier =
                 Modifier
                     .size(46.dp)
-                    .clip(Shapes.LargeCornerBasedShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                    .clip(
+                        Shapes.LargeCornerBasedShape,
+                    ).glassSurface(
+                        Shapes.LargeCornerBasedShape,
+                        MaterialTheme.colorScheme.primaryContainer,
+                        tint = MaterialTheme.colorScheme.primaryContainer,
+                        opacity = 0.7f,
+                    ),
             contentAlignment = Alignment.Center,
         ) {
             Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
@@ -453,8 +461,9 @@ private fun AudioSwitchRow(
             modifier =
                 Modifier
                     .size(46.dp)
-                    .clip(Shapes.LargeCornerBasedShape)
-                    .background(iconBackground),
+                    .clip(
+                        Shapes.LargeCornerBasedShape,
+                    ).glassSurface(Shapes.LargeCornerBasedShape, iconBackground, tint = iconBackground, opacity = 0.7f),
             contentAlignment = Alignment.Center,
         ) {
             Icon(

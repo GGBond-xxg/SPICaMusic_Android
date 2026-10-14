@@ -24,7 +24,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -63,8 +62,10 @@ import me.spica27.spicamusic.ui.player.PlayerPlaybackBottomSection
 import me.spica27.spicamusic.ui.player.playerClick
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
+import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.AudioCover
 import me.spica27.spicamusic.ui.widget.MusicCoverPlaceholder
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
 
 /**
  * 全屏歌词页面。
@@ -447,8 +448,14 @@ private fun LyricsHeader(
                 modifier =
                     Modifier
                         .size(42.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceContainer),
+                        .clip(
+                            CircleShape,
+                        ).glassSurface(
+                            CircleShape,
+                            MaterialTheme.colorScheme.surfaceContainer,
+                            tint = MaterialTheme.colorScheme.surfaceContainer,
+                            opacity = 0.7f,
+                        ),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -479,8 +486,14 @@ private fun LyricsHeader(
                         } else {
                             Modifier
                         },
-                    ).clip(Shapes.ExtraSmallCornerBasedShape)
-                    .background(MaterialTheme.colorScheme.tertiaryContainer),
+                    ).clip(
+                        Shapes.ExtraSmallCornerBasedShape,
+                    ).glassSurface(
+                        Shapes.ExtraSmallCornerBasedShape,
+                        MaterialTheme.colorScheme.tertiaryContainer,
+                        tint = MaterialTheme.colorScheme.tertiaryContainer,
+                        opacity = 0.7f,
+                    ),
         ) {
             if (artworkPainter != null) {
                 Image(
