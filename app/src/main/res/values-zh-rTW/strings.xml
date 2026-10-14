@@ -803,7 +803,7 @@
   <string name="password">密碼</string>
   <string name="telegram_paging_hint">歌曲和專輯封面會分小頁按需載入，因此超大頻道也能保持流暢。</string>
   <string name="telegram_unavailable">此裝置無法使用 Telegram</string>
-  <string name="telegram_unavailable_detail">目前裝置架構無法載入 TDLib 原生元件。</string>
+  <string name="telegram_unavailable_detail">Telegram 原生元件初始化失敗。請確認安裝包支援目前裝置後重新開啟此頁面。</string>
   <string name="telegram_api_title">Telegram API 憑據</string>
   <string name="telegram_api_hint">請在 my.telegram.org 建立應用程式並填寫 API ID 與 API Hash。它們是應用程式憑據，不是你的登入密碼。</string>
   <string name="save_and_continue">儲存並繼續</string>

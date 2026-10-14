@@ -117,6 +117,8 @@ import me.spica27.spicamusic.ui.player.rememberPlayerArtworkMorphState
 import me.spica27.spicamusic.ui.player.sourceArtworkAlpha
 import me.spica27.spicamusic.ui.search.SearchScene
 import me.spica27.spicamusic.ui.theme.LayoutTokens
+import me.spica27.spicamusic.ui.theme.LocalGlassEnabled
+import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.MusicCoverPlaceholder
 import me.spica27.spicamusic.ui.widget.StableAudioCover
 import me.spica27.spicamusic.utils.albumCoverFallbackUri
@@ -679,7 +681,8 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                                             animatedVisibilityScope = this@AnimatedContent,
                                         ).size(56.dp)
                                         .clip(CircleShape)
-                                        .background(
+                                        .glassSurface(
+                                            CircleShape,
                                             MaterialTheme.colorScheme.tertiary.copy(
                                                 alpha = BOTTOM_FLOATING_CONTAINER_ALPHA,
                                             ),
@@ -691,7 +694,7 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                                 Icon(
                                     Icons.Default.Search,
                                     contentDescription = stringResource(R.string.search),
-                                    tint = MaterialTheme.colorScheme.onTertiary,
+                                    tint = if (LocalGlassEnabled.current) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onTertiary,
                                 )
                             }
                         }
@@ -709,7 +712,8 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                                             shape = CircleShape
                                             clip = true
                                             shadowElevation = 0f
-                                        }.background(
+                                        }.glassSurface(
+                                            CircleShape,
                                             MaterialTheme.colorScheme.surfaceContainerHigh.copy(
                                                 alpha = BOTTOM_FLOATING_CONTAINER_ALPHA,
                                             ),
@@ -870,7 +874,8 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                                     resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
                                 ).size(56.dp)
                                 .clip(CircleShape)
-                                .background(
+                                .glassSurface(
+                                    CircleShape,
                                     MaterialTheme.colorScheme.primaryContainer.copy(
                                         alpha = BOTTOM_FLOATING_CONTAINER_ALPHA,
                                     ),
@@ -904,7 +909,8 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                                         shape = CircleShape
                                         clip = true
                                         shadowElevation = 0f
-                                    }.background(
+                                    }.glassSurface(
+                                        CircleShape,
                                         MaterialTheme.colorScheme.surfaceContainerHigh.copy(
                                             alpha = BOTTOM_FLOATING_CONTAINER_ALPHA,
                                         ),
@@ -1045,7 +1051,8 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                                     animatedVisibilityScope = this@AnimatedContent,
                                 ).size(56.dp)
                                 .clip(CircleShape)
-                                .background(
+                                .glassSurface(
+                                    CircleShape,
                                     MaterialTheme.colorScheme.tertiary.copy(
                                         alpha = BOTTOM_FLOATING_CONTAINER_ALPHA,
                                     ),
@@ -1054,7 +1061,7 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                         Icon(
                             imageVector = Icons.Default.Search,
                             contentDescription = stringResource(R.string.search),
-                            tint = MaterialTheme.colorScheme.onTertiary,
+                            tint = if (LocalGlassEnabled.current) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onTertiary,
                         )
                     }
                 }
@@ -1147,7 +1154,8 @@ private fun HomePageSwitcher(modifier: Modifier = Modifier) {
                 .height(56.dp)
                 .padding(end = 12.dp)
                 .clip(CircleShape)
-                .background(
+                .glassSurface(
+                    CircleShape,
                     MaterialTheme.colorScheme.surfaceContainerHigh.copy(
                         alpha = BOTTOM_FLOATING_CONTAINER_ALPHA,
                     ),

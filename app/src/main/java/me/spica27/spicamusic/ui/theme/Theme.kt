@@ -83,7 +83,7 @@ fun SPICaMusicTheme(
     content: @Composable () -> Unit,
 ) {
     when (themeColorStyle) {
-        ThemeColorStyle.Textured ->
+        ThemeColorStyle.Textured, ThemeColorStyle.Glass ->
             DynamicMaterialTheme(
                 seedColor = themeColor,
                 isDark = darkTheme,
@@ -91,7 +91,9 @@ fun SPICaMusicTheme(
                 specVersion = ColorSpec.SpecVersion.SPEC_2021,
                 style = PaletteStyle.TonalSpot,
             ) {
-                ProvideAppInteractionIndication(content = content)
+                CompositionLocalProvider(LocalGlassEnabled provides (themeColorStyle == ThemeColorStyle.Glass)) {
+                    GlassBackdropHost { ProvideAppInteractionIndication(content = content) }
+                }
             }
 
         ThemeColorStyle.Flat -> {
@@ -114,7 +116,9 @@ fun SPICaMusicTheme(
                     )
                 }
             MaterialTheme(colorScheme = colorScheme) {
-                ProvideAppInteractionIndication(content = content)
+                CompositionLocalProvider(LocalGlassEnabled provides (themeColorStyle == ThemeColorStyle.Glass)) {
+                    GlassBackdropHost { ProvideAppInteractionIndication(content = content) }
+                }
             }
         }
     }

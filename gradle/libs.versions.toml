@@ -3,7 +3,7 @@ accompanistVersion = "0.37.3"
 adaptiveVersion = "1.2.0"
 agp = "9.2.1"
 amplitudaVersion = "2.3.1"
-androidliquidglassVersion = "1.0.0-alpha11"
+androidliquidglassVersion = "1.0.6"
 capsuleAndroidVersion = "2.1.1-patch2"
 coilCompose = "3.4.0"
 constraintlayoutComposeVersion = "1.1.1"
@@ -64,7 +64,7 @@ androidx-media3-exoplayer-ffmpeg = { module = "org.jellyfin.media3:media3-ffmpeg
 androidautosize = { module = "com.github.JessYanCoding:AndroidAutoSize", version.ref = "androidautosize" }
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanistVersion" }
 amplituda = { module = "com.github.lincollincol:amplituda", version.ref = "amplitudaVersion" }
-androidliquidglass = { module = "com.github.Kyant0:AndroidLiquidGlass", version.ref = "androidliquidglassVersion" }
+androidliquidglass = { module = "io.github.kyant0:backdrop", version.ref = "androidliquidglassVersion" }
 androidx-adaptive = { module = "androidx.compose.material3.adaptive:adaptive", version.ref = "adaptiveVersion" }
 androidx-adaptive-layout = { module = "androidx.compose.material3.adaptive:adaptive-layout", version.ref = "adaptiveVersion" }
 androidx-adaptive-navigation = { module = "androidx.compose.material3.adaptive:adaptive-navigation", version.ref = "adaptiveVersion" }

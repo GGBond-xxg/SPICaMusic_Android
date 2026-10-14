@@ -1,0 +1,81 @@
+package me.spica27.spicamusic.ui.theme
+
+import android.os.Build
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.dp
+import com.kyant.backdrop.Backdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.lens
+
+val LocalGlassEnabled = staticCompositionLocalOf { false }
+val LocalGlassBackdrop = staticCompositionLocalOf<Backdrop?> { null }
+
+/** The recorded wallpaper is a sibling of the glass surfaces, avoiding recursive sampling. */
+@Composable
+internal fun GlassBackdropHost(content: @Composable () -> Unit) {
+    val enabled = LocalGlassEnabled.current
+    val backdrop = rememberLayerBackdrop()
+    val colors = MaterialTheme.colorScheme
+    Box(Modifier.fillMaxSize()) {
+        if (enabled) {
+            Canvas(Modifier.fillMaxSize().layerBackdrop(backdrop)) {
+                drawRect(colors.background)
+                drawRect(
+                    Brush.radialGradient(
+                        listOf(colors.primaryContainer, Color.Transparent),
+                        Offset(size.width * 0.05f, size.height * 0.2f),
+                        size.width * 0.95f,
+                    ),
+                )
+                drawRect(
+                    Brush.radialGradient(
+                        listOf(colors.tertiaryContainer, Color.Transparent),
+                        Offset(
+                            size.width * 0.95f,
+                            size.height * 0.65f,
+                        ),
+                        size.width * 0.9f,
+                    ),
+                )
+            }
+        }
+        CompositionLocalProvider(LocalGlassBackdrop provides (if (enabled) backdrop else null), content = content)
+    }
+}
+
+/** Real background blur and edge refraction; old Android versions retain a readable tint. */
+@Composable
+fun Modifier.glassSurface(
+    shape: Shape,
+    color: Color,
+): Modifier {
+    val backdrop = LocalGlassBackdrop.current
+    if (!LocalGlassEnabled.current || backdrop == null) return background(color, shape)
+    val tint = MaterialTheme.colorScheme.surface
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return background(tint.copy(alpha = 0.9f), shape)
+    return drawBackdrop(
+        backdrop = backdrop,
+        shape = { shape },
+        effects = {
+            blur(6.dp.toPx())
+            lens(16.dp.toPx(), 24.dp.toPx())
+        },
+        shadow = null,
+        onDrawSurface = { drawRect(tint.copy(alpha = 0.48f)) },
+    )
+}

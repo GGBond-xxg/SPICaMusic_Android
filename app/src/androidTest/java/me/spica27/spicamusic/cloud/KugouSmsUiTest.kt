@@ -49,6 +49,18 @@ class KugouSmsUiTest {
         compose.setContent { MaterialTheme { Surface { KugouSmsLogin(Modifier, account::set, null, client) } } }
         compose.onNodeWithText(cloudText(me.spica27.spicamusic.R.string.kugou_sms_send)).assertIsNotEnabled()
         compose.onNodeWithText(cloudText(me.spica27.spicamusic.R.string.cloud_login)).assertIsNotEnabled()
+        val phoneBounds =
+            compose
+                .onNodeWithText(
+                    cloudText(me.spica27.spicamusic.R.string.kugou_sms_phone),
+                ).fetchSemanticsNode()
+                .boundsInRoot
+        val sendBounds = compose.onNodeWithText(cloudText(me.spica27.spicamusic.R.string.kugou_sms_send)).fetchSemanticsNode().boundsInRoot
+        val loginBounds = compose.onNodeWithText(cloudText(me.spica27.spicamusic.R.string.cloud_login)).fetchSemanticsNode().boundsInRoot
+        val codeBounds = compose.onNodeWithText(cloudText(me.spica27.spicamusic.R.string.kugou_sms_code)).fetchSemanticsNode().boundsInRoot
+        assertTrue("Send code must be to the right of the phone field", sendBounds.left >= phoneBounds.right)
+        assertTrue("Phone and send-code controls must occupy the same row", sendBounds.center.y in phoneBounds.top..phoneBounds.bottom)
+        assertEquals("Login must fill the form width", codeBounds.width, loginBounds.width, 2f)
         compose.onNodeWithText(cloudText(me.spica27.spicamusic.R.string.kugou_sms_phone)).performTextInput("13800138000")
         compose.onNodeWithText(cloudText(me.spica27.spicamusic.R.string.kugou_sms_send)).performClick()
         compose.waitUntil(5000) { calls.get() == 1 }

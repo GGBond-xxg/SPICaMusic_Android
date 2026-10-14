@@ -805,7 +805,7 @@
   <string name="password">Password</string>
   <string name="telegram_paging_hint">Songs and album art are loaded on demand in small pages, keeping very large channels smooth.</string>
   <string name="telegram_unavailable">Telegram is unavailable on this device</string>
-  <string name="telegram_unavailable_detail">The TDLib native component could not be loaded for this device architecture.</string>
+  <string name="telegram_unavailable_detail">The Telegram native component could not be initialized. Check that the installed APK supports this device and try reopening this page.</string>
   <string name="telegram_api_title">Telegram API credentials</string>
   <string name="telegram_api_hint">Create an application at my.telegram.org and enter its API ID and API Hash. These are app credentials, not your login password.</string>
   <string name="save_and_continue">Save and continue</string>

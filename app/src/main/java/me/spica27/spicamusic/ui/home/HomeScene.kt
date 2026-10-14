@@ -28,6 +28,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import me.spica27.navkit.scene.StackScene
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.ui.home.page.FinderPage
@@ -36,6 +38,8 @@ import me.spica27.spicamusic.ui.home.page.MusicPage
 import me.spica27.spicamusic.ui.home.player_bar.BottomBarScrollConnection
 import me.spica27.spicamusic.ui.home.player_bar.BottomMediaBarV2
 import me.spica27.spicamusic.ui.home.player_bar.rememberBottomBarScrollConnection
+import me.spica27.spicamusic.ui.theme.LocalGlassBackdrop
+import me.spica27.spicamusic.ui.theme.LocalGlassEnabled
 import me.spica27.spicamusic.ui.widget.materialSharedAxisZIn
 import me.spica27.spicamusic.ui.widget.materialSharedAxisZOut
 import org.koin.compose.viewmodel.koinActivityViewModel
@@ -61,8 +65,11 @@ class HomeScene : StackScene() {
                 label = "bottomControlsScrimHeight",
             )
         val pageBackground = MaterialTheme.colorScheme.background
+        val glass = LocalGlassEnabled.current
+        val backdrop = rememberLayerBackdrop()
         CompositionLocalProvider(
             LocalBottomBarScrollConnection provides bottomBarScrollConnection,
+            LocalGlassBackdrop provides backdrop,
         ) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -75,7 +82,8 @@ class HomeScene : StackScene() {
                     },
                     modifier =
                         Modifier
-                            .fillMaxSize(),
+                            .fillMaxSize()
+                            .then(if (glass) Modifier.layerBackdrop(backdrop) else Modifier),
                     transitionSpec = {
                         materialSharedAxisZIn(forward = true) togetherWith
                             materialSharedAxisZOut(
@@ -99,8 +107,8 @@ class HomeScene : StackScene() {
                             .background(
                                 Brush.verticalGradient(
                                     0f to pageBackground.copy(alpha = 0f),
-                                    0.38f to pageBackground.copy(alpha = 0.92f),
-                                    1f to pageBackground,
+                                    0.38f to pageBackground.copy(alpha = if (glass) 0.12f else 0.92f),
+                                    1f to pageBackground.copy(alpha = if (glass) 0.3f else 1f),
                                 ),
                             ),
                 )

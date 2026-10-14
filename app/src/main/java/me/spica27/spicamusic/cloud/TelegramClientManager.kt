@@ -1,6 +1,7 @@
 package me.spica27.spicamusic.cloud
 
 import android.content.Context
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -39,11 +40,8 @@ class TelegramClientManager(
     @Volatile
     private var client: Client? = null
 
-    @Volatile
-    private var nativeLoadComplete = false
-
-    @Volatile
-    private var nativeLoadSucceeded = false
+    private val _runtimeState = MutableStateFlow(TelegramRuntimeState.NotStarted)
+    val runtimeState = _runtimeState.asStateFlow()
 
     private val initializationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val initializationMutex = Mutex()
@@ -66,14 +64,13 @@ class TelegramClientManager(
         }
     }
 
-    fun isAvailable(): Boolean = nativeLoadComplete && nativeLoadSucceeded
-
     fun hasConfig(): Boolean = config != null
 
     fun isReady(): Boolean = _authorizationState.value is TdApi.AuthorizationStateReady
 
     suspend fun awaitReady(timeoutMs: Long = 20_000L): Boolean {
         ensureInitialized()
+        if (runtimeState.value != TelegramRuntimeState.Available) return false
         if (isReady()) return true
         return withTimeoutOrNull(timeoutMs) {
             authorizationState.first {
@@ -121,9 +118,15 @@ class TelegramClientManager(
                 _authorizationState.value = update.authorizationState
                 when (val state = update.authorizationState) {
                     is TdApi.AuthorizationStateWaitTdlibParameters -> {
-                        config?.let(::sendTdlibParameters)
+                        // Client.create can deliver its first update before returning the client.
+                        initializationScope.launch {
+                            initializationMutex.withLock { config?.let(::sendTdlibParameters) }
+                        }
                     }
-                    is TdApi.AuthorizationStateClosed -> client = null
+                    is TdApi.AuthorizationStateClosed -> {
+                        client = null
+                        _runtimeState.value = TelegramRuntimeState.NotStarted
+                    }
                     else -> Unit
                 }
             }
@@ -134,15 +137,25 @@ class TelegramClientManager(
 
     private suspend fun ensureInitialized() {
         withContext(Dispatchers.IO) {
-            if (nativeLoadComplete) return@withContext
+            if (client != null) return@withContext
             initializationMutex.withLock {
-                if (nativeLoadComplete) return@withLock
-                nativeLoadSucceeded = nativeLibraryAvailable
-                if (nativeLoadSucceeded) {
+                if (client != null) return@withLock
+                _runtimeState.value = TelegramRuntimeState.Loading
+                try {
+                    check(nativeLibraryAvailable) { "TDLib native library is unavailable" }
                     Client.execute(TdApi.SetLogVerbosityLevel(if (BuildConfig.DEBUG) 1 else 0))
                     client = Client.create(::handleUpdate, null, null)
+                    _runtimeState.value = TelegramRuntimeState.Available
+                } catch (cancelled: CancellationException) {
+                    _runtimeState.value = TelegramRuntimeState.NotStarted
+                    throw cancelled
+                } catch (error: Exception) {
+                    Timber.e(error, "TDLib initialization failed")
+                    _runtimeState.value = TelegramRuntimeState.Unavailable
+                } catch (error: LinkageError) {
+                    Timber.e(error, "TDLib JNI initialization failed")
+                    _runtimeState.value = TelegramRuntimeState.Unavailable
                 }
-                nativeLoadComplete = true
             }
         }
     }
@@ -187,6 +200,8 @@ class TelegramClientManager(
         }
     }
 }
+
+enum class TelegramRuntimeState { NotStarted, Loading, Available, Unavailable }
 
 class TelegramRequestException(
     val errorCode: Int,

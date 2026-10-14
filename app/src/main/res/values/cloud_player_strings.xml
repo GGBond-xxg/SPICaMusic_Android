@@ -119,4 +119,5 @@
     <string name="cloud_local_playlist_hint">Home/library playlist · Supports all music sources</string>
     <string name="cloud_new_playlist">New playlist</string>
     <string name="cloud_remove_from_playlist">Remove from playlist</string>
+    <string name="theme_color_style_glass">Glass</string>
 </resources>

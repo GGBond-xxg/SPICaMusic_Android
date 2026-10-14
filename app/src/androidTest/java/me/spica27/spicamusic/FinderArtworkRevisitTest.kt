@@ -8,7 +8,9 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import me.spica27.spicamusic.core.preferences.PreferencesManager
 import me.spica27.spicamusic.storage.api.IPlaylistRepository
 import me.spica27.spicamusic.storage.api.ISongRepository
 import me.spica27.spicamusic.ui.home.HomePage
@@ -39,7 +41,12 @@ class FinderArtworkRevisitTest {
             assumeTrue("Requires scanned local audio", songs.isNotEmpty())
             val playlists = GlobalContext.get().get<IPlaylistRepository>()
             val id = playlists.createPlaylist("Artwork regression ${System.nanoTime()}")
+            val preferences = GlobalContext.get().get<PreferencesManager>()
+            val originalStyle = preferences.getString(PreferencesManager.Keys.THEME_COLOR_STYLE, "textured").first()
             try {
+                if (InstrumentationRegistry.getArguments().getString("glassAppearance") == "true") {
+                    preferences.setString(PreferencesManager.Keys.THEME_COLOR_STYLE, "glass")
+                }
                 playlists.addSongsToPlaylist(id, songs.map { it.mediaStoreId })
                 compose.waitUntil(15000) { compose.onAllNodesWithTag("finder_list").fetchSemanticsNodes().isNotEmpty() }
                 compose.onNodeWithTag("finder_list").performScrollToKey("playlists_rail")
@@ -73,6 +80,7 @@ class FinderArtworkRevisitTest {
                 compose.mainClock.autoAdvance = true
                 // Delete only the temporary playlist created by this test, never the user's playlists.
                 playlists.deletePlaylist(id)
+                preferences.setString(PreferencesManager.Keys.THEME_COLOR_STYLE, originalStyle)
             }
         }
 

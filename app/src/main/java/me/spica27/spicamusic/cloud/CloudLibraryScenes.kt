@@ -382,6 +382,8 @@ class TelegramScene : StackScene() {
         val viewModel: TelegramViewModel = koinViewModel()
         val state by viewModel.state.collectAsStateWithLifecycle()
         val authState by viewModel.authorizationState.collectAsStateWithLifecycle()
+        val runtimeState by viewModel.runtimeState.collectAsStateWithLifecycle()
+        LaunchedEffect(authState is TdApi.AuthorizationStateClosed) { viewModel.initialize() }
 
         CloudSceneScaffold(
             title = "Telegram",
@@ -390,7 +392,7 @@ class TelegramScene : StackScene() {
             TelegramContent(
                 state = state,
                 authState = authState,
-                tdlibAvailable = viewModel.tdlibAvailable(),
+                runtimeState = runtimeState,
                 modifier =
                     Modifier
                         .fillMaxSize()
@@ -486,7 +488,7 @@ class TelegramChannelScene(
 private fun TelegramContent(
     state: TelegramUiState,
     authState: TdApi.AuthorizationState?,
-    tdlibAvailable: Boolean,
+    runtimeState: TelegramRuntimeState,
     modifier: Modifier,
     onSaveConfig: (String, String) -> Unit,
     onSendPhone: (String) -> Unit,
@@ -524,7 +526,14 @@ private fun TelegramContent(
         contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (!tdlibAvailable) {
+        if (runtimeState == TelegramRuntimeState.NotStarted || runtimeState == TelegramRuntimeState.Loading) {
+            item {
+                CircularProgressIndicator()
+                Text(stringResource(R.string.telegram_connecting_hint))
+            }
+            return@LazyColumn
+        }
+        if (runtimeState == TelegramRuntimeState.Unavailable) {
             item {
                 CloudMessage(
                     icon = Icons.Default.CloudOff,

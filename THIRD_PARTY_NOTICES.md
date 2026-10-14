@@ -40,3 +40,9 @@ SPICa's Kotlin adapter and Compose login screen were implemented within this
 project's existing cloud architecture; no Flutter/Rust source, server binary,
 or visual assets from MD3Music are bundled. Login QR images are generated locally
 using the existing Apache-2.0-licensed ZXing dependency.
+
+## Backdrop (AndroidLiquidGlass)
+
+Glass appearance uses [Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass),
+published as `io.github.kyant0:backdrop:1.0.6`, under the Apache License, Version 2.0.
+Copyright 2025 Kyant. License: <https://www.apache.org/licenses/LICENSE-2.0>.

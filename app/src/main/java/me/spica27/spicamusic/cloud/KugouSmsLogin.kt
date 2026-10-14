@@ -8,6 +8,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.platform.LocalConfiguration
@@ -88,46 +89,54 @@ internal fun KugouSmsLogin(
         ) {
             Text(stringResource(R.string.kugou_sms_overseas_hint), style = MaterialTheme.typography.bodySmall)
         }
-        OutlinedTextField(
-            mobile,
-            {
-                mobile = it.filter { char -> char in '0'..'9' }.take(15 - countryCode.length)
-                candidates = emptyList()
-                code = ""
-            },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !busy,
-            singleLine = true,
-            label = { Text(stringResource(R.string.kugou_sms_phone)) },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-        )
-        OutlinedButton(enabled = !busy && seconds == 0 && isKugouSmsPhoneValid(mobile, countryCode), onClick = {
-            busy = true
-            scope.launch {
-                try {
-                    client.sendSms(mobile, session, countryCode)
-                    deadline = SystemClock.elapsedRealtime() + 60_000
-                    seconds = 60
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Bottom) {
+            OutlinedTextField(
+                mobile,
+                {
+                    mobile = it.filter { char -> char in '0'..'9' }.take(15 - countryCode.length)
                     candidates = emptyList()
-                    message = cloudText(R.string.kugou_sms_sent)
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (error: Exception) {
-                    message = error.message ?: cloudText(R.string.kugou_sms_send_error)
-                } finally {
-                    busy = false
-                }
-            }
-        }) {
-            Text(
-                if (seconds >
-                    0
-                ) {
-                    stringResource(R.string.kugou_sms_resend, seconds)
-                } else {
-                    stringResource(R.string.kugou_sms_send)
+                    code = ""
                 },
+                modifier = Modifier.weight(1f),
+                enabled = !busy,
+                singleLine = true,
+                label = { Text(stringResource(R.string.kugou_sms_phone)) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
             )
+            OutlinedButton(
+                modifier = Modifier.width(116.dp).heightIn(min = 56.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                enabled =
+                    !busy && seconds == 0 && isKugouSmsPhoneValid(mobile, countryCode),
+                onClick = {
+                    busy = true
+                    scope.launch {
+                        try {
+                            client.sendSms(mobile, session, countryCode)
+                            deadline = SystemClock.elapsedRealtime() + 60_000
+                            seconds = 60
+                            candidates = emptyList()
+                            message = cloudText(R.string.kugou_sms_sent)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (error: Exception) {
+                            message = error.message ?: cloudText(R.string.kugou_sms_send_error)
+                        } finally {
+                            busy = false
+                        }
+                    }
+                },
+            ) {
+                Text(
+                    if (seconds >
+                        0
+                    ) {
+                        stringResource(R.string.kugou_sms_resend, seconds)
+                    } else {
+                        stringResource(R.string.kugou_sms_send)
+                    },
+                )
+            }
         }
         OutlinedTextField(
             code,
@@ -141,7 +150,7 @@ internal fun KugouSmsLogin(
             label = { Text(stringResource(R.string.kugou_sms_code)) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         )
-        Button(onClick = {
+        Button(modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), onClick = {
             login()
         }, enabled = !busy && isKugouSmsPhoneValid(mobile, countryCode) && code.length in 4..8) {
             Text(

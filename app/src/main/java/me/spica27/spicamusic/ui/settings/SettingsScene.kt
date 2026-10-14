@@ -113,9 +113,12 @@ import me.spica27.spicamusic.ui.about.AboutScene
 import me.spica27.spicamusic.ui.audioeffects.AudioEffectsScene
 import me.spica27.spicamusic.ui.player.playerHapticStrength
 import me.spica27.spicamusic.ui.theme.EaseOutEmphasized
+import me.spica27.spicamusic.ui.theme.GlassBackdropHost
 import me.spica27.spicamusic.ui.theme.LayoutTokens
+import me.spica27.spicamusic.ui.theme.LocalGlassEnabled
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
+import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.clickHighlight
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
 import org.koin.compose.viewmodel.koinViewModel
@@ -175,17 +178,20 @@ class SettingsScene : StackScene() {
         val coverName = coverLabels[coverTypeValue] ?: coverShiningStarsLabel
         val texturedLabel = stringResource(R.string.theme_color_style_textured)
         val flatLabel = stringResource(R.string.theme_color_style_flat)
+        val glassLabel = stringResource(R.string.theme_color_style_glass)
         val themeColorStyleName =
             when (ThemeColorStyle.fromString(themeColorStyleValue)) {
                 ThemeColorStyle.Textured -> texturedLabel
                 ThemeColorStyle.Flat -> flatLabel
+                ThemeColorStyle.Glass -> glassLabel
             }
         val themeColorStyleOptions =
-            remember(texturedLabel, flatLabel) {
+            remember(texturedLabel, flatLabel, glassLabel) {
                 ImmutableList.copyOf(
                     listOf(
                         SelectOption(ThemeColorStyle.Textured.value, texturedLabel),
                         SelectOption(ThemeColorStyle.Flat.value, flatLabel),
+                        SelectOption(ThemeColorStyle.Glass.value, glassLabel),
                     ),
                 )
             }
@@ -335,270 +341,276 @@ class SettingsScene : StackScene() {
         val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
         val mastheadGone by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
 
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background),
-        ) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding =
-                    PaddingValues(
-                        start = LayoutTokens.MusicHeaderHorizontalPadding,
-                        end = LayoutTokens.MusicHeaderHorizontalPadding,
-                        top = statusBarTop + 56.dp,
-                        bottom = 96.dp,
-                    ),
-                verticalArrangement = Arrangement.spacedBy(Spacing.Large),
-                overscrollEffect = rememberIOSOverScrollEffect(orientation = Orientation.Vertical),
+        GlassBackdropHost {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(if (LocalGlassEnabled.current) Color.Transparent else MaterialTheme.colorScheme.background),
             ) {
-                item(key = "settings_masthead") {
-                    SettingsMasthead(
-                        modifier =
-                            Modifier
-                                .padding(top = Spacing.Large),
-                    )
-                }
-                item {
-                    SettingsSectionCard(
-                        title = stringResource(R.string.settings_appearance),
-                        subtitle = stringResource(R.string.settings_appearance_subtitle),
-                    ) {
-                        ModernSettingsSelectItem(
-                            rowKey = "color_style",
-                            title = stringResource(R.string.settings_theme_color_style),
-                            subtitle = themeColorStyleName,
-                            icon = Icons.Default.Palette,
-                            options = themeColorStyleOptions,
-                            currentValue = themeColorStyleValue,
-                            expandedKey = expandedRowKey,
-                            onExpandChange = { expandedRowKey = it },
-                            onValueChange = viewModel::setThemeColorStyle,
-                        )
-                        SettingsItemDivider()
-                        ModernSettingsSelectItem(
-                            rowKey = "theme_mode",
-                            title = stringResource(R.string.settings_theme_mode_title),
-                            subtitle = themeModeName,
-                            icon = Icons.Default.Brightness6,
-                            options = themeModeOptions,
-                            currentValue = themeMode.value,
-                            expandedKey = expandedRowKey,
-                            onExpandChange = { expandedRowKey = it },
-                            onValueChange = viewModel::setThemeMode,
-                        )
-                        SettingsItemDivider()
-                        ModernSettingsSelectItem(
-                            rowKey = "finder_hero_source",
-                            title = stringResource(R.string.settings_finder_source_title),
-                            subtitle = finderHeroSourceName,
-                            icon = Icons.Default.AutoAwesome,
-                            options = finderHeroSourceOptions,
-                            currentValue = finderHeroSourceValue,
-                            expandedKey = expandedRowKey,
-                            onExpandChange = { expandedRowKey = it },
-                            onValueChange = viewModel::setFinderHeroSource,
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding =
+                        PaddingValues(
+                            start = LayoutTokens.MusicHeaderHorizontalPadding,
+                            end = LayoutTokens.MusicHeaderHorizontalPadding,
+                            top = statusBarTop + 56.dp,
+                            bottom = 96.dp,
+                        ),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.Large),
+                    overscrollEffect = rememberIOSOverScrollEffect(orientation = Orientation.Vertical),
+                ) {
+                    item(key = "settings_masthead") {
+                        SettingsMasthead(
+                            modifier =
+                                Modifier
+                                    .padding(top = Spacing.Large),
                         )
                     }
-                }
-
-                item {
-                    SettingsSectionCard(
-                        title = stringResource(R.string.settings_player_page),
-                        subtitle = stringResource(R.string.settings_player_page_subtitle),
-                    ) {
-                        ModernSettingsSwitchItem(
-                            title = stringResource(R.string.player_haptics_title),
-                            subtitle = stringResource(R.string.player_haptics_description),
-                            icon = Icons.Default.NotificationsActive,
-                            checked = playerHapticsEnabled,
-                            onCheckedChange = viewModel::setPlayerHapticsEnabled,
-                        )
-                        if (playerHapticsEnabled) {
-                            SettingsItemDivider()
+                    item {
+                        SettingsSectionCard(
+                            title = stringResource(R.string.settings_appearance),
+                            subtitle = stringResource(R.string.settings_appearance_subtitle),
+                        ) {
                             ModernSettingsSelectItem(
-                                rowKey = "player_haptic_strength",
-                                title = stringResource(R.string.player_haptics_strength),
-                                subtitle = stringResource(R.string.player_haptics_percent, playerHapticStrength(playerHapticsStrength)),
-                                icon = Icons.Default.NotificationsActive,
-                                options =
-                                    ImmutableList.copyOf(
-                                        listOf(
-                                            SelectOption("light", stringResource(R.string.player_haptics_light)),
-                                            SelectOption("medium", stringResource(R.string.player_haptics_medium)),
-                                            SelectOption("strong", stringResource(R.string.player_haptics_strong)),
-                                        ),
-                                    ),
-                                currentValue =
-                                    when (playerHapticStrength(playerHapticsStrength)) {
-                                        25 -> "light"
-                                        60 -> "medium"
-                                        100 -> "strong"
-                                        else -> playerHapticsStrength
-                                    },
+                                rowKey = "color_style",
+                                title = stringResource(R.string.settings_theme_color_style),
+                                subtitle = themeColorStyleName,
+                                icon = Icons.Default.Palette,
+                                options = themeColorStyleOptions,
+                                currentValue = themeColorStyleValue,
                                 expandedKey = expandedRowKey,
                                 onExpandChange = { expandedRowKey = it },
-                                onValueChange = viewModel::setPlayerHapticsStrength,
+                                onValueChange = viewModel::setThemeColorStyle,
                             )
-                            var sliderStrength by remember(playerHapticsStrength) {
-                                mutableStateOf(playerHapticStrength(playerHapticsStrength).toFloat())
-                            }
-                            Column(Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
-                                Text(stringResource(R.string.player_haptics_percent, sliderStrength.roundToInt()))
-                                Slider(
-                                    value = sliderStrength,
-                                    onValueChange = { sliderStrength = it },
-                                    onValueChangeFinished = { viewModel.setPlayerHapticsStrength(sliderStrength.roundToInt().toString()) },
-                                    valueRange = 0f..100f,
-                                    modifier = Modifier.semantics { contentDescription = hapticSliderDescription },
-                                )
-                                Text(stringResource(R.string.player_haptics_device_hint), style = MaterialTheme.typography.bodySmall)
-                            }
+                            SettingsItemDivider()
+                            ModernSettingsSelectItem(
+                                rowKey = "theme_mode",
+                                title = stringResource(R.string.settings_theme_mode_title),
+                                subtitle = themeModeName,
+                                icon = Icons.Default.Brightness6,
+                                options = themeModeOptions,
+                                currentValue = themeMode.value,
+                                expandedKey = expandedRowKey,
+                                onExpandChange = { expandedRowKey = it },
+                                onValueChange = viewModel::setThemeMode,
+                            )
+                            SettingsItemDivider()
+                            ModernSettingsSelectItem(
+                                rowKey = "finder_hero_source",
+                                title = stringResource(R.string.settings_finder_source_title),
+                                subtitle = finderHeroSourceName,
+                                icon = Icons.Default.AutoAwesome,
+                                options = finderHeroSourceOptions,
+                                currentValue = finderHeroSourceValue,
+                                expandedKey = expandedRowKey,
+                                onExpandChange = { expandedRowKey = it },
+                                onValueChange = viewModel::setFinderHeroSource,
+                            )
                         }
-                        SettingsItemDivider()
-                        ModernSettingsSelectItem(
-                            rowKey = "player_background",
-                            title = stringResource(R.string.settings_dynamic_spectrum),
-                            subtitle = spectrumName,
-                            icon = Icons.Default.LensBlur,
-                            options = spectrumOptions,
-                            currentValue = spectrumValue,
-                            expandedKey = expandedRowKey,
-                            onExpandChange = { expandedRowKey = it },
-                            onValueChange = viewModel::setDynamicSpectrumBackground,
-                        )
-                        SettingsItemDivider()
-                        ModernSettingsSelectItem(
-                            rowKey = "progress_bar_style",
-                            title = stringResource(R.string.settings_progress_bar_style),
-                            subtitle = progressBarStyleName,
-                            icon = Icons.Default.Percent,
-                            options = progressBarStyleOptions,
-                            currentValue = progressBarStyleValue,
-                            expandedKey = expandedRowKey,
-                            onExpandChange = { expandedRowKey = it },
-                            onValueChange = viewModel::setProgressBarStyle,
-                        )
                     }
-                }
 
-                item {
-                    SettingsSectionCard(
-                        title = stringResource(R.string.settings_playback),
-                        subtitle = stringResource(R.string.settings_playback_subtitle),
-                    ) {
-                        SettingsRow(
-                            title = stringResource(R.string.settings_sound_effects),
-                            subtitle = stringResource(R.string.settings_sound_effects_subtitle),
-                            icon = Icons.Default.GraphicEq,
-                            selected = false,
-                            onClick = { path.push(AudioEffectsScene()) },
-                            trailingContent = {
-                                Icon(
-                                    imageVector = Icons.Default.ChevronRight,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    item {
+                        SettingsSectionCard(
+                            title = stringResource(R.string.settings_player_page),
+                            subtitle = stringResource(R.string.settings_player_page_subtitle),
+                        ) {
+                            ModernSettingsSwitchItem(
+                                title = stringResource(R.string.player_haptics_title),
+                                subtitle = stringResource(R.string.player_haptics_description),
+                                icon = Icons.Default.NotificationsActive,
+                                checked = playerHapticsEnabled,
+                                onCheckedChange = viewModel::setPlayerHapticsEnabled,
+                            )
+                            if (playerHapticsEnabled) {
+                                SettingsItemDivider()
+                                ModernSettingsSelectItem(
+                                    rowKey = "player_haptic_strength",
+                                    title = stringResource(R.string.player_haptics_strength),
+                                    subtitle = stringResource(R.string.player_haptics_percent, playerHapticStrength(playerHapticsStrength)),
+                                    icon = Icons.Default.NotificationsActive,
+                                    options =
+                                        ImmutableList.copyOf(
+                                            listOf(
+                                                SelectOption("light", stringResource(R.string.player_haptics_light)),
+                                                SelectOption("medium", stringResource(R.string.player_haptics_medium)),
+                                                SelectOption("strong", stringResource(R.string.player_haptics_strong)),
+                                            ),
+                                        ),
+                                    currentValue =
+                                        when (playerHapticStrength(playerHapticsStrength)) {
+                                            25 -> "light"
+                                            60 -> "medium"
+                                            100 -> "strong"
+                                            else -> playerHapticsStrength
+                                        },
+                                    expandedKey = expandedRowKey,
+                                    onExpandChange = { expandedRowKey = it },
+                                    onValueChange = viewModel::setPlayerHapticsStrength,
                                 )
-                            },
-                        )
-                        SettingsItemDivider()
-                        ModernSettingsSwitchItem(
-                            title = stringResource(R.string.settings_keep_screen_on),
-                            subtitle = stringResource(R.string.settings_keep_screen_on_subtitle),
-                            icon = Icons.Default.Visibility,
-                            checked = keepScreenOn,
-                            onCheckedChange = viewModel::setKeepScreenOn,
-                        )
+                                var sliderStrength by remember(playerHapticsStrength) {
+                                    mutableStateOf(playerHapticStrength(playerHapticsStrength).toFloat())
+                                }
+                                Column(Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
+                                    Text(stringResource(R.string.player_haptics_percent, sliderStrength.roundToInt()))
+                                    Slider(
+                                        value = sliderStrength,
+                                        onValueChange = { sliderStrength = it },
+                                        onValueChangeFinished = {
+                                            viewModel.setPlayerHapticsStrength(
+                                                sliderStrength.roundToInt().toString(),
+                                            )
+                                        },
+                                        valueRange = 0f..100f,
+                                        modifier = Modifier.semantics { contentDescription = hapticSliderDescription },
+                                    )
+                                    Text(stringResource(R.string.player_haptics_device_hint), style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                            SettingsItemDivider()
+                            ModernSettingsSelectItem(
+                                rowKey = "player_background",
+                                title = stringResource(R.string.settings_dynamic_spectrum),
+                                subtitle = spectrumName,
+                                icon = Icons.Default.LensBlur,
+                                options = spectrumOptions,
+                                currentValue = spectrumValue,
+                                expandedKey = expandedRowKey,
+                                onExpandChange = { expandedRowKey = it },
+                                onValueChange = viewModel::setDynamicSpectrumBackground,
+                            )
+                            SettingsItemDivider()
+                            ModernSettingsSelectItem(
+                                rowKey = "progress_bar_style",
+                                title = stringResource(R.string.settings_progress_bar_style),
+                                subtitle = progressBarStyleName,
+                                icon = Icons.Default.Percent,
+                                options = progressBarStyleOptions,
+                                currentValue = progressBarStyleValue,
+                                expandedKey = expandedRowKey,
+                                onExpandChange = { expandedRowKey = it },
+                                onValueChange = viewModel::setProgressBarStyle,
+                            )
+                        }
                     }
-                }
 
-                item {
-                    SettingsSectionCard(
-                        title = stringResource(R.string.settings_other),
-                        subtitle = stringResource(R.string.settings_other_subtitle),
-                    ) {
-                        ModernSettingsSelectItem(
-                            rowKey = "language",
-                            title = stringResource(R.string.settings_language_title),
-                            subtitle = currentLanguageName,
-                            icon = Icons.Default.Language,
-                            options = languageOptions,
-                            currentValue = currentLanguage,
-                            expandedKey = expandedRowKey,
-                            onExpandChange = { expandedRowKey = it },
-                            onValueChange = { AppLocaleController.setLanguage(context, it) },
-                        )
-                        SettingsItemDivider()
-                        ModernSettingsSelectItem(
-                            rowKey = "notification_mode",
-                            title = stringResource(R.string.top_display_mode_title),
-                            subtitle = topDisplaySubtitle,
-                            icon = Icons.Default.NotificationsActive,
-                            options = topDisplayModeOptions,
-                            currentValue = topDisplayMode.value,
-                            expandedKey = expandedRowKey,
-                            onExpandChange = { expandedRowKey = it },
-                            onValueChange = viewModel::setTopDisplayMode,
-                        )
+                    item {
+                        SettingsSectionCard(
+                            title = stringResource(R.string.settings_playback),
+                            subtitle = stringResource(R.string.settings_playback_subtitle),
+                        ) {
+                            SettingsRow(
+                                title = stringResource(R.string.settings_sound_effects),
+                                subtitle = stringResource(R.string.settings_sound_effects_subtitle),
+                                icon = Icons.Default.GraphicEq,
+                                selected = false,
+                                onClick = { path.push(AudioEffectsScene()) },
+                                trailingContent = {
+                                    Icon(
+                                        imageVector = Icons.Default.ChevronRight,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                },
+                            )
+                            SettingsItemDivider()
+                            ModernSettingsSwitchItem(
+                                title = stringResource(R.string.settings_keep_screen_on),
+                                subtitle = stringResource(R.string.settings_keep_screen_on_subtitle),
+                                icon = Icons.Default.Visibility,
+                                checked = keepScreenOn,
+                                onCheckedChange = viewModel::setKeepScreenOn,
+                            )
+                        }
                     }
-                }
 
-                item {
-                    SettingsSectionCard(
-                        title = stringResource(R.string.settings_data),
-                        subtitle = stringResource(R.string.settings_data_subtitle),
-                    ) {
-                        SettingsRow(
-                            title = stringResource(R.string.backup_title),
-                            subtitle = stringResource(R.string.backup_short),
-                            icon = Icons.Default.Backup,
-                            selected = false,
-                            onClick = { path.push(BackupScene()) },
-                            trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null) },
-                        )
-                        SettingsItemDivider()
-                        SettingsRow(
-                            title = stringResource(R.string.offline_title),
-                            subtitle = stringResource(R.string.offline_short),
-                            icon = Icons.Default.Download,
-                            selected = false,
-                            onClick = { path.push(OfflineScene()) },
-                            trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null) },
-                        )
+                    item {
+                        SettingsSectionCard(
+                            title = stringResource(R.string.settings_other),
+                            subtitle = stringResource(R.string.settings_other_subtitle),
+                        ) {
+                            ModernSettingsSelectItem(
+                                rowKey = "language",
+                                title = stringResource(R.string.settings_language_title),
+                                subtitle = currentLanguageName,
+                                icon = Icons.Default.Language,
+                                options = languageOptions,
+                                currentValue = currentLanguage,
+                                expandedKey = expandedRowKey,
+                                onExpandChange = { expandedRowKey = it },
+                                onValueChange = { AppLocaleController.setLanguage(context, it) },
+                            )
+                            SettingsItemDivider()
+                            ModernSettingsSelectItem(
+                                rowKey = "notification_mode",
+                                title = stringResource(R.string.top_display_mode_title),
+                                subtitle = topDisplaySubtitle,
+                                icon = Icons.Default.NotificationsActive,
+                                options = topDisplayModeOptions,
+                                currentValue = topDisplayMode.value,
+                                expandedKey = expandedRowKey,
+                                onExpandChange = { expandedRowKey = it },
+                                onValueChange = viewModel::setTopDisplayMode,
+                            )
+                        }
                     }
-                }
-                item {
-                    SettingsSectionCard(
-                        title = stringResource(R.string.settings_about),
-                        subtitle = stringResource(R.string.settings_about_subtitle),
-                    ) {
-                        SettingsRow(
+
+                    item {
+                        SettingsSectionCard(
+                            title = stringResource(R.string.settings_data),
+                            subtitle = stringResource(R.string.settings_data_subtitle),
+                        ) {
+                            SettingsRow(
+                                title = stringResource(R.string.backup_title),
+                                subtitle = stringResource(R.string.backup_short),
+                                icon = Icons.Default.Backup,
+                                selected = false,
+                                onClick = { path.push(BackupScene()) },
+                                trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null) },
+                            )
+                            SettingsItemDivider()
+                            SettingsRow(
+                                title = stringResource(R.string.offline_title),
+                                subtitle = stringResource(R.string.offline_short),
+                                icon = Icons.Default.Download,
+                                selected = false,
+                                onClick = { path.push(OfflineScene()) },
+                                trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null) },
+                            )
+                        }
+                    }
+                    item {
+                        SettingsSectionCard(
                             title = stringResource(R.string.settings_about),
                             subtitle = stringResource(R.string.settings_about_subtitle),
-                            icon = Icons.Default.Info,
-                            selected = false,
-                            onClick = { path.push(AboutScene()) },
-                            trailingContent = {
-                                Icon(
-                                    imageVector = Icons.Default.ChevronRight,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            },
-                        )
+                        ) {
+                            SettingsRow(
+                                title = stringResource(R.string.settings_about),
+                                subtitle = stringResource(R.string.settings_about_subtitle),
+                                icon = Icons.Default.Info,
+                                selected = false,
+                                onClick = { path.push(AboutScene()) },
+                                trailingContent = {
+                                    Icon(
+                                        imageVector = Icons.Default.ChevronRight,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                },
+                            )
+                        }
                     }
                 }
-            }
 
-            SettingsTopBar(
-                title = stringResource(R.string.finder_settings_title),
-                listState = listState,
-                solid = mastheadGone,
-                onBack = { path.popTop() },
-                modifier = Modifier.align(Alignment.TopStart),
-            )
+                SettingsTopBar(
+                    title = stringResource(R.string.finder_settings_title),
+                    listState = listState,
+                    solid = mastheadGone,
+                    onBack = { path.popTop() },
+                    modifier = Modifier.align(Alignment.TopStart),
+                )
+            }
         }
     }
 }
@@ -861,7 +873,7 @@ private fun SettingsSectionCard(
             modifier
                 .fillMaxWidth()
                 .clip(Shapes.ExtraLargeCornerBasedShape)
-                .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f))
+                .glassSurface(Shapes.ExtraLargeCornerBasedShape, MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f))
                 .padding(vertical = Spacing.Large),
     ) {
         Column(
@@ -1166,6 +1178,7 @@ private fun optionIcon(
             when (ThemeColorStyle.fromString(value)) {
                 ThemeColorStyle.Textured -> Icons.Default.AutoAwesome
                 ThemeColorStyle.Flat -> Icons.Default.Layers
+                ThemeColorStyle.Glass -> Icons.Default.AutoAwesome
             }
         "theme_mode" ->
             when (ThemeMode.fromString(value)) {

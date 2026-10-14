@@ -10,7 +10,7 @@ class TelegramRepository(
     val authorizationState: Flow<TdApi.AuthorizationState?> = client.authorizationState
     val errors = client.errors
 
-    fun isAvailable(): Boolean = client.isAvailable()
+    val runtimeState = client.runtimeState
 
     fun configure(config: TelegramConfig) = client.configure(config)
 

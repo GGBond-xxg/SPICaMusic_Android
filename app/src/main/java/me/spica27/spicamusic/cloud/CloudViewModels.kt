@@ -298,7 +298,9 @@ class TelegramViewModel(
         _state.update { it.copy(error = null) }
     }
 
-    fun tdlibAvailable(): Boolean = repository.isAvailable()
+    val runtimeState = repository.runtimeState
+
+    fun initialize() = repository.initializeAsync()
 
     private fun runAction(action: suspend () -> Unit) {
         if (_state.value.isWorking) return

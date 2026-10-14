@@ -254,8 +254,8 @@ val ossLibraries: List<OssLibrary> =
             "https://github.com/chrisbanes/haze",
         ),
         OssLibrary(
-            "AndroidLiquidGlass",
-            "com.github.Kyant0:AndroidLiquidGlass",
+            "Backdrop (AndroidLiquidGlass)",
+            "io.github.kyant0:backdrop",
             "Apache-2.0",
             "https://github.com/Kyant0/AndroidLiquidGlass",
         ),

@@ -20,6 +20,8 @@ sealed class ThemeColorStyle(
         "扁平化",
     )
 
+    object Glass : ThemeColorStyle("glass", "Glass")
+
     override fun toString(): String = name
 
     companion object {
@@ -27,10 +29,11 @@ sealed class ThemeColorStyle(
             when (value) {
                 Textured.value -> Textured
                 Flat.value -> Flat
+                Glass.value -> Glass
                 else -> Textured
             }
 
         val presets: List<ThemeColorStyle>
-            get() = listOf(Textured, Flat)
+            get() = listOf(Textured, Flat, Glass)
     }
 }
