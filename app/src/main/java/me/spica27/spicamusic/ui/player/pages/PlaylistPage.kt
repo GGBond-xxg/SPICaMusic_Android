@@ -10,19 +10,18 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,6 +35,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.ClearAll
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.LocationSearching
 import androidx.compose.material3.ButtonDefaults
@@ -81,6 +81,8 @@ import me.spica27.spicamusic.ui.player.PlayerViewModel
 import me.spica27.spicamusic.ui.player.formatTime
 import me.spica27.spicamusic.ui.player.playerClick
 import me.spica27.spicamusic.ui.playlistdetail.RenameDialog
+import me.spica27.spicamusic.ui.theme.EqualHeightActionRow
+import me.spica27.spicamusic.ui.theme.LocalGlassEnabled
 import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.ShowOnIdleContent
 import me.spica27.spicamusic.ui.widget.combinedClickHighlight
@@ -88,6 +90,7 @@ import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.floor
 import me.spica27.spicamusic.ui.theme.GlassAlertDialog as AlertDialog
 import me.spica27.spicamusic.ui.theme.GlassButton as Button
+import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
 import me.spica27.spicamusic.ui.theme.GlassTextButton as TextButton
 
 /**
@@ -99,6 +102,7 @@ fun CurrentPlaylistPage(
     modifier: Modifier = Modifier,
     viewModel: PlayerViewModel = LocalPlayerViewModel.current,
 ) {
+    val glass = LocalGlassEnabled.current
     val panelViewModel: CurrentPlaylistPanelViewModel = koinViewModel()
     val currentPlaylist by viewModel.currentPlaylist.collectAsStateWithLifecycle()
     val currentMediaItem by viewModel.currentMediaItem.collectAsStateWithLifecycle()
@@ -146,148 +150,62 @@ fun CurrentPlaylistPage(
     Column(
         modifier = modifier,
     ) {
-        // 顶部标题和操作
-        Row(
+        // Let the count and controls wrap as a group at large font sizes.
+        FlowRow(
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .glassSurface(androidx.compose.ui.graphics.RectangleShape, MaterialTheme.colorScheme.surfaceContainer)
                     .animateContentSize()
                     .padding(vertical = 12.dp, horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            AnimatedContent(
-                isMultiSelectMode,
-                modifier = Modifier,
-            ) { isMultiSelectMode ->
-                Text(
-                    text =
-                        if (isMultiSelectMode) {
-                            stringResource(
-                                R.string.multi_select_count_format,
-                                selectedCount,
-                            )
-                        } else {
-                            "${currentPlayingIndex + 1} / ${currentPlaylist.size}"
-                        },
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier =
-                        Modifier
-                            .background(
-                                MaterialTheme.colorScheme.surfaceContainerHighest,
-                                RoundedCornerShape(50),
-                            ).padding(
-                                horizontal = 12.dp,
-                                vertical = 6.dp,
-                            ),
-                )
-            }
-            AnimatedContent(isMultiSelectMode) { selectMode ->
-                if (selectMode) {
-                    TextButton(
-                        onClick = {
-                            PlayerHaptics.click()
+            Text(
+                text =
+                    if (isMultiSelectMode) {
+                        stringResource(R.string.multi_select_count_format, selectedCount)
+                    } else {
+                        "${currentPlayingIndex + 1} / ${currentPlaylist.size}"
+                    },
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier =
+                    Modifier
+                        .align(Alignment.CenterVertically)
+                        .glassSurface(RoundedCornerShape(50), MaterialTheme.colorScheme.surfaceContainerHighest)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+            )
+            if (isMultiSelectMode) {
+                TextButton(
+                    onClick =
+                        playerClick {
                             isMultiSelectMode = false
                             selectedMediaIds.clear()
                         },
+                ) { Text(stringResource(R.string.cancel)) }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    IconButton(
+                        onClick =
+                            playerClick {
+                                if (currentPlayingIndex >= 0) {
+                                    coroutineScope.launch {
+                                        scrollState.animateScrollToItem(
+                                            index = currentPlayingIndex,
+                                            scrollOffset = -scrollState.layoutInfo.viewportSize.height / 2,
+                                        )
+                                    }
+                                }
+                            },
                     ) {
-                        Text(stringResource(R.string.cancel))
+                        Icon(Icons.Default.LocationSearching, stringResource(R.string.jump_to_playing))
                     }
-                } else {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier =
-                                Modifier
-                                    .background(
-                                        MaterialTheme.colorScheme.surfaceContainerHighest,
-                                        RoundedCornerShape(
-                                            topStartPercent = 50,
-                                            bottomStartPercent = 50,
-                                            topEndPercent = 15,
-                                            bottomEndPercent = 15,
-                                        ),
-                                    ).clip(
-                                        RoundedCornerShape(
-                                            topStartPercent = 50,
-                                            bottomStartPercent = 50,
-                                            topEndPercent = 15,
-                                            bottomEndPercent = 15,
-                                        ),
-                                    ).clickable {
-                                        PlayerHaptics.click()
-                                        if (currentPlayingIndex >= 0) {
-                                            coroutineScope.launch {
-                                                scrollState.animateScrollToItem(
-                                                    index = currentPlayingIndex,
-                                                    scrollOffset = -scrollState.layoutInfo.viewportSize.height / 2,
-                                                )
-                                            }
-                                        }
-                                    }.padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.LocationSearching,
-                                contentDescription = stringResource(R.string.jump_to_playing),
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(24.dp),
-                            )
-                        }
-                        Box(
-                            modifier =
-                                Modifier
-                                    .background(
-                                        MaterialTheme.colorScheme.surfaceContainerHighest,
-                                        RoundedCornerShape(15),
-                                    ).clickable {
-                                        PlayerHaptics.click()
-                                        isMultiSelectMode = true
-                                    }.padding(horizontal = 8.dp, vertical = 8.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Checklist,
-                                contentDescription = stringResource(R.string.clear_playlist),
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(24.dp),
-                            )
-                        }
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier =
-                                Modifier
-                                    .background(
-                                        MaterialTheme.colorScheme.surfaceContainerHighest,
-                                        RoundedCornerShape(
-                                            topStartPercent = 15,
-                                            bottomStartPercent = 15,
-                                            topEndPercent = 50,
-                                            bottomEndPercent = 50,
-                                        ),
-                                    ).clip(
-                                        RoundedCornerShape(
-                                            topStartPercent = 15,
-                                            bottomStartPercent = 15,
-                                            topEndPercent = 50,
-                                            bottomEndPercent = 50,
-                                        ),
-                                    ).clickable {
-                                        PlayerHaptics.click()
-                                        showClearConfirmDialog = true
-                                    }.padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ClearAll,
-                                contentDescription = stringResource(R.string.clear_playlist),
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(24.dp),
-                            )
-                        }
+                    IconButton(onClick = playerClick { isMultiSelectMode = true }) {
+                        Icon(Icons.Default.Checklist, stringResource(R.string.multi_select))
+                    }
+                    IconButton(onClick = playerClick { showClearConfirmDialog = true }) {
+                        Icon(Icons.Default.ClearAll, stringResource(R.string.clear_playlist))
                     }
                 }
             }
@@ -342,7 +260,7 @@ fun CurrentPlaylistPage(
                         .weight(1f)
                         .clipToBounds()
                         .drawBehind {
-                            if (currentPlayingIndex < 0) return@drawBehind
+                            if (glass || currentPlayingIndex < 0) return@drawBehind
                             val layoutInfo = scrollState.layoutInfo
                             val visible = layoutInfo.visibleItemsInfo
                             if (visible.isEmpty()) return@drawBehind
@@ -440,7 +358,7 @@ fun CurrentPlaylistPage(
         }
 
         AnimatedVisibility(visible = isMultiSelectMode) {
-            Row(
+            EqualHeightActionRow(
                 modifier =
                     Modifier
                         .fillMaxWidth()
@@ -453,7 +371,8 @@ fun CurrentPlaylistPage(
                         showDeleteConfirmDialog = true
                     },
                     enabled = selectedCount > 0,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                     shape = RoundedCornerShape(15),
                 ) {
                     Icon(
@@ -473,7 +392,8 @@ fun CurrentPlaylistPage(
                         showCreateDialog = true
                     },
                     enabled = selectedCount > 0,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                     shape = RoundedCornerShape(15),
                 ) {
                     Icon(
@@ -610,17 +530,27 @@ private fun PlaylistItemRow(
         modifier =
             modifier
                 .fillMaxWidth()
-                .combinedClickHighlight(
+                .padding(horizontal = 16.dp)
+                .then(
+                    if (LocalGlassEnabled.current && (isPlaying || isSelected)) {
+                        Modifier.glassSurface(
+                            RoundedCornerShape(12.dp),
+                            MaterialTheme.colorScheme.secondaryContainer,
+                            tint = MaterialTheme.colorScheme.secondaryContainer,
+                        )
+                    } else {
+                        Modifier
+                    },
+                ).combinedClickHighlight(
                     onClick = playerClick(onClick),
                     onLongClick = onLongClick,
-                ).height(80.dp)
-                .padding(vertical = 8.dp, horizontal = 16.dp),
+                ).heightIn(min = 80.dp)
+                .padding(vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
         Row(
             modifier =
                 Modifier
-                    .fillMaxHeight()
                     .fillMaxWidth()
                     .padding(end = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -639,8 +569,7 @@ private fun PlaylistItemRow(
                 },
                 modifier =
                     Modifier
-                        .fillMaxHeight()
-                        .aspectRatio(1f)
+                        .size(64.dp)
                         .clip(
                             MaterialTheme.shapes.medium,
                         ).glassSurface(
@@ -674,6 +603,7 @@ private fun PlaylistItemRow(
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.W600,
                     maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth(),
                     color = MaterialTheme.colorScheme.onSurface,
                 )
@@ -682,6 +612,7 @@ private fun PlaylistItemRow(
                     modifier = Modifier.fillMaxWidth(),
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
             }
@@ -700,11 +631,11 @@ private fun PlaylistItemRow(
                             ).value,
                     )
                 } else if (isPlaying) {
-                    Text(
-                        stringResource(R.string.now_playing_indicator),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.W600,
-                        color = MaterialTheme.colorScheme.primary,
+                    Icon(
+                        Icons.Default.GraphicEq,
+                        contentDescription = stringResource(R.string.now_playing_indicator),
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp),
                     )
                 } else {
                     Text(

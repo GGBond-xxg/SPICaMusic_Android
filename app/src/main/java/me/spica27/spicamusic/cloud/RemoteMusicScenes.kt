@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package me.spica27.spicamusic.cloud
 
 import android.annotation.SuppressLint
@@ -16,8 +18,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -88,6 +92,7 @@ import me.spica27.spicamusic.ui.dialog.CloudSongMenuScene
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.playlist.PlaylistViewModel
 import me.spica27.spicamusic.ui.playlistdetail.PlaylistCloudSongRow
+import me.spica27.spicamusic.ui.theme.EqualHeightActionRow
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.appPageBackground
 import me.spica27.spicamusic.ui.theme.glassSurface
@@ -308,12 +313,15 @@ class RemoteMusicScene(
                                 }
                             }
                             if (state.accounts.size > 1) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FlowRow(
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
                                     state.accounts.take(3).forEach { account ->
                                         if (account.id == state.selectedAccount?.id) {
                                             FilledTonalButton(
                                                 onClick = { viewModel.selectAccount(account.id) },
-                                                modifier = Modifier.widthIn(max = 240.dp),
+                                                modifier = Modifier.widthIn(max = 240.dp).fillMaxRowHeight(),
                                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                                             ) {
                                                 Text(account.displayName)
@@ -321,7 +329,7 @@ class RemoteMusicScene(
                                         } else {
                                             OutlinedButton(
                                                 onClick = { viewModel.selectAccount(account.id) },
-                                                modifier = Modifier.widthIn(max = 240.dp),
+                                                modifier = Modifier.widthIn(max = 240.dp).fillMaxRowHeight(),
                                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                                             ) {
                                                 Text(account.displayName)
@@ -1416,7 +1424,7 @@ private fun SubsonicLogin(
             )
         }
         item {
-            Row(
+            EqualHeightActionRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -1424,14 +1432,14 @@ private fun SubsonicLogin(
                     OutlinedButton(
                         onClick = onCancel,
                         enabled = !state.isConnecting,
-                        modifier = Modifier.weight(1f).heightIn(min = 52.dp),
+                        modifier = Modifier.weight(1f).fillMaxHeight().heightIn(min = 52.dp),
                     ) {
                         Text(stringResource(R.string.cloud_action_cancel))
                     }
                 }
                 Button(
                     onClick = { onLogin(serverUrl, username, password) },
-                    modifier = Modifier.weight(1f).heightIn(min = 52.dp),
+                    modifier = Modifier.weight(1f).fillMaxHeight().heightIn(min = 52.dp),
                     enabled =
                         !state.isConnecting &&
                             serverUrl.isNotBlank() &&
@@ -1509,7 +1517,7 @@ private fun CookieWebLogin(
             },
             onRelease = WebView::releaseAfterLayout,
         )
-        Row(
+        EqualHeightActionRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
         ) {
@@ -1517,14 +1525,14 @@ private fun CookieWebLogin(
                 OutlinedButton(
                     onClick = onCancel,
                     enabled = !state.isConnecting,
-                    modifier = Modifier.weight(1f).heightIn(min = 52.dp),
+                    modifier = Modifier.weight(1f).fillMaxHeight().heightIn(min = 52.dp),
                 ) {
                     Text(stringResource(R.string.cloud_action_cancel))
                 }
             }
             Button(
                 enabled = !state.isConnecting,
-                modifier = Modifier.weight(1f).heightIn(min = 52.dp),
+                modifier = Modifier.weight(1f).fillMaxHeight().heightIn(min = 52.dp),
                 onClick = {
                     CookieManager.getInstance().flush()
                     val cookies = collectCookies(provider.cookieUrls)

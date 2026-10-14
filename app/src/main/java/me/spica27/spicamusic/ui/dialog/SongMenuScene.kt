@@ -76,6 +76,7 @@ import me.spica27.spicamusic.ui.albumdetail.AlbumDetailScene
 import me.spica27.spicamusic.ui.artistdetail.ArtistDetailScene
 import me.spica27.spicamusic.ui.playlist.PlaylistCreatorScene
 import me.spica27.spicamusic.ui.playlist.PlaylistViewModel
+import me.spica27.spicamusic.ui.theme.AdaptiveActionGrid
 import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.CoverFallback
 import org.koin.compose.viewmodel.koinActivityViewModel
@@ -499,76 +500,72 @@ private fun SongMenuContent(
                         maxLines = 1,
                     )
                 }
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                ) {
-                    IconButton(onClick = onClose) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = stringResource(R.string.close),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                IconButton(onClick = onClose, shape = RoundedCornerShape(14.dp)) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = stringResource(R.string.close),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                ControlButton(
-                    title = stringResource(R.string.play_next),
-                    icon = Icons.Default.PlayArrow,
-                    modifier = Modifier.weight(1f),
-                    onClick = onPlayNext,
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    iconTint = MaterialTheme.colorScheme.primary,
-                )
-                ControlButton(
-                    title = stringResource(R.string.add),
-                    icon = Icons.Default.PlaylistPlay,
-                    modifier = Modifier.weight(1f),
-                    onClick = onAddToQueue,
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    iconTint = MaterialTheme.colorScheme.secondary,
-                )
-                ControlButton(
-                    title =
-                        if (onToggleLike == null) {
-                            stringResource(R.string.song_info_dialog_title)
-                        } else if (isLiked == true) {
-                            stringResource(R.string.remove_from_favorites)
-                        } else {
-                            stringResource(R.string.favorite)
-                        },
-                    icon =
-                        if (onToggleLike == null) {
-                            Icons.Default.Info
-                        } else if (isLiked == true) {
-                            Icons.Default.Favorite
-                        } else {
-                            Icons.Default.FavoriteBorder
-                        },
-                    modifier = Modifier.weight(1f),
-                    onClick = onToggleLike ?: onOpenSongInfo,
-                    containerColor =
-                        if (isLiked == true) {
-                            MaterialTheme.colorScheme.tertiaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.surfaceContainerHigh
-                        },
-                    iconTint =
-                        if (isLiked == true) {
-                            MaterialTheme.colorScheme.tertiary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                )
-            }
+            AdaptiveActionGrid(
+                listOf(
+                    { actionModifier ->
+                        ControlButton(
+                            title = stringResource(R.string.play_next),
+                            icon = Icons.Default.PlayArrow,
+                            modifier = actionModifier,
+                            onClick = onPlayNext,
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            iconTint = MaterialTheme.colorScheme.primary,
+                        )
+                    },
+                    { actionModifier ->
+                        ControlButton(
+                            title = stringResource(R.string.add),
+                            icon = Icons.Default.PlaylistPlay,
+                            modifier = actionModifier,
+                            onClick = onAddToQueue,
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            iconTint = MaterialTheme.colorScheme.secondary,
+                        )
+                    },
+                    { actionModifier ->
+                        ControlButton(
+                            title =
+                                if (onToggleLike == null) {
+                                    stringResource(R.string.song_info_dialog_title)
+                                } else if (isLiked == true) {
+                                    stringResource(R.string.remove_from_favorites)
+                                } else {
+                                    stringResource(R.string.favorite)
+                                },
+                            icon =
+                                if (onToggleLike == null) {
+                                    Icons.Default.Info
+                                } else if (isLiked == true) {
+                                    Icons.Default.Favorite
+                                } else {
+                                    Icons.Default.FavoriteBorder
+                                },
+                            modifier = actionModifier,
+                            onClick = onToggleLike ?: onOpenSongInfo,
+                            containerColor =
+                                if (isLiked == true) {
+                                    MaterialTheme.colorScheme.tertiaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceContainerHigh
+                                },
+                            iconTint =
+                                if (isLiked == true) {
+                                    MaterialTheme.colorScheme.tertiary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                        )
+                    },
+                ),
+            )
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
@@ -624,7 +621,7 @@ private fun SongMenuContent(
 }
 
 @Composable
-private fun ControlButton(
+internal fun ControlButton(
     modifier: Modifier = Modifier,
     title: String,
     icon: ImageVector,

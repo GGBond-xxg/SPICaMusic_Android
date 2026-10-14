@@ -65,7 +65,6 @@ import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlin.math.ceil
 import me.spica27.spicamusic.ui.theme.GlassButton as Button
-import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
 import me.spica27.spicamusic.ui.theme.GlassModalBottomSheet as ModalBottomSheet
 
 private val SleepTimerPresets = listOf(15, 30, 45, 60, 90)
@@ -168,9 +167,6 @@ fun SleepTimerSheet(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                    }
-                    IconButton(onClick = playerClick(onDismiss)) {
-                        Icon(Icons.Rounded.Close, stringResource(R.string.close))
                     }
                 }
 

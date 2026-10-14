@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -23,6 +24,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.spica27.spicamusic.R
+import me.spica27.spicamusic.ui.theme.EqualHeightActionRow
 import org.koin.compose.koinInject
 import me.spica27.spicamusic.ui.theme.GlassAlertDialog as AlertDialog
 import me.spica27.spicamusic.ui.theme.GlassCard as Card
@@ -47,7 +49,7 @@ internal fun KugouRewardsCard(
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(R.string.kugou_rewards_title), style = MaterialTheme.typography.titleMedium)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
+                Column(Modifier.weight(1f).fillMaxHeight()) {
                     Text(stringResource(R.string.kugou_auto_checkin))
                     Text(
                         stringResource(R.string.kugou_checkin_timezone),
@@ -72,11 +74,11 @@ internal fun KugouRewardsCard(
             if (state.signedToday && state.message != stringResource(R.string.kugou_checkin_success)) {
                 Text(message, style = MaterialTheme.typography.bodySmall)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            EqualHeightActionRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
                     onClick = { rewards.retry(account.userId) },
                     enabled = !state.busy && !state.signedToday,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
                 ) {
                     Text(
                         if (state.signedToday) {
@@ -91,7 +93,7 @@ internal fun KugouRewardsCard(
                 OutlinedButton(
                     onClick = { rewards.claimListening(account.userId) },
                     enabled = !state.busy && !state.listenedToday && state.canClaimListening,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
                 ) {
                     Text(
                         if (state.listenedToday) {

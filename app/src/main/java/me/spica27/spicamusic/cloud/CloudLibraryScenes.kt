@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package me.spica27.spicamusic.cloud
 
 import android.net.Uri
@@ -6,9 +8,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -70,6 +74,7 @@ import androidx.paging.compose.itemKey
 import me.spica27.navkit.path.LocalNavigationPath
 import me.spica27.navkit.scene.StackScene
 import me.spica27.spicamusic.R
+import me.spica27.spicamusic.ui.theme.EqualHeightActionRow
 import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.AudioCover
 import org.drinkless.tdlib.TdApi
@@ -309,8 +314,9 @@ class MediaServerScene(
                                 }
                             }
                             if (state.accounts.size > 1) {
-                                Row(
+                                FlowRow(
                                     modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
                                     state.accounts.take(3).forEach { account ->
@@ -318,13 +324,13 @@ class MediaServerScene(
                                         if (selected) {
                                             FilledTonalButton(
                                                 onClick = { viewModel.selectAccount(account.id) },
-                                                modifier = Modifier.widthIn(max = 240.dp),
+                                                modifier = Modifier.widthIn(max = 240.dp).fillMaxRowHeight(),
                                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                                             ) { Text(account.displayName) }
                                         } else {
                                             OutlinedButton(
                                                 onClick = { viewModel.selectAccount(account.id) },
-                                                modifier = Modifier.widthIn(max = 240.dp),
+                                                modifier = Modifier.widthIn(max = 240.dp).fillMaxRowHeight(),
                                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                                             ) { Text(account.displayName) }
                                         }
@@ -839,7 +845,7 @@ private fun MediaServerLogin(
             )
         }
         item {
-            Row(
+            EqualHeightActionRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -847,14 +853,14 @@ private fun MediaServerLogin(
                     OutlinedButton(
                         onClick = onCancel,
                         enabled = !isConnecting,
-                        modifier = Modifier.weight(1f).heightIn(min = 52.dp),
+                        modifier = Modifier.weight(1f).fillMaxHeight().heightIn(min = 52.dp),
                     ) {
                         Text(stringResource(R.string.cancel))
                     }
                 }
                 Button(
                     onClick = { onLogin(serverUrl, username, password) },
-                    modifier = Modifier.weight(1f).heightIn(min = 52.dp),
+                    modifier = Modifier.weight(1f).fillMaxHeight().heightIn(min = 52.dp),
                     enabled =
                         !isConnecting &&
                             serverUrl.isNotBlank() &&

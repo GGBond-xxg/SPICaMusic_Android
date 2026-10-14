@@ -231,22 +231,24 @@ fun GlassModalBottomSheet(
         dragHandle = if (glass) null else dragHandle,
     ) {
         if (glass) {
-            // Draw inside the sheet's translated surface so its lens and clip move with it.
-            Column(
-                // A separate dialog window may not replay the underlying page's graphics layer.
-                // Keep an opaque base so missing/transparent samples cannot expose page text.
-                Modifier.fillMaxWidth().background(containerColor, BottomSheetDefaults.ExpandedShape).glassSurface(
-                    BottomSheetDefaults.ExpandedShape,
-                    containerColor,
-                    tint = containerColor,
-                    opacity = 0.78f,
-                    frosted = true,
-                ),
-            ) {
-                if (dragHandle != null) {
-                    Box(Modifier.align(Alignment.CenterHorizontally)) { dragHandle() }
+            GlassWindowBackdrop {
+                // Draw inside the sheet's translated surface so its lens and clip move with it.
+                Column(
+                    // A separate dialog window may not replay the underlying page's graphics layer.
+                    // Keep an opaque base so missing/transparent samples cannot expose page text.
+                    Modifier.fillMaxWidth().background(containerColor, BottomSheetDefaults.ExpandedShape).glassSurface(
+                        BottomSheetDefaults.ExpandedShape,
+                        containerColor,
+                        tint = containerColor,
+                        opacity = 0.78f,
+                        frosted = true,
+                    ),
+                ) {
+                    if (dragHandle != null) {
+                        Box(Modifier.align(Alignment.CenterHorizontally)) { dragHandle() }
+                    }
+                    content()
                 }
-                content()
             }
         } else {
             content()
@@ -337,6 +339,23 @@ fun GlassButton(
                 LocalTextStyle.current.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center),
             ) { content() }
         },
+    )
+}
+
+@Composable
+fun GlassElevatedButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
+    content: @Composable RowScope.() -> Unit,
+) {
+    GlassButton(
+        onClick = onClick,
+        modifier = modifier,
+        colors = ButtonDefaults.elevatedButtonColors(),
+        elevation = ButtonDefaults.elevatedButtonElevation(),
+        contentPadding = contentPadding,
+        content = content,
     )
 }
 

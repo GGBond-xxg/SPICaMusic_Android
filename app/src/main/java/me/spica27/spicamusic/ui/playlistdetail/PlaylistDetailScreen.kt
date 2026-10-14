@@ -153,6 +153,7 @@ import me.spica27.spicamusic.ui.dialog.CloudSongMenuScene
 import me.spica27.spicamusic.ui.dialog.SongMenuScene
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.theme.AppBackArrow
+import me.spica27.spicamusic.ui.theme.EqualHeightActionRow
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
 import me.spica27.spicamusic.ui.theme.ListItemFadeOutSpec
@@ -1223,7 +1224,7 @@ private fun PlaylistDropdownMenuItem(
 // ── 操作行：播放 / 添加（排序中就地换成提示胶囊）────────────────────────────────
 
 @Composable
-private fun ActionRow(
+internal fun ActionRow(
     isSortMode: Boolean,
     playEnabled: Boolean,
     onPlayAll: () -> Unit,
@@ -1244,7 +1245,7 @@ private fun ActionRow(
                         .padding(horizontal = Spacing.Large, vertical = Spacing.Medium),
             )
         } else {
-            Row(
+            EqualHeightActionRow(
                 modifier =
                     Modifier
                         .fillMaxWidth()
@@ -1255,7 +1256,8 @@ private fun ActionRow(
                 Button(
                     onClick = onPlayAll,
                     enabled = playEnabled,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 ) {
                     Icon(
                         Icons.Default.PlayArrow,
@@ -1267,7 +1269,8 @@ private fun ActionRow(
                 }
                 FilledTonalButton(
                     onClick = onAddSongs,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.PlaylistAdd,
@@ -2379,14 +2382,14 @@ private fun SongPickerBottomSheet(
                     shadowElevation = 8.dp,
                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
                 ) {
-                    Row(
+                    EqualHeightActionRow(
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         TextButton(
                             onClick = onDismiss,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                         ) {
                             Text(stringResource(R.string.cancel))
                         }
@@ -2403,7 +2406,7 @@ private fun SongPickerBottomSheet(
                                 }
                             },
                             enabled = totalSelected > 0,
-                            modifier = Modifier.weight(1.5f),
+                            modifier = Modifier.weight(1.5f).fillMaxHeight(),
                         ) {
                             Text(
                                 if (totalSelected == 0) {

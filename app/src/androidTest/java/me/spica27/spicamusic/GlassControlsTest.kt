@@ -31,11 +31,15 @@ class GlassControlsTest {
     @get:Rule val compose = createComposeRule()
 
     @Test fun glassSheetDoesNotExposePageWhenBackdropSampleIsTransparent() {
+        var pageColor by mutableStateOf(Color.Red)
+        var paintSource by mutableStateOf(false)
         compose.setContent {
             SPICaMusicTheme(themeColor = Color.Blue, themeColorStyle = ThemeColorStyle.Glass, animateColors = false) {
                 val emptyBackdrop = rememberLayerBackdrop()
-                Box(Modifier.fillMaxSize().background(Color.Red)) {
-                    Canvas(Modifier.fillMaxSize().layerBackdrop(emptyBackdrop)) {}
+                Box(Modifier.fillMaxSize().background(pageColor)) {
+                    Canvas(Modifier.fillMaxSize().layerBackdrop(emptyBackdrop)) {
+                        if (paintSource) drawRect(pageColor)
+                    }
                     CompositionLocalProvider(LocalGlassBackdrop provides emptyBackdrop) {
                         GlassModalBottomSheet(
                             onDismissRequest = {},
@@ -52,7 +56,21 @@ class GlassControlsTest {
         compose.onNodeWithTag("sheetBody").assertIsDisplayed()
         val pixels = compose.onNodeWithTag("sheetBody").captureToImage().toPixelMap()
         val center = pixels[pixels.width / 2, pixels.height / 2]
-        assertTrue("The underlying red page must not bleed into the sheet: $center", center.red < 0.08f && center.blue > 0.9f)
+        assertTrue("The sheet must retain its blue tint: $center", center.blue > center.red + 0.5f)
+        compose.runOnIdle {
+            pageColor = Color.Green
+            paintSource = true
+        }
+        val changed = compose.onNodeWithTag("sheetBody").captureToImage().toPixelMap()
+        for (fraction in listOf(.1f, .5f, .9f)) {
+            val x = (pixels.width * fraction).toInt()
+            val y = pixels.height / 2
+            val before = pixels[x, y]
+            val after = changed[x, y]
+            assertEquals("Activity backdrop must not leak across windows", before.red, after.red, .01f)
+            assertEquals(before.green, after.green, .01f)
+            assertEquals(before.blue, after.blue, .01f)
+        }
     }
 
     @Test fun glassSleepTimerKeepsBottomActionVisibleAndClickable() {
@@ -72,6 +90,8 @@ class GlassControlsTest {
                 }
             }
         }
+        val closeLabel = InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.close)
+        compose.onNodeWithContentDescription(closeLabel).assertDoesNotExist()
         compose.onNodeWithText(cancelLabel).assertIsDisplayed().performClick()
         compose.waitUntil(5_000) { dismissed }
         compose.runOnIdle { assertTrue(cancelled) }

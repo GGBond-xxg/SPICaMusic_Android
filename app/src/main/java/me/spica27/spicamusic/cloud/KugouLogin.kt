@@ -6,8 +6,8 @@ import android.provider.MediaStore
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
@@ -42,6 +42,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.spica27.spicamusic.R
+import me.spica27.spicamusic.ui.theme.EqualHeightActionRow
 import org.koin.compose.koinInject
 import me.spica27.spicamusic.ui.theme.GlassButton as Button
 import me.spica27.spicamusic.ui.theme.GlassOutlinedButton as OutlinedButton
@@ -55,9 +56,13 @@ internal fun KugouLogin(
 ) {
     var sms by remember { mutableStateOf(true) }
     Column(modifier) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-            TextButton(onClick = { sms = true }, enabled = !sms) { Text(stringResource(R.string.kugou_sms_tab)) }
-            TextButton(onClick = { sms = false }, enabled = sms) { Text(stringResource(R.string.kugou_qr_tab)) }
+        EqualHeightActionRow(Modifier.fillMaxWidth()) {
+            TextButton(modifier = Modifier.weight(1f).fillMaxHeight(), onClick = {
+                sms = true
+            }, enabled = !sms) { Text(stringResource(R.string.kugou_sms_tab)) }
+            TextButton(modifier = Modifier.weight(1f).fillMaxHeight(), onClick = {
+                sms = false
+            }, enabled = sms) { Text(stringResource(R.string.kugou_qr_tab)) }
         }
         if (sms) {
             KugouSmsLogin(Modifier.weight(1f), onLogin, onCancel)
@@ -169,12 +174,13 @@ private fun KugouQrLogin(
             )
         }
         Text(message, style = MaterialTheme.typography.bodyLarge)
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        EqualHeightActionRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedButton(
                 onClick = { revision++ },
+                modifier = Modifier.weight(1f).fillMaxHeight(),
                 enabled = !loading,
             ) { Text(stringResource(R.string.kugou_qr_refresh)) }
-            Button(enabled = bitmap != null && !saving, onClick = {
+            Button(modifier = Modifier.weight(1f).fillMaxHeight(), enabled = bitmap != null && !saving, onClick = {
                 val image = bitmap ?: return@Button
                 saving = true
                 scope.launch {

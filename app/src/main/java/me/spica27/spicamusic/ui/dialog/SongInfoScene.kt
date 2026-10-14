@@ -260,17 +260,12 @@ class SongInfoScene private constructor(
                             maxLines = 1,
                         )
                     }
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    ) {
-                        IconButton(onClick = { path.pop(scene) }) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = stringResource(R.string.close),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                    IconButton(onClick = { path.pop(scene) }, shape = RoundedCornerShape(14.dp)) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = stringResource(R.string.close),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))

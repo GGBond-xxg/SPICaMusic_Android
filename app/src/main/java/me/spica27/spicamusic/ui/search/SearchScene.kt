@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -170,7 +171,7 @@ class SearchScene(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .glassSurface(CircleShape, MaterialTheme.colorScheme.surfaceContainerHigh)
                     .padding(horizontal = Spacing.Large),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
@@ -458,7 +459,7 @@ private fun SearchHeader(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall),
         ) {
-            IconButton(onClick = onBack) {
+            androidx.compose.material3.IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
                 Icon(
                     imageVector = AppBackArrow,
                     contentDescription = stringResource(R.string.back),
@@ -610,7 +611,7 @@ private fun SearchInputField(
     Row(
         modifier =
             modifier
-                .height(52.dp)
+                .heightIn(min = 52.dp)
                 .clip(CircleShape)
                 .then(
                     if (geometryTransition != null) {
@@ -621,7 +622,7 @@ private fun SearchInputField(
                 ).graphicsLayer {
                     alpha = if (geometryTransition?.shouldShowTarget() != false) 1f else 0f
                 }.glassSurface(CircleShape, MaterialTheme.colorScheme.surfaceContainerHigh)
-                .padding(start = Spacing.Large, end = Spacing.Small),
+                .padding(start = Spacing.Large, end = Spacing.Small, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
     ) {

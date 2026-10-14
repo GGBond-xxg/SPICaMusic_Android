@@ -38,6 +38,22 @@ val LocalGlassEnabled = staticCompositionLocalOf { false }
 val LocalGlassBackdrop = staticCompositionLocalOf<Backdrop?> { null }
 val LocalGlassOverlay = staticCompositionLocalOf { false }
 
+/** Dialog windows cannot safely sample a LayerBackdrop owned by the activity window.
+ * Use a local, coordinate-independent wallpaper during sheet translation and predictive back.
+ */
+@Composable
+internal fun GlassWindowBackdrop(content: @Composable () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val backdrop =
+        rememberCanvasBackdrop {
+            drawRect(colors.background)
+            drawRect(
+                Brush.linearGradient(listOf(colors.primaryContainer, colors.tertiaryContainer)),
+            )
+        }
+    CompositionLocalProvider(LocalGlassBackdrop provides backdrop, content = content)
+}
+
 @Composable
 fun GlassSceneContainers(content: @Composable () -> Unit) {
     CompositionLocalProvider(

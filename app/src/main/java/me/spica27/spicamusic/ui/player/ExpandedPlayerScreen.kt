@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -118,6 +119,7 @@ import me.spica27.spicamusic.player.api.PlayMode
 import me.spica27.spicamusic.ui.player.pages.CurrentPlaylistPage
 import me.spica27.spicamusic.ui.player.scene.LyricsPlayerPage
 import me.spica27.spicamusic.ui.settings.SettingsViewModel
+import me.spica27.spicamusic.ui.theme.EqualHeightActionRow
 import me.spica27.spicamusic.ui.theme.LocalGlassBackdrop
 import me.spica27.spicamusic.ui.theme.LocalGlassEnabled
 import me.spica27.spicamusic.ui.theme.LocalGlassOverlay
@@ -1463,7 +1465,7 @@ private fun PlayerAudioQualitySheet(
             when (provider) {
                 "NETEASE" -> {
                     item(key = "netease_featured_qualities") {
-                        Row(
+                        EqualHeightActionRow(
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
@@ -1485,7 +1487,7 @@ private fun PlayerAudioQualitySheet(
                                             quality.value,
                                         )
                                     },
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier.weight(1f).fillMaxHeight(),
                                 )
                             }
                         }
@@ -1600,7 +1602,7 @@ private fun PlayerAudioQualitySheet(
 }
 
 @Composable
-private fun FeaturedQualityCard(
+internal fun FeaturedQualityCard(
     title: String,
     englishTitle: String,
     subtitle: String,

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,7 +34,6 @@ import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -73,6 +73,7 @@ import me.spica27.spicamusic.common.entity.getCoverUri
 import me.spica27.spicamusic.ui.dialog.SongMenuScene
 import me.spica27.spicamusic.ui.home.HomeViewModel
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
+import me.spica27.spicamusic.ui.theme.EqualHeightActionRow
 import me.spica27.spicamusic.ui.theme.appPageBackground
 import me.spica27.spicamusic.ui.widget.CoverFallback
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
@@ -81,6 +82,7 @@ import me.spica27.spicamusic.utils.rememberDominantColorFromUri
 import org.koin.compose.viewmodel.koinActivityViewModel
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
+import me.spica27.spicamusic.ui.theme.GlassElevatedButton as ElevatedButton
 import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
 
 // ── 滚动驱动常量（像素）────────────────────────────────────────────────────────
@@ -424,12 +426,12 @@ internal fun AlbumCoverContent(album: Album) {
 // ── 播放 / 随机播放操作行 ──────────────────────────────────────────────────────
 
 @Composable
-private fun PlayButtons(
+internal fun PlayButtons(
     onPlayAll: () -> Unit,
     onShuffle: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    EqualHeightActionRow(
         modifier =
             modifier
                 .fillMaxWidth()
@@ -438,7 +440,8 @@ private fun PlayButtons(
     ) {
         ElevatedButton(
             onClick = onPlayAll,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
         ) {
             Icon(
                 Icons.Default.PlayArrow,
@@ -450,7 +453,8 @@ private fun PlayButtons(
         }
         ElevatedButton(
             onClick = onShuffle,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
         ) {
             Icon(
                 Icons.Default.Shuffle,
