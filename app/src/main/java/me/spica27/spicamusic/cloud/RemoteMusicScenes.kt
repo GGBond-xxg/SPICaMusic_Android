@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -312,16 +313,18 @@ class RemoteMusicScene(
                                         if (account.id == state.selectedAccount?.id) {
                                             FilledTonalButton(
                                                 onClick = { viewModel.selectAccount(account.id) },
-                                                contentPadding = PaddingValues(horizontal = 12.dp),
+                                                modifier = Modifier.widthIn(max = 240.dp),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                                             ) {
-                                                Text(account.displayName, maxLines = 1)
+                                                Text(account.displayName)
                                             }
                                         } else {
                                             OutlinedButton(
                                                 onClick = { viewModel.selectAccount(account.id) },
-                                                contentPadding = PaddingValues(horizontal = 12.dp),
+                                                modifier = Modifier.widthIn(max = 240.dp),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                                             ) {
-                                                Text(account.displayName, maxLines = 1)
+                                                Text(account.displayName)
                                             }
                                         }
                                     }
@@ -363,7 +366,7 @@ class RemoteMusicScene(
                                         hasSubmittedSearch = searchText.isNotBlank()
                                         viewModel.search(searchText)
                                     },
-                                    modifier = Modifier.height(58.dp),
+                                    modifier = Modifier.heightIn(min = 58.dp),
                                     shape = RoundedCornerShape(20.dp),
                                     contentPadding = PaddingValues(horizontal = 20.dp),
                                 ) {

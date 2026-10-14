@@ -935,6 +935,12 @@ private fun IgnoredMultiSelectBar(
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.bodyMedium,
                 )
+            }
+            androidx.compose.foundation.layout.FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.Small, Alignment.End),
+                verticalArrangement = Arrangement.spacedBy(Spacing.Small),
+            ) {
                 TextButton(onClick = onSelectAll) { Text(stringResource(R.string.select_all)) }
                 TextButton(onClick = onDeselectAll) { Text(stringResource(R.string.deselect_all)) }
             }
@@ -994,11 +1000,11 @@ private fun MultiSelectActionPill(
         Spacer(Modifier.width(Spacing.ExtraSmall))
         Text(
             text = text,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.weight(1f, fill = false),
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
             color = contentColor.copy(alpha = contentAlpha),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
         )
     }
 }

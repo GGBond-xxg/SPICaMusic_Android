@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -1259,7 +1260,7 @@ private fun MusicTabChip(
     Column(
         modifier =
             modifier
-                .height(LayoutTokens.MusicTabHeight)
+                .heightIn(min = LayoutTokens.MusicTabHeight)
                 .graphicsLayer {
                     scaleX = pressScale
                     scaleY = pressScale
@@ -1281,7 +1282,7 @@ private fun MusicTabChip(
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
             color = content,
-            maxLines = 1,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
     }
 }

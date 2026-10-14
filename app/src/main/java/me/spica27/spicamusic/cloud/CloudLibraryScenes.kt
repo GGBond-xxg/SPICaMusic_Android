@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -317,13 +318,15 @@ class MediaServerScene(
                                         if (selected) {
                                             FilledTonalButton(
                                                 onClick = { viewModel.selectAccount(account.id) },
-                                                contentPadding = PaddingValues(horizontal = 12.dp),
-                                            ) { Text(account.displayName, maxLines = 1) }
+                                                modifier = Modifier.widthIn(max = 240.dp),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                            ) { Text(account.displayName) }
                                         } else {
                                             OutlinedButton(
                                                 onClick = { viewModel.selectAccount(account.id) },
-                                                contentPadding = PaddingValues(horizontal = 12.dp),
-                                            ) { Text(account.displayName, maxLines = 1) }
+                                                modifier = Modifier.widthIn(max = 240.dp),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                            ) { Text(account.displayName) }
                                         }
                                     }
                                 }

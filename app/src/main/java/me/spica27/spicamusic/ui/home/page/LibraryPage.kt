@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -840,7 +841,7 @@ private fun RollingPlaylistCount(
 
 /** 命令药丸：52dp 圆胶囊 + 按压回弹（收藏页 HeroCommandPill 同款，无心跳脉冲） */
 @Composable
-private fun LibraryCommandPill(
+internal fun LibraryCommandPill(
     text: String,
     icon: ImageVector,
     container: Color,
@@ -862,7 +863,7 @@ private fun LibraryCommandPill(
     Box(
         modifier =
             modifier
-                .height(52.dp)
+                .heightIn(min = 52.dp)
                 .graphicsLayer {
                     scaleX = pressScale
                     scaleY = pressScale
@@ -872,6 +873,7 @@ private fun LibraryCommandPill(
         contentAlignment = Alignment.Center,
     ) {
         Row(
+            modifier = Modifier.padding(horizontal = Spacing.Medium, vertical = Spacing.Small),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall),
         ) {
@@ -883,6 +885,8 @@ private fun LibraryCommandPill(
             )
             Text(
                 text = text,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.weight(1f, fill = false),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = contentColor,
@@ -924,8 +928,6 @@ private fun InaccessibleFoldersNotice(
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onErrorContainer,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
         )
     }
 }

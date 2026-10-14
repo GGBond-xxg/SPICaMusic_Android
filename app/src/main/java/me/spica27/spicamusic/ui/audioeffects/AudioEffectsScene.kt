@@ -530,7 +530,7 @@ private fun EqualizerPresets(onPreset: (AudioEffectsViewModel.Preset) -> Unit) {
                 FilterChip(
                     selected = false,
                     onClick = { onPreset(preset) },
-                    label = { Text(label, modifier = Modifier.fillMaxWidth(), maxLines = 1, textAlign = TextAlign.Center) },
+                    label = { Text(label, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
                     modifier = Modifier.weight(1f),
                 )
             }

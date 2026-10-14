@@ -42,6 +42,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -780,7 +781,7 @@ private fun HeroCommandPill(
     Box(
         modifier =
             modifier
-                .height(52.dp)
+                .heightIn(min = 52.dp)
                 .graphicsLayer {
                     val scale = pressScale * pulse.value
                     scaleX = scale
@@ -801,6 +802,7 @@ private fun HeroCommandPill(
         contentAlignment = Alignment.Center,
     ) {
         Row(
+            modifier = Modifier.padding(horizontal = Spacing.Medium, vertical = Spacing.Small),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall),
         ) {
@@ -812,6 +814,8 @@ private fun HeroCommandPill(
             )
             Text(
                 text = text,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.weight(1f, fill = false),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = contentColor.copy(alpha = contentAlpha),
@@ -1199,6 +1203,12 @@ private fun FavoriteMultiSelectBar(
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.bodyMedium,
                 )
+            }
+            androidx.compose.foundation.layout.FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.Small, Alignment.End),
+                verticalArrangement = Arrangement.spacedBy(Spacing.Small),
+            ) {
                 TextButton(onClick = onSelectAll) { Text(stringResource(R.string.select_all)) }
                 TextButton(onClick = onDeselectAll) { Text(stringResource(R.string.deselect_all)) }
             }
@@ -1276,11 +1286,11 @@ private fun MultiSelectActionPill(
         Spacer(Modifier.width(Spacing.ExtraSmall))
         Text(
             text = text,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.weight(1f, fill = false),
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
             color = contentColor.copy(alpha = contentAlpha),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
         )
     }
 }

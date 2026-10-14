@@ -141,7 +141,11 @@ fun GlassFilterChip(
     FilterChip(
         selected,
         onClick,
-        label,
+        {
+            ProvideTextStyle(LocalTextStyle.current.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center)) {
+                Box(Modifier.padding(vertical = 4.dp)) { label() }
+            }
+        },
         modifier =
             if (glass) {
                 modifier.padding(4.dp).glassSurface(
@@ -150,7 +154,7 @@ fun GlassFilterChip(
                     tint = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
                 )
             } else {
-                modifier
+                modifier.padding(4.dp)
             },
         enabled = enabled,
         shape = if (glass) CircleShape else FilterChipDefaults.shape,
@@ -177,8 +181,20 @@ fun GlassAssistChip(
     val glass = LocalGlassEnabled.current
     AssistChip(
         onClick,
-        label,
-        modifier = if (glass) modifier.padding(4.dp).glassSurface(CircleShape, MaterialTheme.colorScheme.surfaceContainer) else modifier,
+        {
+            ProvideTextStyle(LocalTextStyle.current.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center)) {
+                Box(Modifier.padding(vertical = 4.dp)) { label() }
+            }
+        },
+        modifier =
+            if (glass) {
+                modifier
+                    .padding(
+                        4.dp,
+                    ).glassSurface(CircleShape, MaterialTheme.colorScheme.surfaceContainer)
+            } else {
+                modifier.padding(4.dp)
+            },
         enabled = enabled,
         shape = if (glass) CircleShape else AssistChipDefaults.shape,
         border = if (glass) null else AssistChipDefaults.assistChipBorder(enabled),
@@ -307,7 +323,7 @@ fun GlassButton(
                         },
                 )
             } else {
-                modifier
+                modifier.padding(4.dp)
             },
         enabled = enabled,
         shape = shape,
@@ -316,7 +332,11 @@ fun GlassButton(
         border = if (glass) null else border,
         contentPadding = contentPadding,
         interactionSource = interactionSource,
-        content = content,
+        content = {
+            ProvideTextStyle(
+                LocalTextStyle.current.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center),
+            ) { content() }
+        },
     )
 }
 
@@ -353,7 +373,7 @@ fun GlassFilledTonalButton(
                         },
                 )
             } else {
-                modifier
+                modifier.padding(4.dp)
             },
         enabled = enabled,
         shape = shape,
@@ -362,7 +382,11 @@ fun GlassFilledTonalButton(
         border = if (glass) null else border,
         contentPadding = contentPadding,
         interactionSource = interactionSource,
-        content = content,
+        content = {
+            ProvideTextStyle(
+                LocalTextStyle.current.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center),
+            ) { content() }
+        },
     )
 }
 
@@ -399,7 +423,7 @@ fun GlassOutlinedButton(
                         },
                 )
             } else {
-                modifier
+                modifier.padding(4.dp)
             },
         enabled = enabled,
         shape = shape,
@@ -408,7 +432,11 @@ fun GlassOutlinedButton(
         border = if (glass) null else border,
         contentPadding = contentPadding,
         interactionSource = interactionSource,
-        content = content,
+        content = {
+            ProvideTextStyle(
+                LocalTextStyle.current.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center),
+            ) { content() }
+        },
     )
 }
 
@@ -445,7 +473,7 @@ fun GlassTextButton(
                         },
                 )
             } else {
-                modifier
+                modifier.padding(4.dp)
             },
         enabled = enabled,
         shape = shape,
@@ -453,7 +481,11 @@ fun GlassTextButton(
         border = if (glass) null else border,
         contentPadding = contentPadding,
         interactionSource = interactionSource,
-        content = content,
+        content = {
+            ProvideTextStyle(
+                LocalTextStyle.current.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center),
+            ) { content() }
+        },
     )
 }
 

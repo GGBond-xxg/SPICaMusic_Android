@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -1024,7 +1025,7 @@ private fun SearchCapsule(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(52.dp)
+                    .heightIn(min = 52.dp)
                     .graphicsLayer {
                         scaleX = pressScale
                         scaleY = pressScale
@@ -1049,7 +1050,6 @@ private fun SearchCapsule(
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
             )
         }
     }
@@ -1444,7 +1444,7 @@ private fun FavoriteSongRow(
 
 /** 动作药丸：次级容器色 + 按压回弹（收藏/常听卡内的成对动作） */
 @Composable
-private fun FinderActionPill(
+internal fun FinderActionPill(
     text: String,
     icon: ImageVector,
     onClick: () -> Unit,
@@ -1482,11 +1482,11 @@ private fun FinderActionPill(
         )
         Text(
             text = text,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.weight(1f, fill = false),
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSecondaryContainer,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
         )
     }
 }

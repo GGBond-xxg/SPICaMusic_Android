@@ -439,7 +439,6 @@ private fun ScanRuleChip(
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
             color = contentColor,
-            maxLines = 1,
         )
     }
 }

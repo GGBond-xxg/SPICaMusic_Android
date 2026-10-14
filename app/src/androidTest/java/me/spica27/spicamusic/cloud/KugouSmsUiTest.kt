@@ -5,6 +5,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -60,7 +61,9 @@ class KugouSmsUiTest {
         val codeBounds = compose.onNodeWithText(cloudText(me.spica27.spicamusic.R.string.kugou_sms_code)).fetchSemanticsNode().boundsInRoot
         assertTrue("Send code must be to the right of the phone field", sendBounds.left >= phoneBounds.right)
         assertTrue("Phone and send-code controls must occupy the same row", sendBounds.center.y in phoneBounds.top..phoneBounds.bottom)
-        assertEquals("Login must fill the form width", codeBounds.width, loginBounds.width, 2f)
+        val actionMargin = with(compose.density) { 4.dp.toPx() }
+        assertEquals("Login must span the form with a left action margin", codeBounds.left + actionMargin, loginBounds.left, 2f)
+        assertEquals("Login must span the form with a right action margin", codeBounds.right - actionMargin, loginBounds.right, 2f)
         compose.onNodeWithText(cloudText(me.spica27.spicamusic.R.string.kugou_sms_phone)).performTextInput("13800138000")
         compose.onNodeWithText(cloudText(me.spica27.spicamusic.R.string.kugou_sms_send)).performClick()
         compose.waitUntil(5000) { calls.get() == 1 }

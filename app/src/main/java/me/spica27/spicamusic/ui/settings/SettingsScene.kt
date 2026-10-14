@@ -41,7 +41,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ShowChart
-import androidx.compose.material.icons.filled.ArrowBackIosNew
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.BlurOn
@@ -109,6 +108,7 @@ import me.spica27.spicamusic.topdisplay.TopDisplayMode
 import me.spica27.spicamusic.ui.about.AboutScene
 import me.spica27.spicamusic.ui.audioeffects.AudioEffectsScene
 import me.spica27.spicamusic.ui.player.playerHapticStrength
+import me.spica27.spicamusic.ui.theme.AppBackArrow
 import me.spica27.spicamusic.ui.theme.EaseOutEmphasized
 import me.spica27.spicamusic.ui.theme.GlassBackdropHost
 import me.spica27.spicamusic.ui.theme.LayoutTokens
@@ -690,7 +690,7 @@ private fun SettingsTopBar(
         ) {
             IconButton(onClick = onBack) {
                 Icon(
-                    imageVector = Icons.Default.ArrowBackIosNew,
+                    imageVector = AppBackArrow,
                     contentDescription = stringResource(R.string.back),
                 )
             }
@@ -864,8 +864,6 @@ private fun SettingsPill(label: String) {
     ) { targetLabel ->
         Text(
             text = targetLabel,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onPrimaryContainer,

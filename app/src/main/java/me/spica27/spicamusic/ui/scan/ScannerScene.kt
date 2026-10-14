@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -1168,7 +1169,7 @@ private fun ScannerActionPill(
     Row(
         modifier =
             modifier
-                .height(52.dp)
+                .heightIn(min = 52.dp)
                 .clip(
                     Shapes.MediumCornerBasedShape,
                 ).glassSurface(
@@ -1176,7 +1177,8 @@ private fun ScannerActionPill(
                     if (enabled) container else container.copy(alpha = 0.45f),
                     tint = if (enabled) container else container.copy(alpha = 0.45f),
                     opacity = 0.7f,
-                ).clickHighlight(enabled = enabled, onClick = onClick),
+                ).clickHighlight(enabled = enabled, onClick = onClick)
+                .padding(horizontal = Spacing.Medium, vertical = Spacing.Small),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
@@ -1191,11 +1193,11 @@ private fun ScannerActionPill(
         }
         Text(
             text = text,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.weight(1f, fill = false),
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
             color = contentColor.copy(alpha = contentAlpha),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
         )
     }
 }

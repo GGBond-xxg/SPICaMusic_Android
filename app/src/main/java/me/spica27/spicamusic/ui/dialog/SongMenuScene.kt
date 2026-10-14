@@ -657,7 +657,6 @@ private fun ControlButton(
                 modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
                 textAlign = TextAlign.Center,
             )
         }

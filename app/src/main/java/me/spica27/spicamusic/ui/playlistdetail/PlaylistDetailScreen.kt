@@ -43,6 +43,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -62,7 +63,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Album
-import androidx.compose.material.icons.filled.ArrowBackIosNew
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Clear
@@ -152,6 +152,7 @@ import me.spica27.spicamusic.common.entity.getCoverUri
 import me.spica27.spicamusic.ui.dialog.CloudSongMenuScene
 import me.spica27.spicamusic.ui.dialog.SongMenuScene
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
+import me.spica27.spicamusic.ui.theme.AppBackArrow
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
 import me.spica27.spicamusic.ui.theme.ListItemFadeOutSpec
@@ -1005,7 +1006,7 @@ private fun SearchTopBar(
     ) {
         IconButton(onClick = onBack) {
             Icon(
-                imageVector = Icons.Default.ArrowBackIosNew,
+                imageVector = AppBackArrow,
                 contentDescription = stringResource(R.string.close_search_cd),
                 tint = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.size(20.dp),
@@ -1143,7 +1144,7 @@ private fun SortTopBar(
         // 模式唯一出口，实底权重
         Button(
             onClick = onDone,
-            modifier = Modifier.height(40.dp),
+            modifier = Modifier.heightIn(min = 40.dp),
             contentPadding = PaddingValues(horizontal = Spacing.Large),
         ) {
             Text(stringResource(R.string.done_sorting))
@@ -2062,15 +2063,16 @@ private fun MultiSelectBar(
                 ) {
                     Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(Spacing.ExtraSmall))
-                    Text(stringResource(R.string.remove), maxLines = 1)
+                    Text(stringResource(R.string.remove))
                 }
             }
-            Row(
+            androidx.compose.foundation.layout.FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.Small, Alignment.End),
+                verticalArrangement = Arrangement.spacedBy(Spacing.Small),
             ) {
-                TextButton(onClick = onSelectAll) { Text(stringResource(R.string.select_all), maxLines = 1) }
-                TextButton(onClick = onDeselectAll) { Text(stringResource(R.string.deselect_all), maxLines = 1) }
+                TextButton(onClick = onSelectAll) { Text(stringResource(R.string.select_all)) }
+                TextButton(onClick = onDeselectAll) { Text(stringResource(R.string.deselect_all)) }
             }
         }
     }

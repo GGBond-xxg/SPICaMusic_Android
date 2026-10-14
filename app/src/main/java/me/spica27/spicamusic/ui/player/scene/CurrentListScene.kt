@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBackIosNew
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
@@ -33,6 +31,7 @@ import me.spica27.navkit.scene.DialogScene
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.ui.player.PlayerHaptics
 import me.spica27.spicamusic.ui.player.pages.CurrentPlaylistPage
+import me.spica27.spicamusic.ui.theme.AppBackArrow
 import me.spica27.spicamusic.ui.widget.ShowOnIdleContent
 import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
 import me.spica27.spicamusic.ui.theme.GlassScaffold as Scaffold
@@ -76,7 +75,7 @@ class CurrentListScene : DialogScene() {
                                 ),
                         ) {
                             Icon(
-                                imageVector = Icons.Default.ArrowBackIosNew,
+                                imageVector = AppBackArrow,
                                 contentDescription = stringResource(R.string.back),
                             )
                         }
