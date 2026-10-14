@@ -135,6 +135,7 @@ fun GlassFilterChip(
             },
         enabled = enabled,
         shape = if (glass) CircleShape else FilterChipDefaults.shape,
+        border = if (glass) null else FilterChipDefaults.filterChipBorder(enabled, selected),
         colors =
             if (glass) {
                 FilterChipDefaults.filterChipColors(
@@ -228,14 +229,28 @@ fun GlassIconButton(
     content: @Composable () -> Unit,
 ) {
     val glass = LocalGlassEnabled.current
-    IconButton(
-        onClick,
-        if (glass) modifier.glassSurface(shape, MaterialTheme.colorScheme.surfaceContainer) else modifier,
-        enabled,
-        if (glass) colors.copy(containerColor = Color.Transparent, disabledContainerColor = Color.Transparent) else colors,
-        interactionSource = interactionSource,
-        content = content,
-    )
+    if (!glass) {
+        IconButton(onClick, modifier, enabled, colors, interactionSource, shape = shape, content = content)
+        return
+    }
+    Box(modifier, contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .matchParentSize()
+                .padding(4.dp)
+                .graphicsLayer { alpha = if (enabled) 1f else 0.45f }
+                .glassSurface(shape, MaterialTheme.colorScheme.surfaceContainer),
+        )
+        IconButton(
+            onClick,
+            Modifier.size(48.dp),
+            enabled,
+            colors.copy(containerColor = Color.Transparent, disabledContainerColor = Color.Transparent),
+            interactionSource,
+            shape = shape,
+            content = content,
+        )
+    }
 }
 
 @Composable
@@ -525,6 +540,8 @@ fun GlassSlider(
             } else {
                 SliderDefaults.Track(
                     state,
+                    thumbTrackGapSize = if (glass) 0.dp else 6.dp,
+                    drawStopIndicator = null,
                     modifier = if (glass) Modifier.glassSurface(CircleShape, MaterialTheme.colorScheme.surfaceContainer) else Modifier,
                     enabled = enabled,
                     colors =

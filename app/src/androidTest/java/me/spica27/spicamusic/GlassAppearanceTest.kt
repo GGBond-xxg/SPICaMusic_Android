@@ -40,7 +40,15 @@ class GlassAppearanceTest {
         var dark by mutableStateOf(false)
         var creations = 0
         compose.setContent {
-            SPICaMusicTheme(darkTheme = dark, themeColor = Color.Blue, themeColorStyle = style, animateColors = false) {
+            SPICaMusicTheme(
+                darkTheme = dark,
+                themeColor = Color.Blue,
+                themeColorStyle = style,
+                animateColors = false,
+                glassSettings =
+                    me.spica27.spicamusic.common.entity
+                        .GlassSettings(smoothMode = false),
+            ) {
                 val identity = remember { ++creations }
                 val backdrop = rememberLayerBackdrop()
                 Box(Modifier.fillMaxSize()) {

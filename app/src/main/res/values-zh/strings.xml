@@ -770,7 +770,7 @@
   <string name="sleep_timer_dialog_subtitle">选择停止播放的时间。</string>
   <string name="sleep_timer_unit_minutes">分钟</string>
   <string name="sleep_timer_custom">自定义时长</string>
-  <string name="sleep_timer_custom_hint">使用 −/+ 微调时长</string>
+  <string name="sleep_timer_custom_hint">点击数字输入，或用 −/+ 微调</string>
   <string name="sleep_timer_start">开始计时</string>
   <string name="sleep_timer_active_hint">定时结束后暂停播放</string>
   <string name="local_lyrics_source">本地歌词</string>

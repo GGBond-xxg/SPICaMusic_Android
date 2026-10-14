@@ -33,6 +33,7 @@ class PreferencesManager(
         val PLAYER_HAPTICS_STRENGTH = stringPreferencesKey("player_haptics_strength")
         val DARK_MODE = booleanPreferencesKey("dark_mode")
         val THEME_MODE = stringPreferencesKey("theme_mode")
+        val GLASS_EFFECTS = stringPreferencesKey("glass_effects")
         val THEME_COLOR_STYLE = stringPreferencesKey("theme_color_style")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         val BACKGROUND_PLAYBACK = booleanPreferencesKey("background_playback")
@@ -230,7 +231,7 @@ class PreferencesManager(
 
     // Explicit portable preferences: no account credentials, file grants, or device-local fonts.
     private val portableBooleans = listOf(Keys.DARK_MODE, Keys.KEEP_SCREEN_ON, Keys.BACKGROUND_PLAYBACK, Keys.RESUME_ON_HEADSET, Keys.FADE_ENABLED, Keys.HIFI_MODE, Keys.USB_DAC_OUTPUT, Keys.LYRICON_ENABLED, Keys.WAVY_PROGRESS_DEFAULT_APPLIED, Keys.EQ_ENABLED, Keys.REVERB_ENABLED, Keys.LOUDNESS_NORMALIZATION_ENABLED)
-    private val portableStrings = listOf(Keys.THEME_MODE, Keys.THEME_COLOR_STYLE, Keys.FADE_DURATION_MS, Keys.CLOUD_AUDIO_CACHE_MIB, Keys.NETEASE_AUDIO_QUALITY, Keys.QQ_AUDIO_QUALITY, Keys.TOP_DISPLAY_MODE, Keys.DYNAMIC_SPECTRUM_BACKGROUND, Keys.DYNAMIC_COVER_TYPE, Keys.PROGRESS_BAR_STYLE, Keys.FINDER_HERO_SOURCE, Keys.LYRICS_TEXT_ALIGNMENT, Keys.LYRICS_TEXT_SCALE, Keys.LYRICS_ACTIVE_LINE_SCALE, Keys.LYRICS_LINE_SPACING, Keys.EQ_BANDS, Keys.REVERB_LEVEL, Keys.REVERB_ROOM_SIZE, Keys.SCAN_MIN_DURATION_SEC, Keys.SCAN_MAX_DURATION_SEC, Keys.SCAN_MIN_FILE_SIZE_KB, Keys.SCAN_ENABLED_FORMATS)
+    private val portableStrings = listOf(Keys.THEME_MODE, Keys.THEME_COLOR_STYLE, Keys.GLASS_EFFECTS, Keys.FADE_DURATION_MS, Keys.CLOUD_AUDIO_CACHE_MIB, Keys.NETEASE_AUDIO_QUALITY, Keys.QQ_AUDIO_QUALITY, Keys.TOP_DISPLAY_MODE, Keys.DYNAMIC_SPECTRUM_BACKGROUND, Keys.DYNAMIC_COVER_TYPE, Keys.PROGRESS_BAR_STYLE, Keys.FINDER_HERO_SOURCE, Keys.LYRICS_TEXT_ALIGNMENT, Keys.LYRICS_TEXT_SCALE, Keys.LYRICS_ACTIVE_LINE_SCALE, Keys.LYRICS_LINE_SPACING, Keys.EQ_BANDS, Keys.REVERB_LEVEL, Keys.REVERB_ROOM_SIZE, Keys.SCAN_MIN_DURATION_SEC, Keys.SCAN_MAX_DURATION_SEC, Keys.SCAN_MIN_FILE_SIZE_KB, Keys.SCAN_ENABLED_FORMATS)
 
     suspend fun exportPortableSettings(): Pair<Map<String, Boolean>, Map<String, String>> {
         val snapshot = context.dataStore.data.first()

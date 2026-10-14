@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.spica27.navkit.stack.NavigationStack
+import me.spica27.spicamusic.common.entity.GlassSettings
 import me.spica27.spicamusic.common.entity.ThemeColorStyle
 import me.spica27.spicamusic.common.entity.ThemeMode
 import me.spica27.spicamusic.core.preferences.PreferencesManager
@@ -63,6 +64,9 @@ fun AppScaffold() {
         preferencesManager
             .getString(PreferencesManager.Keys.THEME_COLOR_STYLE, ThemeColorStyle.Textured.value)
             .collectAsStateWithLifecycle(initialThemeColorStyle)
+    val glassEffects by preferencesManager
+        .getString(PreferencesManager.Keys.GLASS_EFFECTS, "")
+        .collectAsStateWithLifecycle(preferencesManager.getInitialString(PreferencesManager.Keys.GLASS_EFFECTS, ""))
     val playerViewModel: PlayerViewModel = koinActivityViewModel()
     val color by playerViewModel.playerThemeColor.collectAsStateWithLifecycle()
     val keepScreenOn by
@@ -77,6 +81,7 @@ fun AppScaffold() {
         darkTheme = isDarkMode,
         themeColor = color,
         themeColorStyle = ThemeColorStyle.fromString(themeColorStyleValue),
+        glassSettings = GlassSettings.decode(glassEffects),
         playerViewModel = playerViewModel,
     )
 }
@@ -86,6 +91,7 @@ private fun AppThemeContent(
     darkTheme: Boolean,
     themeColor: Color,
     themeColorStyle: ThemeColorStyle,
+    glassSettings: GlassSettings,
     playerViewModel: PlayerViewModel,
 ) {
     val themedView = LocalView.current
@@ -97,6 +103,7 @@ private fun AppThemeContent(
         darkTheme = darkTheme,
         themeColor = themeColor,
         themeColorStyle = themeColorStyle,
+        glassSettings = glassSettings,
         // Album artwork changes are animated by the player's retained backdrop. Animating the
         // entire Material color scheme at the same time invalidates the full navigation subtree
         // and can expose the sheet's plain surface for one frame during Media3 hand-off.

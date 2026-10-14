@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="glass_effect_settings">Glass 效果</string>
+    <string name="glass_smooth_mode">流暢模式</string>
+    <string name="glass_smooth_hint">使用輕量玻璃表面，降低渲染負擔；關閉後啟用即時模糊與折射。</string>
+    <string name="glass_opacity">底色不透明度</string>
+    <string name="glass_blur">模糊半徑</string>
+    <string name="glass_refraction">折射強度</string>
+    <string name="glass_apply_hint">放開滑桿後套用。關閉流暢模式後可調節模糊與折射。</string>
+    <string name="timer_input_title">自訂計時</string>
+    <string name="timer_input_minutes">分鐘</string>
+    <string name="timer_input_range">請輸入 1–240 分鐘</string>
+</resources>

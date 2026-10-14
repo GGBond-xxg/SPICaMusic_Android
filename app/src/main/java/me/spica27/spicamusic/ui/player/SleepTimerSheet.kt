@@ -66,7 +66,7 @@ import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
 import me.spica27.spicamusic.ui.theme.GlassModalBottomSheet as ModalBottomSheet
 
 private val SleepTimerPresets = listOf(15, 30, 45, 60, 90)
-private const val CustomTimerMin = 5
+private const val CustomTimerMin = 1
 private const val CustomTimerMax = 240
 private const val CustomTimerStep = 5
 
@@ -83,6 +83,7 @@ fun SleepTimerSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     var customExpanded by remember { mutableStateOf(false) }
+    var editingMinutes by remember { mutableStateOf(false) }
     var customMinutes by remember(durationMs) {
         mutableIntStateOf(
             durationMs
@@ -90,6 +91,13 @@ fun SleepTimerSheet(
                 ?.coerceIn(CustomTimerMin, CustomTimerMax)
                 ?: 20,
         )
+    }
+
+    if (editingMinutes) {
+        TimerMinutesDialog(customMinutes, onConfirm = {
+            customMinutes = it
+            editingMinutes = false
+        }, onDismiss = { editingMinutes = false })
     }
 
     fun dismissAfter(action: () -> Unit) {
@@ -269,6 +277,12 @@ fun SleepTimerSheet(
                                 text = stringResource(R.string.sleep_timer_minutes, customMinutes),
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
+                                modifier =
+                                    Modifier
+                                        .clickable {
+                                            PlayerHaptics.click()
+                                            editingMinutes = true
+                                        }.padding(horizontal = Spacing.Medium, vertical = Spacing.Small),
                             )
                             TimerStepButton(
                                 icon = Icons.Rounded.Add,
@@ -422,7 +436,7 @@ private fun TimerStepButton(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    IconButton(
+    androidx.compose.material3.IconButton(
         onClick = playerClick(onClick),
         enabled = enabled,
         modifier =

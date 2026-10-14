@@ -143,6 +143,7 @@ class SettingsScene : StackScene() {
         val coverTypeValue by viewModel.dynamicCoverType.collectAsStateWithLifecycle()
         val progressBarStyleValue by viewModel.progressBarStyle.collectAsStateWithLifecycle()
         val finderHeroSourceValue by viewModel.finderHeroSource.collectAsStateWithLifecycle()
+        val glassEffects by viewModel.glassEffects.collectAsStateWithLifecycle()
         val themeColorStyleValue by viewModel.themeColorStyle.collectAsStateWithLifecycle()
         val spectrumTopGlowLabel = stringResource(R.string.dynamic_spectrum_top_glow)
         val spectrumLiquidAuroraLabel = stringResource(R.string.dynamic_spectrum_liquid_aurora)
@@ -384,6 +385,13 @@ class SettingsScene : StackScene() {
                                 onExpandChange = { expandedRowKey = it },
                                 onValueChange = viewModel::setThemeColorStyle,
                             )
+                            if (themeColorStyleValue == ThemeColorStyle.Glass.value) {
+                                GlassSettingsPanel(
+                                    me.spica27.spicamusic.common.entity.GlassSettings
+                                        .decode(glassEffects),
+                                    viewModel::setGlassEffects,
+                                )
+                            }
                             SettingsItemDivider()
                             ModernSettingsSelectItem(
                                 rowKey = "theme_mode",

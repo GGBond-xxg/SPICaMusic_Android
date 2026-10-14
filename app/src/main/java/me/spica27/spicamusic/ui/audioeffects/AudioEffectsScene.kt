@@ -10,9 +10,11 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,6 +35,7 @@ import androidx.compose.material.icons.filled.VolumeDown
 import androidx.compose.material.icons.filled.Waves
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -517,15 +520,17 @@ private fun EqualizerPresets(onPreset: (AudioEffectsViewModel.Preset) -> Unit) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Row(
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
+            verticalArrangement = Arrangement.spacedBy(Spacing.Small),
+            maxItemsInEachRow = 2,
         ) {
             presets.forEach { (preset, label) ->
                 FilterChip(
                     selected = false,
                     onClick = { onPreset(preset) },
-                    label = { Text(label) },
+                    label = { Text(label, modifier = Modifier.fillMaxWidth(), maxLines = 1, textAlign = TextAlign.Center) },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -589,6 +594,14 @@ private fun VerticalBandSlider(
             value = value,
             onValueChange = onValueChange,
             valueRange = -12f..12f,
+            thumb = {
+                Box(
+                    Modifier.size(18.dp).background(MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.CircleShape),
+                )
+            },
+            track = { state ->
+                SliderDefaults.Track(state, modifier = Modifier.height(4.dp), thumbTrackGapSize = 0.dp, drawStopIndicator = null)
+            },
             modifier =
                 Modifier
                     .graphicsLayer { rotationZ = 270f }

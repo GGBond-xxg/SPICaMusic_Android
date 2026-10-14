@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.materialkolor.DynamicMaterialTheme
 import com.materialkolor.PaletteStyle
 import com.materialkolor.dynamiccolor.ColorSpec
+import me.spica27.spicamusic.common.entity.GlassSettings
 import me.spica27.spicamusic.common.entity.ThemeColorStyle
 import me.spica27.spicamusic.ui.widget.rememberClickHighlightIndication
 
@@ -80,6 +81,7 @@ fun SPICaMusicTheme(
     themeColor: Color,
     themeColorStyle: ThemeColorStyle = ThemeColorStyle.Textured,
     animateColors: Boolean = true,
+    glassSettings: GlassSettings = GlassSettings(),
     content: @Composable () -> Unit,
 ) {
     when (themeColorStyle) {
@@ -91,7 +93,10 @@ fun SPICaMusicTheme(
                 specVersion = ColorSpec.SpecVersion.SPEC_2021,
                 style = PaletteStyle.TonalSpot,
             ) {
-                CompositionLocalProvider(LocalGlassEnabled provides (themeColorStyle == ThemeColorStyle.Glass)) {
+                CompositionLocalProvider(
+                    LocalGlassEnabled provides (themeColorStyle == ThemeColorStyle.Glass),
+                    LocalGlassSettings provides glassSettings,
+                ) {
                     GlassSceneContainers { GlassBackdropHost { ProvideAppInteractionIndication(content = content) } }
                 }
             }
@@ -116,7 +121,10 @@ fun SPICaMusicTheme(
                     )
                 }
             MaterialTheme(colorScheme = colorScheme) {
-                CompositionLocalProvider(LocalGlassEnabled provides (themeColorStyle == ThemeColorStyle.Glass)) {
+                CompositionLocalProvider(
+                    LocalGlassEnabled provides (themeColorStyle == ThemeColorStyle.Glass),
+                    LocalGlassSettings provides glassSettings,
+                ) {
                     GlassSceneContainers { GlassBackdropHost { ProvideAppInteractionIndication(content = content) } }
                 }
             }

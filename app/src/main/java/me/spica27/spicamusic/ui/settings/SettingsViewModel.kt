@@ -92,6 +92,15 @@ class SettingsViewModel(
         }
     }
 
+    val glassEffects =
+        settingsUseCases
+            .getString(SettingsUseCases.Keys.GLASS_EFFECTS, "")
+            .stateIn(viewModelScope, SharingStarted.Eagerly, settingsUseCases.getInitialString(SettingsUseCases.Keys.GLASS_EFFECTS, ""))
+
+    fun setGlassEffects(settings: me.spica27.spicamusic.common.entity.GlassSettings) {
+        viewModelScope.launch { settingsUseCases.setString(SettingsUseCases.Keys.GLASS_EFFECTS, settings.encode()) }
+    }
+
     // 主题色风格
     val themeColorStyle =
         settingsUseCases

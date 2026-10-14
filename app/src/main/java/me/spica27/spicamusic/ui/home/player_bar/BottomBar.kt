@@ -426,7 +426,7 @@ fun BottomMediaBar(bottomBarScrollConnection: BottomBarScrollConnection = LocalB
                         verticalAlignment = Alignment.Bottom,
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        IconButton(
+                        androidx.compose.material3.IconButton(
                             onClick = {
                                 PlayerHaptics.click()
                                 isSingleLineMode = false
@@ -525,7 +525,7 @@ fun BottomMediaBar(bottomBarScrollConnection: BottomBarScrollConnection = LocalB
                                         .basicMarquee(repeatDelayMillis = 0),
                             )
                         }
-                        IconButton(
+                        androidx.compose.material3.IconButton(
                             onClick = {
                                 navigationPath.push(SearchScene())
                             },
@@ -879,7 +879,7 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                     verticalAlignment = Alignment.Bottom,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    IconButton(
+                    androidx.compose.material3.IconButton(
                         onClick = {
                             PlayerHaptics.click()
                             bottomBarScrollConnection.expand()
@@ -1064,7 +1064,7 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                             }
                         }
                     }
-                    IconButton(
+                    androidx.compose.material3.IconButton(
                         onClick = {
                             navigationPath.push(SearchScene())
                         },

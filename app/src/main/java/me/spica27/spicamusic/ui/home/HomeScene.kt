@@ -40,6 +40,8 @@ import me.spica27.spicamusic.ui.home.player_bar.BottomMediaBarV2
 import me.spica27.spicamusic.ui.home.player_bar.rememberBottomBarScrollConnection
 import me.spica27.spicamusic.ui.theme.LocalGlassBackdrop
 import me.spica27.spicamusic.ui.theme.LocalGlassEnabled
+import me.spica27.spicamusic.ui.theme.LocalGlassOverlay
+import me.spica27.spicamusic.ui.theme.LocalGlassSettings
 import me.spica27.spicamusic.ui.widget.materialSharedAxisZIn
 import me.spica27.spicamusic.ui.widget.materialSharedAxisZOut
 import org.koin.compose.viewmodel.koinActivityViewModel
@@ -65,7 +67,7 @@ class HomeScene : StackScene() {
                 label = "bottomControlsScrimHeight",
             )
         val pageBackground = MaterialTheme.colorScheme.background
-        val glass = LocalGlassEnabled.current
+        val glass = LocalGlassEnabled.current && !LocalGlassSettings.current.smoothMode
         val backdrop = rememberLayerBackdrop()
         CompositionLocalProvider(
             LocalBottomBarScrollConnection provides bottomBarScrollConnection,
@@ -111,7 +113,7 @@ class HomeScene : StackScene() {
                                 ),
                             ),
                 )
-                CompositionLocalProvider(LocalGlassBackdrop provides backdrop) {
+                CompositionLocalProvider(LocalGlassBackdrop provides backdrop, LocalGlassOverlay provides true) {
                     BottomMediaBarV2(bottomBarScrollConnection)
                 }
             }

@@ -12,6 +12,7 @@ class SettingsUseCases(
         val PLAYER_HAPTICS_STRENGTH = PreferencesManager.Keys.PLAYER_HAPTICS_STRENGTH
         val DARK_MODE = PreferencesManager.Keys.DARK_MODE
         val THEME_MODE = PreferencesManager.Keys.THEME_MODE
+        val GLASS_EFFECTS = PreferencesManager.Keys.GLASS_EFFECTS
         val THEME_COLOR_STYLE = PreferencesManager.Keys.THEME_COLOR_STYLE
         val KEEP_SCREEN_ON = PreferencesManager.Keys.KEEP_SCREEN_ON
         val BACKGROUND_PLAYBACK = PreferencesManager.Keys.BACKGROUND_PLAYBACK

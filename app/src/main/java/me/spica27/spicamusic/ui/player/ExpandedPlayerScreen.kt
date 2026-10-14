@@ -119,6 +119,8 @@ import me.spica27.spicamusic.ui.player.scene.LyricsPlayerPage
 import me.spica27.spicamusic.ui.settings.SettingsViewModel
 import me.spica27.spicamusic.ui.theme.LocalGlassBackdrop
 import me.spica27.spicamusic.ui.theme.LocalGlassEnabled
+import me.spica27.spicamusic.ui.theme.LocalGlassOverlay
+import me.spica27.spicamusic.ui.theme.LocalGlassSettings
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
 import me.spica27.spicamusic.ui.theme.glassSurface
@@ -373,8 +375,8 @@ fun ExpandedPlayerScreen(
         )
 
     val playerBackdrop = rememberLayerBackdrop()
-    val glass = LocalGlassEnabled.current
-    CompositionLocalProvider(LocalGlassBackdrop provides playerBackdrop) {
+    val glass = LocalGlassEnabled.current && !LocalGlassSettings.current.smoothMode
+    CompositionLocalProvider(LocalGlassBackdrop provides playerBackdrop, LocalGlassOverlay provides false) {
         // Player popups must sample this background, never the home page behind the mini player.
         if (showAudioQualitySheet) {
             PlayerAudioQualitySheet(
@@ -730,11 +732,14 @@ fun ExpandedPlayerScreen(
                                         .size(42.dp)
                                         .clip(
                                             CircleShape,
-                                        ).glassSurface(
-                                            CircleShape,
-                                            MaterialTheme.colorScheme.surfaceContainer,
-                                            tint = MaterialTheme.colorScheme.surfaceContainer,
-                                            opacity = 0.7f,
+                                        ).then(
+                                            if (LocalGlassEnabled.current) {
+                                                Modifier
+                                            } else {
+                                                Modifier.background(
+                                                    MaterialTheme.colorScheme.surfaceContainer,
+                                                )
+                                            },
                                         ),
                                 contentAlignment = Alignment.Center,
                             ) {
@@ -888,11 +893,14 @@ private fun TopBar(
                             .size(42.dp)
                             .clip(
                                 CircleShape,
-                            ).glassSurface(
-                                CircleShape,
-                                MaterialTheme.colorScheme.surfaceContainer,
-                                tint = MaterialTheme.colorScheme.surfaceContainer,
-                                opacity = 0.7f,
+                            ).then(
+                                if (LocalGlassEnabled.current) {
+                                    Modifier
+                                } else {
+                                    Modifier.background(
+                                        MaterialTheme.colorScheme.surfaceContainer,
+                                    )
+                                },
                             ),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -926,14 +934,13 @@ private fun MorphingPlayerTopAction(
     Box(
         modifier =
             modifier
-                .size(42.dp)
+                .size(48.dp)
+                .padding(4.dp)
                 .clip(
                     CircleShape,
                 ).glassSurface(
                     CircleShape,
                     MaterialTheme.colorScheme.surfaceContainer,
-                    tint = MaterialTheme.colorScheme.surfaceContainer,
-                    opacity = 0.7f,
                 ).clickable {
                     PlayerHaptics.click()
                     if (showsEditor) onLyricsEditorClick() else onPlaylistClick()

@@ -263,6 +263,8 @@ fun LargeBottomPlayerBar(
                     )
                 }
 
+                Spacer(Modifier.width(8.dp))
+
                 // 下一首
                 IconButton(
                     onClick = {
