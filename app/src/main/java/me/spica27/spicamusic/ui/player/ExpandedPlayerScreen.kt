@@ -97,7 +97,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
-import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.linc.amplituda.Amplituda
 import kotlinx.coroutines.Dispatchers
@@ -416,8 +415,8 @@ fun ExpandedPlayerScreen(
             FluidMusicBackground(
                 modifier =
                     Modifier
-                        .fillMaxSize()
-                        .then(if (glass) Modifier.layerBackdrop(playerBackdrop) else Modifier),
+                        .fillMaxSize(),
+                glassBackdrop = if (glass) playerBackdrop else null,
                 coverColor = coverColor,
                 isDarkMode = MaterialTheme.colorScheme.surface.luminance() < 0.5f,
                 coverUri = { playerArtworkUri },
@@ -437,7 +436,8 @@ fun ExpandedPlayerScreen(
                             if (
                                 pagerState.currentPage == 0 &&
                                 lyricsPagerState.currentPage == 0 &&
-                                !lyricsPagerState.isScrollInProgress
+                                !lyricsPagerState.isScrollInProgress &&
+                                !playerNeedsVerticalScroll()
                             ) {
                                 dragToCollapseModifier
                             } else {
@@ -451,7 +451,7 @@ fun ExpandedPlayerScreen(
                 state = pagerState,
                 key = { it },
                 overscrollEffect = rememberIOSOverScrollEffect(orientation = Orientation.Vertical),
-                userScrollEnabled = lyricsPagerState.currentPage == 0,
+                userScrollEnabled = lyricsPagerState.currentPage == 0 && !playerNeedsVerticalScroll(),
                 flingBehavior =
                     PagerDefaults.flingBehavior(
                         state = pagerState,
@@ -459,11 +459,9 @@ fun ExpandedPlayerScreen(
                     ),
             ) {
                 if (it == 0) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .playerLyricsMorphRoot(lyricsMorphState),
+                    AdaptivePlayerViewport(
+                        modifier = Modifier.fillMaxSize(),
+                        contentModifier = Modifier.playerLyricsMorphRoot(lyricsMorphState),
                     ) {
                         HorizontalPager(
                             state = lyricsPagerState,

@@ -50,6 +50,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.kyant.backdrop.backdrops.LayerBackdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
 import com.skydoves.landscapist.components.rememberImageComponent
 import com.skydoves.landscapist.image.LandscapistImage
 import kotlinx.coroutines.CoroutineScope
@@ -94,6 +96,7 @@ fun FluidMusicBackground(
     coverUri: () -> Uri? = { null },
     active: Boolean = true,
     visibilityProgressProvider: () -> Float = { 1f },
+    glassBackdrop: LayerBackdrop? = null,
 ) {
     val playerViewModel = LocalPlayerViewModel.current
     val settingsViewModel: SettingsViewModel = koinViewModel()
@@ -153,6 +156,10 @@ fun FluidMusicBackground(
             }
         }
 
+    // SurfaceView display lists must never be replayed by glass in a dialog window:
+    // replay moves the native surface to the dialog's transform/clip after the IME closes.
+    // Record only the Compose base; the GL/TextureView animation remains a sibling.
+    val backdropModifier = glassBackdrop?.let { Modifier.layerBackdrop(it) } ?: Modifier
     Box(modifier = modifier) {
         when (backgroundMode) {
             DynamicSpectrumBackground.OFF -> {
@@ -160,37 +167,40 @@ fun FluidMusicBackground(
                     modifier =
                         Modifier
                             .matchParentSize()
+                            .then(backdropModifier)
                             .background(surfaceColor),
                 )
             }
 
             DynamicSpectrumBackground.BlurCover -> {
-                // Keep the previous decoded backdrop until the next one is fully prepared. The
-                // image loader's own crossfade clears its old request first, exposing surface for
-                // one or more frames (white in light mode and black in dark mode).
-                Box(
-                    modifier =
-                        Modifier
-                            .matchParentSize()
-                            .background(surfaceColor),
-                )
-                StableBlurredBackdrop(
-                    modifier = Modifier.matchParentSize(),
-                    uri = coverUri.invoke(),
-                )
-                Box(
-                    modifier =
-                        Modifier
-                            .matchParentSize()
-                            .background(surfaceColor.copy(alpha = 0.5f)),
-                )
+                Box(Modifier.matchParentSize().then(backdropModifier)) {
+                    // Keep the previous decoded backdrop until the next one is fully prepared. The
+                    // image loader's own crossfade clears its old request first, exposing surface for
+                    // one or more frames (white in light mode and black in dark mode).
+                    Box(
+                        modifier =
+                            Modifier
+                                .matchParentSize()
+                                .background(surfaceColor),
+                    )
+                    StableBlurredBackdrop(
+                        modifier = Modifier.matchParentSize(),
+                        uri = coverUri.invoke(),
+                    )
+                    Box(
+                        modifier =
+                            Modifier
+                                .matchParentSize()
+                                .background(surfaceColor.copy(alpha = 0.5f)),
+                    )
+                }
             }
 
             else -> {
                 // 始终先绘制同色静态底。动态层真正完成首帧后再做 240ms 交叉淡化，
                 // 不会再从纯色一帧跳到动态封面。
                 StaticPlayerBackdrop(
-                    modifier = Modifier.matchParentSize(),
+                    modifier = Modifier.matchParentSize().then(backdropModifier),
                     coverColor = coverColor,
                     surfaceColor = surfaceColor,
                     isDarkMode = effectiveDarkMode,

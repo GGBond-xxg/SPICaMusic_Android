@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -126,6 +127,7 @@ import me.spica27.spicamusic.ui.playlistdetail.PlaylistDetailScene
 import me.spica27.spicamusic.ui.search.SearchScene
 import me.spica27.spicamusic.ui.settings.SettingsScene
 import me.spica27.spicamusic.ui.theme.CollapsingBarBackground
+import me.spica27.spicamusic.ui.theme.EqualHeightActionRow
 import me.spica27.spicamusic.ui.theme.LayoutTokens
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
@@ -1368,18 +1370,18 @@ private fun FavoritesCard(
                 )
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.Small)) {
+        EqualHeightActionRow(horizontalArrangement = Arrangement.spacedBy(Spacing.Small)) {
             FinderActionPill(
                 text = stringResource(R.string.play_all),
                 icon = Icons.Default.PlayArrow,
                 onClick = onPlayAll,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).fillMaxHeight(),
             )
             FinderActionPill(
                 text = stringResource(R.string.finder_save_as_playlist),
                 icon = Icons.Default.Add,
                 onClick = onSaveAsPlaylist,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).fillMaxHeight(),
             )
         }
     }

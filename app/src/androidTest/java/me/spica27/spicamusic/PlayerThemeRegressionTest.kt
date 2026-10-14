@@ -28,7 +28,11 @@ import org.junit.Test
 import java.util.Locale
 
 class PlayerThemeRegressionTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule(order = 0)
+    val englishLocale = EnglishAppLocaleRule()
+
+    @get:Rule(order = 1)
+    val compose = createComposeRule()
 
     @Test fun paletteChangesPreserveRememberedPageAndScrollState() {
         var style by mutableStateOf<ThemeColorStyle>(ThemeColorStyle.Textured)
@@ -119,7 +123,7 @@ class PlayerThemeRegressionTest {
                 .performScrollTo()
                 .performClick()
             compose.onNode(hasSetTextAction()).performTextReplacement("37")
-            compose.onNodeWithText("Confirm").performScrollTo().performClick()
+            compose.onNodeWithText("Confirm").assertIsDisplayed().performClick()
             compose.runOnIdle { assertEquals(0, minutes) }
             compose
                 .onNodeWithText("Start timer")

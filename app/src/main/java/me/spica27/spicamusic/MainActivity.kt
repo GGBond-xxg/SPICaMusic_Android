@@ -148,12 +148,12 @@ class MainActivity :
         super.onDestroy()
     }
 
-    override fun isBaseOnWidth(): Boolean = true
+    override fun isBaseOnWidth(): Boolean = resources.configuration.orientation != android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     /**
      * 设计稿基准尺寸（dp）
-     * 竖屏：375dp（手机设计稿）
-     * 横屏：1024dp（平板/横屏设计稿）
+     * Use the short edge in both orientations. Scaling a landscape window's long edge to
+     * 375dp magnifies every control and can leave no space above the keyboard.
      */
     override fun getSizeInDp(): Float = 375f
 
