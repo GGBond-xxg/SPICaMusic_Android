@@ -258,24 +258,6 @@ fun ExpandedPlayerScreen(
     var showPlaybackSourceDialog by rememberSaveable(mediaId) { mutableStateOf(false) }
     val playbackSourceState by viewModel.playbackSourcePickerState.collectAsStateWithLifecycle()
 
-    if (showAudioQualitySheet) {
-        PlayerAudioQualitySheet(
-            audioQualityInfo = audioQualityInfo,
-            playerViewModel = viewModel,
-            onDismiss = { showAudioQualitySheet = false },
-        )
-    }
-    if (showPlaybackSourceDialog) {
-        PlaybackSourceDialog(
-            state = playbackSourceState,
-            onSelect = { option ->
-                viewModel.selectPlaybackSource(option)
-                showPlaybackSourceDialog = false
-            },
-            onDismiss = { showPlaybackSourceDialog = false },
-        )
-    }
-
     LaunchedEffect(songLikeState) {
         Timber.tag("ExpandedPlayerScreen").d("当前歌曲收藏状态: $songLikeState")
     }
@@ -393,6 +375,24 @@ fun ExpandedPlayerScreen(
     val playerBackdrop = rememberLayerBackdrop()
     val glass = LocalGlassEnabled.current
     CompositionLocalProvider(LocalGlassBackdrop provides playerBackdrop) {
+        // Player popups must sample this background, never the home page behind the mini player.
+        if (showAudioQualitySheet) {
+            PlayerAudioQualitySheet(
+                audioQualityInfo = audioQualityInfo,
+                playerViewModel = viewModel,
+                onDismiss = { showAudioQualitySheet = false },
+            )
+        }
+        if (showPlaybackSourceDialog) {
+            PlaybackSourceDialog(
+                state = playbackSourceState,
+                onSelect = { option ->
+                    viewModel.selectPlaybackSource(option)
+                    showPlaybackSourceDialog = false
+                },
+                onDismiss = { showPlaybackSourceDialog = false },
+            )
+        }
         Box(
             modifier =
                 modifier
