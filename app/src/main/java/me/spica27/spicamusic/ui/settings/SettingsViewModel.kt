@@ -8,6 +8,9 @@ import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -284,15 +287,7 @@ class SettingsViewModel(
             settingsUseCases.getString(SettingsUseCases.Keys.TOP_DISPLAY_MODE, ""),
             settingsUseCases.getBoolean(SettingsUseCases.Keys.LYRICON_ENABLED, true),
         ) { savedMode, legacyLyriconEnabled ->
-            if (savedMode.isBlank()) {
-                if (legacyLyriconEnabled) {
-                    TopDisplayMode.STATUS_LYRIC.value
-                } else {
-                    TopDisplayMode.OFF.value
-                }
-            } else {
-                TopDisplayMode.fromString(savedMode).value
-            }
+            TopDisplayMode.resolve(savedMode, legacyLyriconEnabled).value
         }.stateIn(
             viewModelScope,
             SharingStarted.Eagerly,
@@ -300,7 +295,12 @@ class SettingsViewModel(
         )
 
     val liveUpdateSupported: Boolean = topDisplayModeController.isLiveUpdateSupported()
-    val promotedNotificationAllowed: Boolean = topDisplayModeController.canPostPromotedNotification()
+    var promotedNotificationAllowed: Boolean by mutableStateOf(topDisplayModeController.canPostPromotedNotification())
+        private set
+
+    fun refreshNotificationCapabilities() {
+        promotedNotificationAllowed = topDisplayModeController.canPostPromotedNotification()
+    }
 
     fun setTopDisplayMode(value: String) {
         viewModelScope.launch {

@@ -79,6 +79,7 @@ class PlaybackService : MediaLibraryService() {
     private val player: IMusicPlayer by inject()
     private val topDisplayModeController: TopDisplayModeController by inject()
     private val desktopLyricsController: DesktopLyricsController by inject()
+    private val sharedLyricsStore: SharedLyricsStore by inject()
     private val cloudPlaybackItemResolver: CloudPlaybackItemResolver by inject()
     private val cloudRecentStore: CloudRecentStore by inject()
     private val settingsUseCases: SettingsUseCases by inject()
@@ -417,6 +418,7 @@ class PlaybackService : MediaLibraryService() {
         startDiagnosticMonitor()
         topDisplayModeController.start(exoPlayer)
         desktopLyricsController.start(exoPlayer)
+        sharedLyricsStore.start(exoPlayer)
 
         val desktopLyricsCommand = SessionCommand(ACTION_TOGGLE_DESKTOP_LYRICS, android.os.Bundle.EMPTY)
         val closePlayerCommand = SessionCommand(ACTION_CLOSE_PLAYER, android.os.Bundle.EMPTY)
@@ -747,6 +749,7 @@ class PlaybackService : MediaLibraryService() {
         cloudPrefetchJob?.cancel()
         diagnosticMonitorJob?.cancel()
         exoPlayer.removeListener(playbackListener)
+        sharedLyricsStore.release()
         topDisplayModeController.release()
         desktopLyricsController.release()
         serviceScope.cancel()
@@ -943,6 +946,7 @@ class PlaybackService : MediaLibraryService() {
 
             topDisplayModeController.start(replacement)
             desktopLyricsController.start(replacement)
+            sharedLyricsStore.start(replacement)
             hiFiOutputEnabled = enableHiFi
             Timber
                 .tag("PlaybackService")

@@ -70,6 +70,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -91,6 +92,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.common.collect.ImmutableList
 import me.spica27.navkit.path.LocalNavigationPath
@@ -103,6 +107,7 @@ import me.spica27.spicamusic.common.entity.FinderHeroSource
 import me.spica27.spicamusic.common.entity.ProgressBarStyle
 import me.spica27.spicamusic.common.entity.ThemeColorStyle
 import me.spica27.spicamusic.common.entity.ThemeMode
+import me.spica27.spicamusic.topdisplay.SystemStatusLyricsManager
 import me.spica27.spicamusic.topdisplay.TopDisplayMode
 import me.spica27.spicamusic.ui.about.AboutScene
 import me.spica27.spicamusic.ui.audioeffects.AudioEffectsScene
@@ -118,6 +123,7 @@ import me.spica27.spicamusic.ui.theme.Spacing
 import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.clickHighlight
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.roundToInt
 import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
@@ -131,6 +137,18 @@ class SettingsScene : StackScene() {
         val path = LocalNavigationPath.current
         val context = LocalContext.current
         val viewModel: SettingsViewModel = koinViewModel()
+        val systemLyrics: SystemStatusLyricsManager = koinInject()
+        val lifecycleOwner = LocalLifecycleOwner.current
+        DisposableEffect(lifecycleOwner, viewModel) {
+            val observer =
+                LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_RESUME) {
+                        viewModel.refreshNotificationCapabilities()
+                    }
+                }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        }
 
         val themeModeValue by viewModel.themeMode.collectAsStateWithLifecycle()
         val themeMode = ThemeMode.fromString(themeModeValue)
@@ -288,14 +306,16 @@ class SettingsScene : StackScene() {
                 ?: finderFrequentLabel
         val topDisplayOffLabel = stringResource(R.string.top_display_mode_off)
         val topDisplayLyricLabel = stringResource(R.string.top_display_mode_status_lyric)
+        val topDisplaySystemLabel = stringResource(R.string.top_display_mode_system_status_lyric)
         val topDisplayLiveLabel = stringResource(R.string.top_display_mode_live_update)
         val topDisplayModeOptions =
-            remember(topDisplayOffLabel, topDisplayLyricLabel, topDisplayLiveLabel) {
+            remember(topDisplayOffLabel, topDisplayLyricLabel, topDisplayLiveLabel, topDisplaySystemLabel) {
                 ImmutableList.copyOf(
                     listOf(
                         SelectOption(TopDisplayMode.OFF.value, topDisplayOffLabel),
-                        SelectOption(TopDisplayMode.STATUS_LYRIC.value, topDisplayLyricLabel),
+                        SelectOption(TopDisplayMode.SYSTEM_STATUS_LYRIC.value, topDisplaySystemLabel),
                         SelectOption(TopDisplayMode.LIVE_UPDATE.value, topDisplayLiveLabel),
+                        SelectOption(TopDisplayMode.STATUS_LYRIC.value, topDisplayLyricLabel),
                     ),
                 )
             }
@@ -328,6 +348,14 @@ class SettingsScene : StackScene() {
             when (topDisplayMode) {
                 TopDisplayMode.OFF -> stringResource(R.string.top_display_mode_off_subtitle)
                 TopDisplayMode.STATUS_LYRIC -> stringResource(R.string.settings_lyricon_subtitle)
+                TopDisplayMode.SYSTEM_STATUS_LYRIC ->
+                    stringResource(
+                        if (systemLyrics.isNativeSupported()) {
+                            R.string.status_lyrics_native_summary
+                        } else {
+                            R.string.status_lyrics_overlay_summary
+                        },
+                    )
                 TopDisplayMode.LIVE_UPDATE ->
                     if (!viewModel.liveUpdateSupported || !viewModel.promotedNotificationAllowed) {
                         stringResource(R.string.top_display_mode_live_update_unsupported)
@@ -562,8 +590,24 @@ class SettingsScene : StackScene() {
                                 currentValue = topDisplayMode.value,
                                 expandedKey = expandedRowKey,
                                 onExpandChange = { expandedRowKey = it },
-                                onValueChange = viewModel::setTopDisplayMode,
+                                onValueChange = {
+                                    viewModel.setTopDisplayMode(it)
+                                    if (it == TopDisplayMode.SYSTEM_STATUS_LYRIC.value) {
+                                        path.push(StatusLyricsSettingsScene())
+                                    }
+                                },
                             )
+                            if (topDisplayMode == TopDisplayMode.SYSTEM_STATUS_LYRIC) {
+                                SettingsItemDivider()
+                                SettingsRow(
+                                    title = stringResource(R.string.status_lyrics_settings),
+                                    subtitle = stringResource(R.string.status_lyrics_settings_summary),
+                                    icon = Icons.Default.NotificationsActive,
+                                    selected = false,
+                                    onClick = { path.push(StatusLyricsSettingsScene()) },
+                                    trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null) },
+                                )
+                            }
                         }
                     }
 
@@ -1002,7 +1046,7 @@ private fun ModernSettingsSelectItem(
             Column(
                 modifier =
                     Modifier.padding(
-                        start = 78.dp,
+                        start = if (rowKey == "notification_mode") Spacing.Large else 78.dp,
                         end = Spacing.Large,
                         top = Spacing.ExtraSmall,
                         bottom = Spacing.Small,
@@ -1243,6 +1287,7 @@ private fun optionIcon(
         "notification_mode" ->
             when (TopDisplayMode.fromString(value)) {
                 TopDisplayMode.OFF -> Icons.Default.PowerSettingsNew
+                TopDisplayMode.SYSTEM_STATUS_LYRIC -> Icons.Default.NotificationsActive
                 TopDisplayMode.STATUS_LYRIC -> Icons.Default.NotificationsActive
                 TopDisplayMode.LIVE_UPDATE -> Icons.Default.AutoAwesome
             }

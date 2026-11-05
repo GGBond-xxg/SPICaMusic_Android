@@ -172,7 +172,6 @@ class PlayerViewModel(
         flow {
             while (currentCoroutineContext().isActive) {
                 val position = player.currentPosition
-                topDisplayModeController.updatePosition(position)
                 emit(position)
                 // Keep waveform and seek indicators visibly moving instead of advancing in
                 // one-second jumps. The progress state is consumed by leaf composables only.

@@ -9,8 +9,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import me.spica27.spicamusic.common.entity.LyricItem
 import me.spica27.spicamusic.common.entity.getSentenceContent
@@ -28,6 +30,7 @@ class TopDisplayModeController(
     private val liveUpdateManager: MusicLiveUpdateManager,
     private val preferences: PreferencesManager,
     private val desktopLyricsController: DesktopLyricsController,
+    private val systemStatusLyricsManager: SystemStatusLyricsManager,
 ) {
     private var player: Player? = null
     private var scope: CoroutineScope? = null
@@ -50,6 +53,7 @@ class TopDisplayModeController(
                 lyricsOffsetMs = 0L
                 lastLiveLyricKey = null
                 lastLiveUpdatePositionMs = Long.MIN_VALUE
+                systemStatusLyricsManager.cancel()
                 lyriconManager.clearLyrics()
                 desktopLyricsController.clearLyrics()
                 syncCurrentState(force = true)
@@ -101,18 +105,16 @@ class TopDisplayModeController(
                     preferences.getString(PreferencesManager.Keys.TOP_DISPLAY_MODE, ""),
                     preferences.getBoolean(PreferencesManager.Keys.LYRICON_ENABLED, true),
                 ) { savedMode, legacyLyriconEnabled ->
-                    if (savedMode.isBlank()) {
-                        if (legacyLyriconEnabled) {
-                            TopDisplayMode.STATUS_LYRIC
-                        } else {
-                            TopDisplayMode.OFF
-                        }
-                    } else {
-                        TopDisplayMode.fromString(savedMode)
-                    }
+                    TopDisplayMode.resolve(savedMode, legacyLyriconEnabled)
                 }.distinctUntilChanged()
                     .collect(::applyModeInternal)
             }
+        scope?.launch {
+            while (isActive) {
+                this@TopDisplayModeController.player?.let { updatePosition(it.currentPosition) }
+                delay(POSITION_INTERVAL_MS)
+            }
+        }
     }
 
     suspend fun applyMode(mode: TopDisplayMode) {
@@ -147,6 +149,10 @@ class TopDisplayModeController(
         force: Boolean = false,
     ) {
         lyriconManager.updatePosition(positionMs)
+        if (mode == TopDisplayMode.SYSTEM_STATUS_LYRIC) {
+            syncCurrentState(positionOverrideMs = positionMs, force = true)
+            return
+        }
         if (mode != TopDisplayMode.LIVE_UPDATE) return
         if (!liveUpdateManager.isSupported() || !liveUpdateManager.canPostPromotedNotification()) return
         val lyricKey = currentLyric(positionMs)?.let { "${it.time}:${it.displayText()}" }
@@ -161,6 +167,7 @@ class TopDisplayModeController(
 
     @Synchronized
     fun onPlaybackStopped() {
+        systemStatusLyricsManager.cancel()
         liveUpdateManager.cancel()
         lyriconManager.clear()
         desktopLyricsController.clearLyrics()
@@ -177,6 +184,7 @@ class TopDisplayModeController(
         scope?.cancel()
         scope = null
         liveUpdateManager.cancel()
+        systemStatusLyricsManager.release()
         lyriconManager.release()
         mode = TopDisplayMode.OFF
         lyricsMediaId = null
@@ -192,6 +200,7 @@ class TopDisplayModeController(
     @Synchronized
     private fun applyModeInternal(newMode: TopDisplayMode) {
         if (player == null) {
+            systemStatusLyricsManager.cancel()
             liveUpdateManager.cancel()
             lyriconManager.setEnabled(false)
             mode = newMode
@@ -202,7 +211,13 @@ class TopDisplayModeController(
             syncCurrentState(force = true)
             return
         }
+        systemStatusLyricsManager.cancel()
         when (newMode) {
+            TopDisplayMode.SYSTEM_STATUS_LYRIC -> {
+                liveUpdateManager.cancel()
+                lyriconManager.setEnabled(false)
+            }
+
             TopDisplayMode.OFF -> {
                 liveUpdateManager.cancel()
                 lyriconManager.setEnabled(false)
@@ -241,19 +256,27 @@ class TopDisplayModeController(
                 return
             }
 
-            TopDisplayMode.LIVE_UPDATE -> Unit
+            TopDisplayMode.SYSTEM_STATUS_LYRIC,
+            TopDisplayMode.LIVE_UPDATE,
+            -> Unit
         }
         val item = activePlayer.currentMediaItem
         if (item == null || activePlayer.mediaItemCount == 0) {
+            systemStatusLyricsManager.cancel()
             liveUpdateManager.cancel()
             return
         }
         if (activePlayer.playbackState == Player.STATE_ENDED) {
+            systemStatusLyricsManager.cancel()
             liveUpdateManager.cancel()
             return
         }
         val position = (positionOverrideMs ?: activePlayer.currentPosition).coerceAtLeast(0L)
         val state = currentState(activePlayer, item, position)
+        if (mode == TopDisplayMode.SYSTEM_STATUS_LYRIC) {
+            if (state.isPlaying) systemStatusLyricsManager.showOrUpdate(state) else systemStatusLyricsManager.cancel()
+            return
+        }
         val lyricKey = currentLyric(position)?.let { "${it.time}:${it.displayText()}" }
         if (force) {
             liveUpdateManager.showOrUpdate(state)
@@ -288,9 +311,7 @@ class TopDisplayModeController(
 
     private fun currentLyric(positionMs: Long): LyricItem? {
         val activeMediaId = player?.currentMediaItem?.let(::stableId) ?: return null
-        if (lyricsMediaId != activeMediaId || lyrics.isEmpty()) return null
-        val adjustedPosition = positionMs - lyricsOffsetMs
-        return lyrics.lastOrNull { it.time <= adjustedPosition }
+        return currentLyricFor(activeMediaId, lyricsMediaId, lyrics, positionMs, lyricsOffsetMs)
     }
 
     private fun LyricItem.displayText(): String =
@@ -311,5 +332,19 @@ class TopDisplayModeController(
     private companion object {
         const val TAG = "TopDisplayMode"
         const val LIVE_UPDATE_INTERVAL_MS = 10_000L
+        const val POSITION_INTERVAL_MS = 250L
     }
+}
+
+/** A late result for another song must never leak into a background output. */
+internal fun currentLyricFor(
+    activeMediaId: String,
+    lyricsMediaId: String?,
+    lyrics: List<LyricItem>,
+    positionMs: Long,
+    offsetMs: Long,
+): LyricItem? {
+    if (lyricsMediaId != activeMediaId) return null
+    val adjustedPosition = positionMs - offsetMs
+    return lyrics.lastOrNull { it.time <= adjustedPosition }
 }

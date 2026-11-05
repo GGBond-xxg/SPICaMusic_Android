@@ -44,12 +44,13 @@ import me.spica27.spicamusic.feature.library.domain.PlaylistUseCases
 import me.spica27.spicamusic.feature.library.domain.ScanFolderUseCases
 import me.spica27.spicamusic.feature.library.domain.ScanRulesUseCases
 import me.spica27.spicamusic.feature.library.domain.SongUseCases
-import me.spica27.spicamusic.feature.lyrics.domain.LyricsUseCases
 import me.spica27.spicamusic.feature.player.domain.PlayerUseCases
 import me.spica27.spicamusic.feature.settings.domain.SettingsUseCases
 import me.spica27.spicamusic.lyricon.LyriconProviderManager
 import me.spica27.spicamusic.service.DesktopLyricsController
+import me.spica27.spicamusic.service.SharedLyricsStore
 import me.spica27.spicamusic.topdisplay.MusicLiveUpdateManager
+import me.spica27.spicamusic.topdisplay.SystemStatusLyricsManager
 import me.spica27.spicamusic.topdisplay.TopDisplayModeController
 import me.spica27.spicamusic.ui.album.AlbumViewModel
 import me.spica27.spicamusic.ui.albumdetail.AlbumDetailViewModel
@@ -108,7 +109,9 @@ object AppModule {
             single { LyriconProviderManager(androidContext()) }
             single { MusicLiveUpdateManager(androidContext()) }
             single { DesktopLyricsController(androidContext()) }
-            single { TopDisplayModeController(get(), get(), get(), get()) }
+            single { SystemStatusLyricsManager(androidContext()) }
+            single { TopDisplayModeController(get(), get(), get(), get(), get()) }
+            single { SharedLyricsStore(androidContext(), get(), get()) }
 
             single<OkHttpClient>(
                 createdAtStart = true,
@@ -253,10 +256,8 @@ object AppModule {
             // 歌词页面 ViewModel
             viewModel {
                 LyricsViewModel(
-                    context = androidContext(),
                     player = get<PlayerUseCases>(),
-                    lyricsUseCases = get<LyricsUseCases>(),
-                    topDisplayModeController = get(),
+                    lyricsStore = get(),
                 )
             }
 

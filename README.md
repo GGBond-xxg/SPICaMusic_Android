@@ -142,6 +142,7 @@ TELEGRAM_API_HASH=your_api_hash
 - 歌曲、专辑、艺术家、收藏、歌单、最近播放与常听统计。
 - 后台播放、MediaSession、媒体通知和播放队列。
 - 在线歌词搜索、同步歌词和歌词页。
+- 通知显示可选关闭、免模块状态栏歌词、Android 16+ 实时动态通知和词幕（Lyricon）。支持原生接口的魅族使用 Flyme 歌词，其他设备使用可调位置、宽度、字号和透明度的顶部悬浮歌词；具体权限、兼容性和验证范围见 [状态栏歌词说明](STATUS_LYRICS.md)。
 - EQ 均衡器、音效、FFT 频谱及多种进度条样式。
 - FLAC、ALAC、Opus、Vorbis、MP3、AAC、WAV、AC3、EAC3、DTS、MLP、
   TrueHD 等格式支持。
