@@ -211,6 +211,25 @@ class SpicaPlayer(
         return browserInstance
     }
 
+    private suspend fun awaitCommand(browser: MediaBrowser, command: Int): Boolean {
+        if (browser.isCommandAvailable(command)) return true
+        val commands = MutableStateFlow(browser.availableCommands)
+        val listener = object : Player.Listener {
+            override fun onAvailableCommandsChanged(availableCommands: Player.Commands) {
+                commands.value = availableCommands
+            }
+        }
+        browser.addListener(listener)
+        return try {
+            withTimeoutOrNull(10_000L) {
+                commands.first { it.contains(command) }
+                true
+            } ?: false
+        } finally {
+            browser.removeListener(listener)
+        }
+    }
+
     override fun doAction(action: PlayerAction) {
         launch(Dispatchers.Main) {
             try {
@@ -229,6 +248,9 @@ class SpicaPlayer(
                     PlayerAction.Pause -> browser.pause()
 
                     PlayerAction.SkipToNext -> {
+                        // Queue restoration is asynchronous in Media3. The masked timeline can
+                        // already contain the next item before its seek command becomes available.
+                        if (browser.hasNextMediaItem() && !awaitCommand(browser, Player.COMMAND_SEEK_TO_NEXT)) return@launch
                         browser.seekToNext()
                         if (browser.playbackState == Player.STATE_IDLE) {
                             browser.prepare()
@@ -237,6 +259,7 @@ class SpicaPlayer(
                     }
 
                     PlayerAction.SkipToPrevious -> {
+                        if (browser.mediaItemCount > 0 && !awaitCommand(browser, Player.COMMAND_SEEK_TO_PREVIOUS)) return@launch
                         browser.seekToPrevious()
                         if (browser.playbackState == Player.STATE_IDLE) {
                             browser.prepare()

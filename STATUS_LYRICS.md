@@ -7,7 +7,11 @@
 - Live updates: existing Android 16+ promoted ongoing notification, subject to notification/promotion permission and ROM support.
 - Lyricon (词幕): existing module integration. The persisted `status_lyric` value still means Lyricon; the new module-free route uses `system_status_lyric`. Unknown stored values resolve to Off.
 
-Flyme controls the native ticker's placement. Only the application-overlay route exposes horizontal/vertical position, width, font size and text opacity. Its window is non-focusable/non-touchable, bounded to the current usable display area, and hidden when paused, stopped, locked or the screen is off. Android's obscuring-opacity limit is respected; other overlapping overlays can still affect OS touch policy.
+Flyme controls the native ticker's placement. Only the application-overlay route exposes horizontal/vertical position, width, font size and text opacity. Its transparent text window has no background or shadow, is non-focusable/non-touchable, and stays within the usable display area. Normal lyrics hide when paused, stopped, locked or the screen is off. Android's obscuring-opacity limit is respected; other overlapping overlays can still affect OS touch policy.
+
+The settings sliders update the actual overlay immediately while dragging. The visible settings page owns a temporary sample when no lyric is playing; it does not depend on the playback service being started. Leaving the page or backgrounding the app ends this adjustment session and restores normal playback output. Permission management is a single button, without a large explanatory card or an in-page mock preview. Appearance is saved when a gesture finishes or the page loses visibility, rather than writing preferences on every slider frame.
+
+Cold-start mini-player controls remain enabled when a saved track is available. Their actions use the existing lazy connection/queue restoration path; they must not wait for a connection that the disabled buttons themselves would have triggered. Next/previous actions also wait for Media3 to expose the seek command after asynchronous queue restoration, so the first cold-start tap is not silently dropped.
 
 The playback service owns the shared lyric loader and position clock. The player screen and background outputs consume the same source/offset selection; late results for another track are rejected. Rendering is deduplicated by displayed text/layout or native notification content.
 
@@ -40,6 +44,17 @@ The Meizu method has a decompiler warning and an incompletely reconstructed loca
 No Meizu device was connected during development. Capability probing and notification construction are implemented, but native Flyme appearance still needs validation on a supported Meizu/Flyme device.
 
 ## Validation
+
+### v1.7.14 follow-up
+
+- Reproduced the v1.7.13 cold-start mini-player issue on vivo Android 15: tapping Play never started the playback service. The enabled controls now reach the lazy restoration path and start playback without opening the full player.
+- A separate force-stop/cold-start test exposed a second race: the first Next action ran before Media3 enabled its seek command. After waiting for command availability, one tap changed the restored queue from Cruel Summer (index 0) to Insomnia (index 1), with the platform session reporting PLAYING, without opening the full player.
+- Debug compilation, all 64 app JVM tests and all 18 player-data JVM tests passed.
+- In the real overlay editor, held a slider gesture down while moving the horizontal position: the actual type-2038 window moved from x=-207px to x=98px before touch-up, while the persisted setting still held its old value. Touch-up saved the new position. Restored the original appearance after checking persistence.
+- With playback paused, the settings page displays the real temporary overlay. Returning to settings from permission management restored it; leaving the editor, opening permission settings and backgrounding the app each left zero overlay windows. The existing permission grant was preserved.
+- Visually checked transparent lyric text without a background/shadow, a single permission-management button, and removal of the in-page mock preview.
+
+### Original backend validation
 
 - Debug build and all 64 app JVM tests passed, including mode migration, stale-track rejection, lyric offsets/backward seeks and geometry bounds.
 - On the connected vivo Android 15 device: the overlay appeared with window type 2038, `NOT_FOCUSABLE | NOT_TOUCHABLE` and alpha 0.8; background playback and switching tracks updated its lyrics without opening the player/lyrics page. Pausing and revoking overlay permission both removed the window (zero remaining windows).

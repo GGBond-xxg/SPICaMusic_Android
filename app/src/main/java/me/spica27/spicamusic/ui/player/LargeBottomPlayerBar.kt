@@ -69,7 +69,6 @@ fun LargeBottomPlayerBar(
     onCoverPainterReady: (Painter) -> Unit = {},
     onCoverPainterFailed: () -> Unit = {},
     contentReady: Boolean = true,
-    controlsReady: Boolean = true,
     viewModel: PlayerViewModel = LocalPlayerViewModel.current,
     mediaItem: MediaItem?,
     onExpand: () -> Unit,
@@ -245,7 +244,8 @@ fun LargeBottomPlayerBar(
                         PlayerHaptics.click()
                         viewModel.togglePlayPause()
                     },
-                    enabled = hasMediaItem && contentReady && controlsReady,
+                    // A cold tap must reach doAction(), which connects and restores the player.
+                    enabled = hasMediaItem && contentReady,
                     modifier =
                         playButtonModifier
                             .size(40.dp)
@@ -267,7 +267,7 @@ fun LargeBottomPlayerBar(
                         PlayerHaptics.click()
                         onNext()
                     },
-                    enabled = hasMediaItem && contentReady && controlsReady,
+                    enabled = hasMediaItem && contentReady,
                     modifier =
                         nextButtonModifier
                             .size(40.dp)

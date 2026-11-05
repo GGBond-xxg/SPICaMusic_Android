@@ -5,16 +5,10 @@ package me.spica27.spicamusic.ui.settings
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,25 +17,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.spica27.navkit.scene.StackScene
 import me.spica27.spicamusic.R
-import me.spica27.spicamusic.topdisplay.StatusLyricsAppearance
 import me.spica27.spicamusic.topdisplay.SystemStatusLyricsManager
 import me.spica27.spicamusic.ui.about.AboutScaffold
 import me.spica27.spicamusic.ui.theme.GlassButton
@@ -57,202 +44,120 @@ class StatusLyricsSettingsScene : StackScene() {
         val context = LocalContext.current
         val lifecycleOwner = LocalLifecycleOwner.current
         val nativeSupported = remember(manager) { manager.isNativeSupported() }
-        var overlayAllowed by remember(manager) { mutableStateOf(manager.canShowOverlay()) }
-        var notificationsAllowed by remember(context) {
-            mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled())
-        }
         var settingsUnavailable by remember { mutableStateOf(false) }
         val appearance by manager.appearance.collectAsStateWithLifecycle()
-        var draft by remember(appearance) { mutableStateOf(appearance) }
+        val sampleText = stringResource(R.string.status_lyrics_preview_text)
 
-        DisposableEffect(lifecycleOwner, manager) {
+        DisposableEffect(lifecycleOwner, manager, sampleText) {
             val observer =
                 LifecycleEventObserver { _, event ->
-                    if (event == Lifecycle.Event.ON_RESUME) {
-                        overlayAllowed = manager.canShowOverlay()
-                        notificationsAllowed = NotificationManagerCompat.from(context).areNotificationsEnabled()
+                    when (event) {
+                        Lifecycle.Event.ON_RESUME -> manager.beginLiveAdjustment(sampleText)
+                        Lifecycle.Event.ON_PAUSE -> manager.endLiveAdjustment()
+                        else -> Unit
                     }
                 }
             lifecycleOwner.lifecycle.addObserver(observer)
-            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+            if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                manager.beginLiveAdjustment(sampleText)
+            }
+            onDispose {
+                lifecycleOwner.lifecycle.removeObserver(observer)
+                manager.endLiveAdjustment()
+            }
         }
 
         AboutScaffold(title = stringResource(R.string.status_lyrics_settings)) {
             item {
-                GlassCard {
-                    Column(
-                        Modifier.fillMaxWidth().padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Text(
-                            stringResource(
-                                if (nativeSupported) {
-                                    R.string.status_lyrics_native_summary
-                                } else {
-                                    R.string.status_lyrics_overlay_summary
-                                },
-                            ),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        Text(
-                            stringResource(
-                                if (nativeSupported) {
-                                    R.string.status_lyrics_native_hint
-                                } else {
-                                    R.string.status_lyrics_overlay_hint
-                                },
-                            ),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        if (nativeSupported) {
-                            Text(
-                                stringResource(
-                                    if (notificationsAllowed) {
-                                        R.string.status_lyrics_notifications_granted
-                                    } else {
-                                        R.string.status_lyrics_notifications_needed
-                                    },
-                                ),
-                                color =
-                                    if (notificationsAllowed) {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    } else {
-                                        MaterialTheme.colorScheme.error
-                                    },
-                            )
-                            GlassButton(
-                                onClick = {
-                                    settingsUnavailable =
-                                        runCatching {
-                                            context.startActivity(
-                                                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                                                    .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
-                                            )
-                                        }.recoverCatching {
-                                            context.startActivity(
-                                                Intent(
-                                                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                                    Uri.parse("package:${context.packageName}"),
-                                                ),
-                                            )
-                                        }.isFailure
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Text(stringResource(R.string.status_lyrics_notifications_action))
-                            }
-                        } else {
-                            Text(
-                                stringResource(
-                                    if (overlayAllowed) {
-                                        R.string.status_lyrics_permission_granted
-                                    } else {
-                                        R.string.status_lyrics_permission_needed
-                                    },
-                                ),
-                                color =
-                                    if (overlayAllowed) {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    } else {
-                                        MaterialTheme.colorScheme.error
-                                    },
-                            )
-                            GlassButton(
-                                onClick = {
-                                    settingsUnavailable =
-                                        runCatching {
-                                            context.startActivity(
-                                                Intent(
-                                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                                    Uri.parse("package:${context.packageName}"),
-                                                ),
-                                            )
-                                        }.recoverCatching {
-                                            context.startActivity(
-                                                Intent(
-                                                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                                    Uri.parse("package:${context.packageName}"),
-                                                ),
-                                            )
-                                        }.isFailure
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Text(stringResource(R.string.status_lyrics_permission_action))
-                            }
-                        }
-                        if (settingsUnavailable) {
-                            Text(
-                                stringResource(
+                GlassButton(
+                    onClick = {
+                        manager.endLiveAdjustment()
+                        settingsUnavailable =
+                            runCatching {
+                                context.startActivity(
                                     if (nativeSupported) {
-                                        R.string.status_lyrics_notifications_unavailable
+                                        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
                                     } else {
-                                        R.string.status_lyrics_settings_unavailable
+                                        Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))
                                     },
-                                ),
-                            )
-                        }
-                    }
+                                )
+                            }.recoverCatching {
+                                context.startActivity(
+                                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")),
+                                )
+                            }.isFailure
+                        if (settingsUnavailable) manager.beginLiveAdjustment(sampleText)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        stringResource(
+                            if (nativeSupported) R.string.status_lyrics_notifications_action else R.string.status_lyrics_permission_action,
+                        ),
+                    )
                 }
             }
-            if (!nativeSupported) {
+            if (settingsUnavailable) {
                 item {
-                    GlassCard {
-                        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text(stringResource(R.string.status_lyrics_preview), style = MaterialTheme.typography.titleMedium)
-                            StatusLyricsPreview(draft)
-                            Text(stringResource(R.string.status_lyrics_preview_hint), style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
+                    Text(
+                        stringResource(
+                            if (nativeSupported) R.string.status_lyrics_notifications_unavailable else R.string.status_lyrics_settings_unavailable,
+                        ),
+                    )
                 }
+            }
+            if (nativeSupported) {
+                item { Text(stringResource(R.string.status_lyrics_native_hint), style = MaterialTheme.typography.bodyMedium) }
+            } else {
                 item {
                     StatusLyricsSlider(
                         stringResource(R.string.status_lyrics_position_x),
-                        draft.xDp,
+                        appearance.xDp,
                         -180f..180f,
                         "dp",
-                        { draft = draft.copy(xDp = it) },
-                        { manager.updateAppearance(draft) },
+                        { manager.updateAppearance(manager.appearance.value.copy(xDp = it), persist = false) },
+                        manager::saveAppearance,
                     )
                 }
                 item {
                     StatusLyricsSlider(
                         stringResource(R.string.status_lyrics_position_y),
-                        draft.yDp,
+                        appearance.yDp,
                         0f..240f,
                         "dp",
-                        { draft = draft.copy(yDp = it) },
-                        { manager.updateAppearance(draft) },
+                        { manager.updateAppearance(manager.appearance.value.copy(yDp = it), persist = false) },
+                        manager::saveAppearance,
                     )
                 }
                 item {
                     StatusLyricsSlider(
                         stringResource(R.string.status_lyrics_width),
-                        draft.widthDp,
+                        appearance.widthDp,
                         120f..360f,
                         "dp",
-                        { draft = draft.copy(widthDp = it) },
-                        { manager.updateAppearance(draft) },
+                        { manager.updateAppearance(manager.appearance.value.copy(widthDp = it), persist = false) },
+                        manager::saveAppearance,
                     )
                 }
                 item {
                     StatusLyricsSlider(
                         stringResource(R.string.status_lyrics_text_size),
-                        draft.textSizeSp,
+                        appearance.textSizeSp,
                         10f..28f,
                         "sp",
-                        { draft = draft.copy(textSizeSp = it) },
-                        { manager.updateAppearance(draft) },
+                        { manager.updateAppearance(manager.appearance.value.copy(textSizeSp = it), persist = false) },
+                        manager::saveAppearance,
                     )
                 }
                 item {
                     StatusLyricsSlider(
                         stringResource(R.string.status_lyrics_opacity),
-                        draft.opacityPercent,
+                        appearance.opacityPercent,
                         20f..100f,
                         "%",
-                        { draft = draft.copy(opacityPercent = it) },
-                        { manager.updateAppearance(draft) },
+                        { manager.updateAppearance(manager.appearance.value.copy(opacityPercent = it), persist = false) },
+                        manager::saveAppearance,
                     )
                 }
                 item {
@@ -261,34 +166,6 @@ class StatusLyricsSettingsScene : StackScene() {
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun StatusLyricsPreview(appearance: StatusLyricsAppearance) {
-    BoxWithConstraints(
-        Modifier
-            .fillMaxWidth()
-            .height(180.dp)
-            .clipToBounds()
-            .background(Color(0xFF24262B)),
-    ) {
-        val scale = (maxWidth / 400.dp).coerceAtMost(1f)
-        Box(
-            Modifier
-                .align(Alignment.TopCenter)
-                .offset(x = (appearance.xDp * scale).dp, y = (16 + appearance.yDp * 0.5f).dp)
-                .width((appearance.widthDp * scale).dp)
-                .padding(4.dp),
-        ) {
-            Text(
-                stringResource(R.string.status_lyrics_preview_text),
-                color = Color.White.copy(alpha = appearance.opacityPercent / 100f),
-                fontSize = appearance.textSizeSp.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
         }
     }
 }
@@ -303,7 +180,7 @@ private fun StatusLyricsSlider(
     onFinish: () -> Unit,
 ) {
     GlassCard {
-        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("$label · $value $unit", style = MaterialTheme.typography.bodyLarge)
             GlassSlider(
                 value = value.toFloat(),

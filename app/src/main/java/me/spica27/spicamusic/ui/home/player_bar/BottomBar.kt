@@ -795,7 +795,6 @@ fun BottomMediaBarV2(bottomBarScrollConnection: BottomBarScrollConnection = Loca
                                     }
                                 },
                                 contentReady = playerContentReady,
-                                controlsReady = playerInitialized,
                                 modifier = Modifier.fillMaxWidth(),
                                 onExpand = {
                                     initialPage = DEFAULT_PAGE

@@ -9,9 +9,10 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
-import android.graphics.drawable.GradientDrawable
 import android.hardware.input.InputManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
 import android.provider.Settings
@@ -52,6 +53,16 @@ class SystemStatusLyricsManager(
     private var lastState: MusicLiveUpdateState? = null
     private var nextOverlayAttemptMs = 0L
     private var nextBackendAttemptMs = 0L
+    private var adjustmentText: String? = null
+    private val adjustmentHandler = Handler(Looper.getMainLooper())
+    private val adjustmentTick =
+        object : Runnable {
+            override fun run() {
+                if (adjustmentText == null) return
+                refreshDisplay()
+                adjustmentHandler.postDelayed(this, 250L)
+            }
+        }
 
     init {
         // A killed process may have left this independent notification behind.
@@ -62,9 +73,18 @@ class SystemStatusLyricsManager(
 
     fun canShowOverlay(): Boolean = Settings.canDrawOverlays(app)
 
-    fun updateAppearance(value: StatusLyricsAppearance) {
+    fun updateAppearance(
+        value: StatusLyricsAppearance,
+        persist: Boolean = true,
+    ) {
         val safe = value.sanitized()
         mutableAppearance.value = safe
+        if (persist) saveAppearance()
+        refreshDisplay()
+    }
+
+    fun saveAppearance() {
+        val safe = appearance.value
         preferences
             .edit()
             .putInt("x_dp", safe.xDp)
@@ -73,16 +93,37 @@ class SystemStatusLyricsManager(
             .putInt("text_sp", safe.textSizeSp)
             .putInt("opacity", safe.opacityPercent)
             .apply()
-        lastState?.let(::showOrUpdate)
     }
 
     fun resetAppearance() = updateAppearance(StatusLyricsAppearance())
 
+    /** The settings page owns this temporary output, independently of playback/service lifetime. */
+    fun beginLiveAdjustment(sampleText: String) {
+        if (isNativeSupported()) return
+        adjustmentText = sampleText
+        nextBackendAttemptMs = 0L
+        nextOverlayAttemptMs = 0L
+        adjustmentHandler.removeCallbacks(adjustmentTick)
+        adjustmentTick.run()
+    }
+
+    fun endLiveAdjustment() {
+        adjustmentText = null
+        adjustmentHandler.removeCallbacks(adjustmentTick)
+        saveAppearance()
+        refreshDisplay()
+    }
+
     /** Called on the playback service's main dispatcher, including after permission/rotation changes. */
     fun showOrUpdate(state: MusicLiveUpdateState) {
+        lastState = state
+        refreshDisplay()
+    }
+
+    private fun refreshDisplay() {
         if (SystemClock.uptimeMillis() < nextBackendAttemptMs) return
         try {
-            renderState(state)
+            renderState(lastState)
         } catch (error: Exception) {
             // Optional OEM/overlay services must not terminate the playback service's lyric clock.
             Timber.tag(TAG).w(error, "Status lyric backend unavailable")
@@ -91,12 +132,21 @@ class SystemStatusLyricsManager(
         }
     }
 
-    private fun renderState(state: MusicLiveUpdateState) {
-        if (!state.isPlaying) {
-            cancel()
+    private fun renderState(state: MusicLiveUpdateState?) {
+        val editingText = adjustmentText
+        if (editingText != null && !isNativeSupported()) {
+            clearNative()
+            if (canShowOverlay() && power.isInteractive && !keyguard.isKeyguardLocked) {
+                showOverlay(state?.lyric?.takeIf(String::isNotBlank) ?: editingText)
+            } else {
+                removeOverlay()
+            }
             return
         }
-        lastState = state
+        if (state == null || !state.isPlaying) {
+            clearOutputs()
+            return
+        }
         val line = state.lyric?.takeIf(String::isNotBlank) ?: state.title
         if (line.isBlank()) {
             clearOutputs()
@@ -120,7 +170,8 @@ class SystemStatusLyricsManager(
         lastState = null
         nextOverlayAttemptMs = 0L
         nextBackendAttemptMs = 0L
-        clearOutputs()
+        // Paused playback must not erase the live positioning sample owned by the visible editor.
+        if (adjustmentText != null) refreshDisplay() else clearOutputs()
     }
 
     fun release() = cancel()
@@ -243,12 +294,6 @@ class SystemStatusLyricsManager(
                 isSelected = true
                 importantForAccessibility = android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO
                 setPadding(dp(8), dp(2), dp(8), dp(2))
-                setShadowLayer(dp(1).toFloat(), 0f, dp(1).toFloat(), Color.BLACK)
-                background =
-                    GradientDrawable().apply {
-                        cornerRadius = dp(8).toFloat()
-                        setColor(0x99000000.toInt())
-                    }
             }
         // Re-evaluate scaled pixels after a system font-size change, even with unchanged preferences.
         view.setTextSize(TypedValue.COMPLEX_UNIT_SP, style.textSizeSp.toFloat())
