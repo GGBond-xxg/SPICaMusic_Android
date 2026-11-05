@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="status_lyrics_alignment">文字對齊</string>
+    <string name="status_lyrics_align_left">靠左</string>
+    <string name="status_lyrics_align_center">置中</string>
+    <string name="status_lyrics_align_right">靠右</string>
+    <string name="status_lyrics_color">字體顏色</string>
+    <string name="status_lyrics_custom_color">自訂顏色</string>
+    <string name="status_lyrics_color_white">白色</string>
+    <string name="status_lyrics_color_black">黑色</string>
+    <string name="status_lyrics_color_red">紅色</string>
+    <string name="status_lyrics_color_yellow">黃色</string>
+    <string name="status_lyrics_color_green">綠色</string>
+    <string name="status_lyrics_color_blue">藍色</string>
+</resources>

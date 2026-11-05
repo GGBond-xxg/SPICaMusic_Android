@@ -1,12 +1,30 @@
 package me.spica27.spicamusic.topdisplay
 
+enum class StatusLyricsAlignment(
+    val key: String,
+) {
+    LEFT("left"),
+    CENTER("center"),
+    RIGHT("right"),
+    ;
+
+    companion object {
+        fun fromKey(key: String?): StatusLyricsAlignment = entries.firstOrNull { it.key == key } ?: CENTER
+    }
+}
+
 data class StatusLyricsAppearance(
     val xDp: Int = 0,
     val yDp: Int = 0,
     val widthDp: Int = 240,
     val textSizeSp: Int = 14,
     val opacityPercent: Int = 90,
+    val colorRgb: Int = 0xFFFFFF,
+    val alignment: StatusLyricsAlignment = StatusLyricsAlignment.CENTER,
 ) {
+    val textColorArgb: Int
+        get() = ((opacityPercent.coerceIn(20, 100) * 255 / 100) shl 24) or (colorRgb and 0xFFFFFF)
+
     fun sanitized(): StatusLyricsAppearance =
         copy(
             xDp = xDp.coerceIn(-180, 180),
@@ -14,6 +32,7 @@ data class StatusLyricsAppearance(
             widthDp = widthDp.coerceIn(120, 360),
             textSizeSp = textSizeSp.coerceIn(10, 28),
             opacityPercent = opacityPercent.coerceIn(20, 100),
+            colorRgb = colorRgb and 0xFFFFFF,
         )
 }
 

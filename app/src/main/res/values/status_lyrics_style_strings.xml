@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="status_lyrics_alignment">Text alignment</string>
+    <string name="status_lyrics_align_left">Left</string>
+    <string name="status_lyrics_align_center">Center</string>
+    <string name="status_lyrics_align_right">Right</string>
+    <string name="status_lyrics_color">Text color</string>
+    <string name="status_lyrics_custom_color">Custom color</string>
+    <string name="status_lyrics_color_white">White</string>
+    <string name="status_lyrics_color_black">Black</string>
+    <string name="status_lyrics_color_red">Red</string>
+    <string name="status_lyrics_color_yellow">Yellow</string>
+    <string name="status_lyrics_color_green">Green</string>
+    <string name="status_lyrics_color_blue">Blue</string>
+</resources>

@@ -7,7 +7,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.graphics.PixelFormat
 import android.hardware.input.InputManager
 import android.os.Build
@@ -92,6 +91,8 @@ class SystemStatusLyricsManager(
             .putInt("width_dp", safe.widthDp)
             .putInt("text_sp", safe.textSizeSp)
             .putInt("opacity", safe.opacityPercent)
+            .putInt("color_rgb", safe.colorRgb)
+            .putString("alignment", safe.alignment.key)
             .apply()
     }
 
@@ -137,7 +138,8 @@ class SystemStatusLyricsManager(
         if (editingText != null && !isNativeSupported()) {
             clearNative()
             if (canShowOverlay() && power.isInteractive && !keyguard.isKeyguardLocked) {
-                showOverlay(state?.lyric?.takeIf(String::isNotBlank) ?: editingText)
+                val line = statusLyricsText(state?.isPlaying == true, state?.lyric, state?.title, editingText)
+                if (line != null) showOverlay(line) else removeOverlay()
             } else {
                 removeOverlay()
             }
@@ -147,8 +149,8 @@ class SystemStatusLyricsManager(
             clearOutputs()
             return
         }
-        val line = state.lyric?.takeIf(String::isNotBlank) ?: state.title
-        if (line.isBlank()) {
+        val line = statusLyricsText(state.isPlaying, state.lyric, state.title, null)
+        if (line == null) {
             clearOutputs()
             return
         }
@@ -287,7 +289,6 @@ class SystemStatusLyricsManager(
             }
         val view =
             textView ?: TextView(app).apply {
-                gravity = Gravity.CENTER
                 setSingleLine(true)
                 ellipsize = TextUtils.TruncateAt.MARQUEE
                 marqueeRepeatLimit = -1
@@ -298,7 +299,14 @@ class SystemStatusLyricsManager(
         // Re-evaluate scaled pixels after a system font-size change, even with unchanged preferences.
         view.setTextSize(TypedValue.COMPLEX_UNIT_SP, style.textSizeSp.toFloat())
         if (lastAppearance != style || textView == null) {
-            view.setTextColor(Color.argb(style.opacityPercent * 255 / 100, 255, 255, 255))
+            view.setTextColor(style.textColorArgb)
+            view.textAlignment = android.view.View.TEXT_ALIGNMENT_GRAVITY
+            view.gravity = Gravity.CENTER_VERTICAL or
+                when (style.alignment) {
+                    StatusLyricsAlignment.LEFT -> Gravity.LEFT
+                    StatusLyricsAlignment.CENTER -> Gravity.CENTER_HORIZONTAL
+                    StatusLyricsAlignment.RIGHT -> Gravity.RIGHT
+                }
         }
         val font = view.paint.fontMetricsInt
         val bounds =
@@ -363,6 +371,8 @@ class SystemStatusLyricsManager(
                 preferences.getInt("width_dp", 240),
                 preferences.getInt("text_sp", 14),
                 preferences.getInt("opacity", 90),
+                preferences.getInt("color_rgb", 0xFFFFFF),
+                StatusLyricsAlignment.fromKey(preferences.getString("alignment", null)),
             ).sanitized()
         }.getOrDefault(StatusLyricsAppearance())
 

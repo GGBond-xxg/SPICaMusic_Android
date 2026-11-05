@@ -9,6 +9,8 @@
 
 Flyme controls the native ticker's placement. Only the application-overlay route exposes horizontal/vertical position, width, font size and text opacity. Its transparent text window has no background or shadow, is non-focusable/non-touchable, and stays within the usable display area. Normal lyrics hide when paused, stopped, locked or the screen is off. Android's obscuring-opacity limit is respected; other overlapping overlays can still affect OS touch policy.
 
+The overlay also supports left/center/right text alignment within its configured width and an independent RGB text color. Six labeled color presets and expandable RGB sliders update the real overlay immediately. Alignment and color persist alongside the existing appearance settings; older installations retain white, centered text. Opacity remains independent of the RGB value. The same controls use the existing Glass/Material theme components and wrap into additional rows when needed.
+
 The settings sliders update the actual overlay immediately while dragging. The visible settings page owns a temporary sample when no lyric is playing; it does not depend on the playback service being started. Leaving the page or backgrounding the app ends this adjustment session and restores normal playback output. Permission management is a single button, without a large explanatory card or an in-page mock preview. Appearance is saved when a gesture finishes or the page loses visibility, rather than writing preferences on every slider frame.
 
 Cold-start mini-player controls remain enabled when a saved track is available. Their actions use the existing lazy connection/queue restoration path; they must not wait for a connection that the disabled buttons themselves would have triggered. Next/previous actions also wait for Media3 to expose the seek command after asynchronous queue restoration, so the first cold-start tap is not silently dropped.
@@ -44,6 +46,12 @@ The Meizu method has a decompiler warning and an incompletely reconstructed loca
 No Meizu device was connected during development. Capability probing and notification construction are implemented, but native Flyme appearance still needs validation on a supported Meizu/Flyme device.
 
 ## Validation
+
+### v1.7.15 color, alignment and editor sample
+
+- Debug and both signed release variants built successfully; all 69 app JVM tests passed. New tests cover legacy/unknown alignment values, independent RGB/opacity, stale paused lyrics, playing lyrics and removal of the editor-only sample.
+- On vivo Android 15, verified left/center/right placement, black/red presets, and live RGB changes before touch-up. Custom color and alignment survived an app restart. Checked the controls in both flat and Glass themes, plus English at 1.6x font scale; presets wrapped to additional rows and the page remained scrollable.
+- In the visible settings editor, resuming playback replaced the sample with the current lyric ("Feels like insomnia ah ah"); pausing restored the sample. Leaving the editor while paused left zero overlay windows. Songs without a current lyric use the song title while playing, rather than the editor sample.
 
 ### v1.7.14 follow-up
 
