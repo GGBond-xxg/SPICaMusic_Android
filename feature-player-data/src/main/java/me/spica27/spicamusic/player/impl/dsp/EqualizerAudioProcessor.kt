@@ -35,6 +35,9 @@ class EqualizerAudioProcessor : AudioProcessor {
     // 每个频段的 Q 值（带宽）
     private val bandQ = 1.0f
 
+    private val peakLimiter = LinkedPeakLimiter()
+    private var frameSamples = FloatArray(2)
+
     private var sampleRate = 44100f
     private var channelCount = 2
 
@@ -62,6 +65,8 @@ class EqualizerAudioProcessor : AudioProcessor {
         this.outputAudioFormat = inputAudioFormat
         this.sampleRate = inputAudioFormat.sampleRate.toFloat()
         this.channelCount = inputAudioFormat.channelCount
+        frameSamples = FloatArray(channelCount)
+        peakLimiter.configure(sampleRate)
 
         filters = Array(BAND_COUNT) {
             Array(channelCount) { BiquadFilter() }
@@ -98,25 +103,22 @@ class EqualizerAudioProcessor : AudioProcessor {
             return
         }
 
-        val totalSamples = size / 2
-
-        // 处理音频数据 (16-bit PCM, interleaved)
-        for (i in 0 until totalSamples) {
-            val sample = inputBuffer.short
-            val channel = if (channelCount > 0) i % channelCount else 0
-
-            var x = sample / 32768f
-            // 应用 10 段均衡器（peaking EQ）
-            for (band in 0 until BAND_COUNT) {
-                if (bandGains[band] != 0f) {
-                    x = filterBank[band][channel].process(x)
+        // Link peak protection across channels after EQ, before converting back to PCM16.
+        // Keeping float headroom here prevents boosted bands from hitting a hard clipping wall.
+        while (inputBuffer.remaining() >= channelCount * 2) {
+            for (channel in 0 until channelCount) {
+                var x = inputBuffer.short / 32768f
+                for (band in 0 until BAND_COUNT) {
+                    if (bandGains[band] != 0f) x = filterBank[band][channel].process(x)
                 }
+                frameSamples[channel] = x
             }
-
-            val processed = (x * 32768f).roundToInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
-            output.putShort(processed.toShort())
+            peakLimiter.process(frameSamples)
+            for (sample in frameSamples) {
+                output.putShort((sample * 32768f).roundToInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort())
+            }
         }
-        
+
         output.flip()
         outputBuffer = output
     }
@@ -136,6 +138,7 @@ class EqualizerAudioProcessor : AudioProcessor {
     override fun flush() {
         outputBuffer = AudioProcessor.EMPTY_BUFFER
         inputEnded = false
+        peakLimiter.reset()
         resetFilters()
     }
 
@@ -152,6 +155,7 @@ class EqualizerAudioProcessor : AudioProcessor {
     fun setEnabled(enabled: Boolean) {
         this.enabled = enabled
         if (enabled) {
+            peakLimiter.reset()
             resetFilters()
         }
         Timber.tag(TAG).d("EQ enabled: $enabled")
@@ -168,7 +172,7 @@ class EqualizerAudioProcessor : AudioProcessor {
             return
         }
         
-        val clampedGain = gainDb.coerceIn(-12f, 12f)
+        val clampedGain = if (gainDb.isFinite()) gainDb.coerceIn(-12f, 12f) else 0f
         bandGains[band] = clampedGain
 
         updateBandFilter(band)

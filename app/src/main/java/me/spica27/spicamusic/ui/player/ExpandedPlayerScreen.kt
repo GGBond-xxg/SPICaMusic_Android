@@ -132,6 +132,7 @@ import me.spica27.spicamusic.ui.widget.ShowOnIdleContent
 import me.spica27.spicamusic.ui.widget.StableAudioCover
 import me.spica27.spicamusic.ui.widget.audio_seekbar.AudioDynamicWaveSlider
 import me.spica27.spicamusic.ui.widget.audio_seekbar.AudioWaveSlider
+import me.spica27.spicamusic.ui.widget.audio_seekbar.GlowParticleSeekBar
 import me.spica27.spicamusic.ui.widget.audio_seekbar.SongStructureWaveSlider
 import me.spica27.spicamusic.ui.widget.clickHighlight
 import me.spica27.spicamusic.ui.widget.materialSharedAxisYIn
@@ -1574,6 +1575,7 @@ private fun PlayerAudioQualitySheet(
                         icon =
                             when (style) {
                                 ProgressBarStyle.ExpressiveWavy -> Icons.Default.Waves
+                                ProgressBarStyle.GlowParticle -> Icons.Default.Waves
                                 ProgressBarStyle.DynamicWaveform -> Icons.Default.GraphicEq
                                 ProgressBarStyle.TimeDomainWaveform -> Icons.Default.SurroundSound
                                 ProgressBarStyle.SongStructureWave -> Icons.AutoMirrored.Filled.ShowChart
@@ -1941,6 +1943,7 @@ private fun ProgressBarStyle.playerTitle(): String =
     stringResource(
         when (this) {
             ProgressBarStyle.ExpressiveWavy -> R.string.progress_bar_style_expressive_wavy
+            ProgressBarStyle.GlowParticle -> R.string.progress_bar_style_glow_particle
             ProgressBarStyle.DynamicWaveform -> R.string.progress_bar_style_dynamic_waveform
             ProgressBarStyle.TimeDomainWaveform -> R.string.progress_bar_style_time_domain_waveform
             ProgressBarStyle.SongStructureWave -> R.string.progress_bar_style_song_structure_wave
@@ -2032,6 +2035,17 @@ private fun SeekBarSection(
     ) {
         when (progressBarStyle) {
             ProgressBarStyle.ExpressiveWavy -> Unit
+
+            ProgressBarStyle.GlowParticle -> {
+                GlowParticleSeekBar(
+                    progress = sliderProgress,
+                    onProgressChange = onValueChange,
+                    onProgressChangeFinished = onValueChangeFinished,
+                    enabled = duration > 0,
+                    animationsEnabled = isPlaying && isAppInForeground && !isSeekingState,
+                    modifier = Modifier.fillMaxWidth().height(80.dp),
+                )
+            }
 
             ProgressBarStyle.DynamicWaveform -> {
                 val fftDrawData =

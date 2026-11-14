@@ -261,6 +261,7 @@ class SettingsScene : StackScene() {
         val currentLanguageName =
             languageOptions.firstOrNull { it.value == currentLanguage }?.label
                 ?: languageSystemLabel
+        val glowParticleLabel = stringResource(R.string.progress_bar_style_glow_particle)
         val dynamicWaveformLabel = stringResource(R.string.progress_bar_style_dynamic_waveform)
         val timeDomainWaveformLabel = stringResource(R.string.progress_bar_style_time_domain_waveform)
         val expressiveWavyLabel = stringResource(R.string.progress_bar_style_expressive_wavy)
@@ -268,12 +269,14 @@ class SettingsScene : StackScene() {
         val progressBarStyleName =
             when (ProgressBarStyle.fromString(progressBarStyleValue)) {
                 ProgressBarStyle.ExpressiveWavy -> expressiveWavyLabel
+                ProgressBarStyle.GlowParticle -> glowParticleLabel
                 ProgressBarStyle.DynamicWaveform -> dynamicWaveformLabel
                 ProgressBarStyle.TimeDomainWaveform -> timeDomainWaveformLabel
                 ProgressBarStyle.SongStructureWave -> songStructureWaveLabel
             }
         val progressBarStyleOptions =
             remember(
+                glowParticleLabel,
                 expressiveWavyLabel,
                 dynamicWaveformLabel,
                 timeDomainWaveformLabel,
@@ -282,6 +285,7 @@ class SettingsScene : StackScene() {
                 ImmutableList.copyOf(
                     listOf(
                         SelectOption(ProgressBarStyle.ExpressiveWavy.value, expressiveWavyLabel),
+                        SelectOption(ProgressBarStyle.GlowParticle.value, glowParticleLabel),
                         SelectOption(ProgressBarStyle.DynamicWaveform.value, dynamicWaveformLabel),
                         SelectOption(ProgressBarStyle.TimeDomainWaveform.value, timeDomainWaveformLabel),
                         SelectOption(ProgressBarStyle.SongStructureWave.value, songStructureWaveLabel),
@@ -1272,6 +1276,7 @@ private fun optionIcon(
         "progress_bar_style" ->
             when (ProgressBarStyle.fromString(value)) {
                 ProgressBarStyle.ExpressiveWavy -> Icons.Default.Waves
+                ProgressBarStyle.GlowParticle -> Icons.Default.Waves
                 ProgressBarStyle.DynamicWaveform -> Icons.Default.GraphicEq
                 ProgressBarStyle.TimeDomainWaveform -> Icons.AutoMirrored.Filled.ShowChart
                 ProgressBarStyle.SongStructureWave -> Icons.AutoMirrored.Filled.ShowChart

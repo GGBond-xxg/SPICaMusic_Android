@@ -15,5 +15,5 @@ interface LyricsApi {
      * @param title 歌曲标题
      */
     @GET("http://106.54.25.152:4141/api/lyrics")
-    suspend fun searchLyrics(@Query("title") title: String): ApiResponse<LyricsApiResponse>
+    suspend fun searchLyrics(@Query("title") title: String, @Query("artist") artist: String = ""): ApiResponse<LyricsApiResponse>
 }

@@ -217,6 +217,9 @@ private fun FavoriteScreenContent() {
     }
 
     val listState = rememberLazyListState()
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) entrancePlayed = true
+    }
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     // 布尔量化的派生状态：只在刊头完全滚出首位时翻转一次
@@ -455,7 +458,11 @@ private fun rememberEntrance(
     play: Boolean,
 ): Animatable<Float, AnimationVector1D> {
     val entrance = remember { Animatable(if (play) 0f else 1f) }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(play) {
+        if (!play) {
+            entrance.snapTo(1f)
+            return@LaunchedEffect
+        }
         if (entrance.value < 1f) {
             delay(order * ENTRANCE_STAGGER_MILLIS)
             entrance.animateTo(

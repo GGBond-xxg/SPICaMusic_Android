@@ -77,4 +77,10 @@
   <string name="search_source_qq_music">QQ 音乐</string>
   <string name="search_source_local_library">现有曲库与收藏</string>
   <string name="search_remote_source_failed">部分云端音乐搜索失败，请检查网络或重新登录</string>
+    <string name="progress_bar_style_glow_particle">辉光粒子</string>
+    <string name="playlist_import_m3u">导入本地 M3U 歌单</string>
+    <string name="playlist_export_m3u">导出本地歌曲为 M3U8</string>
+    <string name="playlist_export_result">已导出 %1$d 首本地歌曲（不含云端歌曲）。</string>
+    <string name="playlist_import_result">已添加 %1$d 首，未匹配 %2$d 首，重复 %3$d 首。请先扫描需要导入的本地歌曲。</string>
+    <string name="playlist_transfer_failed">操作失败。请确认歌单含本地歌曲，文件为 UTF-8 M3U/M3U8 且不超过 1 MB。</string>
 </resources>

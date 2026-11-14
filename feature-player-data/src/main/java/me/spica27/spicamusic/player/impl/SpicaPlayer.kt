@@ -163,15 +163,14 @@ class SpicaPlayer(
                     playerKVUtils.getHistoryMediaItems()
                 }
 
+                // Restore the mode even on first launch with an empty saved queue.
+                applyPlayMode(browser, PlayMode.from(playerKVUtils.getPlayMode()))
+
                 if (items.isEmpty()) {
                     Timber.e("No songs found")
                     _initializing.set(false)
                     return@launch
                 }
-
-                // 恢复上次的播放模式
-                val savedPlayMode = PlayMode.from(playerKVUtils.getPlayMode())
-                applyPlayMode(browser, savedPlayMode)
 
                 browser.playWhenReady = false
                 val savedMediaId = playerKVUtils.getCurrentMediaId()
@@ -181,6 +180,7 @@ class SpicaPlayer(
                         .takeIf { it >= 0 }
                         ?: playerKVUtils.getHistoryPosition().coerceIn(items.indices)
                 browser.setMediaItems(items, savedIndex, playerKVUtils.getHistoryProgressMs())
+                applyPlayMode(browser, PlayMode.from(playerKVUtils.getPlayMode()))
                 browser.prepare()
             } catch (e: Exception) {
                 Timber.tag(TAG).e(e, "Failed to initialize player")
@@ -368,6 +368,7 @@ class SpicaPlayer(
                             ?.takeIf { it >= 0 } ?: 0
                         val items = withContext(Dispatchers.IO) { MediaLibrary.mediaIdToMediaItems(action.mediaIds) }
                         browser.setMediaItems(items, index, 0)
+                        applyPlayMode(browser, PlayMode.from(playerKVUtils.getPlayMode()))
                         if (action.start) {
                             browser.play()
                         }
@@ -392,6 +393,7 @@ class SpicaPlayer(
                         if (action.items.isEmpty()) return@launch
                         val startIndex = action.startIndex.coerceIn(action.items.indices)
                         browser.setMediaItems(action.items, startIndex, 0L)
+                        applyPlayMode(browser, PlayMode.from(playerKVUtils.getPlayMode()))
                         browser.prepare()
                         browser.playWhenReady = true
                     }
@@ -415,6 +417,7 @@ class SpicaPlayer(
                                 }
                             }
                         browser.setMediaItems(items, currentIndex, action.positionMs.coerceAtLeast(0L))
+                        applyPlayMode(browser, PlayMode.from(playerKVUtils.getPlayMode()))
                         browser.prepare()
                         browser.playWhenReady = wasPlaying
                     }
@@ -428,6 +431,7 @@ class SpicaPlayer(
                                 if (index == currentIndex) action.item else browser.getMediaItemAt(index)
                             }
                         browser.setMediaItems(items, currentIndex, action.positionMs.coerceAtLeast(0L))
+                        applyPlayMode(browser, PlayMode.from(playerKVUtils.getPlayMode()))
                         browser.prepare()
                         browser.playWhenReady = wasPlaying
                     }

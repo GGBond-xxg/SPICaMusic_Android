@@ -366,6 +366,9 @@ fun PlaylistDetailScreen(
         val headerEntrance = rememberEntrance(order = 2)
         val actionRowEntrance = rememberEntrance(order = 3)
         var listEntrancePlay by remember { mutableStateOf(true) }
+        LaunchedEffect(browseListState.isScrollInProgress) {
+            if (browseListState.isScrollInProgress) listEntrancePlay = false
+        }
         LaunchedEffect(listEntrancePlay) {
             if (listEntrancePlay) {
                 delay(55)
@@ -855,6 +858,7 @@ private fun BrowseTopBar(
     onSearchClick: () -> Unit,
     viewModel: PlaylistDetailViewModel,
 ) {
+    val transferActions = rememberPlaylistTransferActions(title, viewModel)
     Row(
         Modifier
             .fillMaxWidth()
@@ -928,6 +932,7 @@ private fun BrowseTopBar(
                         viewModel.showAddSongsSheet()
                     },
                 )
+                transferActions()
                 if (isMultiSelectMode) {
                     PlaylistDropdownMenuItem(
                         text = stringResource(R.string.select_all),
@@ -2572,7 +2577,11 @@ private fun rememberEntrance(
     needAnim: Boolean = true,
 ): Animatable<Float, AnimationVector1D> {
     val entrance = remember { Animatable(if (needAnim) 0f else 1f) }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(needAnim) {
+        if (!needAnim) {
+            entrance.snapTo(1f)
+            return@LaunchedEffect
+        }
         delay(order * 55L)
         entrance.animateTo(
             targetValue = 1f,

@@ -217,6 +217,9 @@ private fun SourceInfoBar(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        LyricSourceArtwork(source.albumArt)
+        Spacer(modifier = Modifier.width(10.dp))
+
         // 序号标签
         LyricsBadge(
             text = stringResource(R.string.pager_format, currentPage + 1, sources.size),

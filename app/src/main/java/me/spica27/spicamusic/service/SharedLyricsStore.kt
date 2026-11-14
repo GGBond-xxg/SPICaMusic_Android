@@ -230,7 +230,7 @@ class SharedLyricsStore(
                 val remoteResults =
                     try {
                         withContext(Dispatchers.IO) {
-                            lyricsUseCases.searchAllLyrics(title)
+                            lyricsUseCases.searchAllLyrics(title, artist.orEmpty())
                         }
                     } catch (cancelled: CancellationException) {
                         throw cancelled

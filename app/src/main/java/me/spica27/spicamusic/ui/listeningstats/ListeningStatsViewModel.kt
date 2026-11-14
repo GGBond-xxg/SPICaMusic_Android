@@ -3,6 +3,7 @@ package me.spica27.spicamusic.ui.listeningstats
 import androidx.compose.runtime.Stable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -11,6 +12,7 @@ import me.spica27.spicamusic.common.entity.PlayStats
 import me.spica27.spicamusic.common.entity.Song
 import me.spica27.spicamusic.feature.library.domain.PlayHistoryUseCases
 import me.spica27.spicamusic.feature.library.domain.SongUseCases
+import timber.log.Timber
 
 data class TopSongDisplayItem(
     val songId: Long,
@@ -61,7 +63,10 @@ class ListeningStatsViewModel(
                             playCount = ts.playCount,
                         )
                     }
-            } catch (_: Exception) {
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Timber.e(error, "Failed to refresh listening stats")
             }
         }
     }

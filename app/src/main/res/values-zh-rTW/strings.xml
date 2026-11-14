@@ -993,4 +993,10 @@
   <string name="status_lyrics_notifications_needed">請允許應用程式通知，以顯示 Flyme 狀態列歌詞。</string>
   <string name="status_lyrics_notifications_action">管理通知權限</string>
   <string name="status_lyrics_notifications_unavailable">請前往系統應用程式設定，允許通知。</string>
+    <string name="progress_bar_style_glow_particle">輝光粒子</string>
+    <string name="playlist_import_m3u">匯入本機 M3U 歌單</string>
+    <string name="playlist_export_m3u">匯出本機歌曲為 M3U8</string>
+    <string name="playlist_export_result">已匯出 %1$d 首本機歌曲（不含雲端歌曲）。</string>
+    <string name="playlist_import_result">已新增 %1$d 首，未匹配 %2$d 首，重複 %3$d 首。請先掃描需要匯入的本機歌曲。</string>
+    <string name="playlist_transfer_failed">操作失敗。請確認歌單含本機歌曲，檔案為 UTF-8 M3U/M3U8 且不超過 1 MB。</string>
 </resources>

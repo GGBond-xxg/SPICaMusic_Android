@@ -30,6 +30,7 @@ import me.spica27.spicamusic.feature.library.domain.PlaylistUseCases
 import me.spica27.spicamusic.feature.library.domain.SongUseCases
 import me.spica27.spicamusic.feature.player.domain.PlayerUseCases
 import me.spica27.spicamusic.player.api.PlayerAction
+import me.spica27.spicamusic.playlist.M3uPlaylist
 import timber.log.Timber
 
 /**
@@ -80,6 +81,20 @@ class PlaylistDetailViewModel(
                 started = SharingStarted.WhileSubscribed(5000),
                 initialValue = emptyList(),
             )
+
+    internal suspend fun exportTracks(): List<M3uPlaylist.Track> =
+        playlistRepository.getSongsByPlaylistIdList(playlistId).map { it.toM3uTrack() }
+
+    internal suspend fun importTracks(entries: List<String>): M3uPlaylist.Match {
+        val library = songRepository.getAllSongs().filterNot { it.isIgnore }.map { it.toM3uTrack() }
+        val match = M3uPlaylist.match(entries, library)
+        val existing = playlistRepository.getSongsByPlaylistIdList(playlistId).mapTo(hashSetOf()) { it.mediaStoreId }
+        val additions = match.ids.filterNot { it in existing }
+        if (additions.isNotEmpty()) playlistRepository.addSongsToPlaylist(playlistId, additions)
+        return match.copy(ids = additions, duplicates = match.duplicates + match.ids.size - additions.size)
+    }
+
+    private fun Song.toM3uTrack() = M3uPlaylist.Track(mediaStoreId, path, displayName, artist, duration)
 
     // ===== 搜索功能 =====
     private val _isSearchMode = MutableStateFlow(false)

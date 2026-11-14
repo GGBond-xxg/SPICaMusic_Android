@@ -87,6 +87,7 @@ class PlaybackService : MediaLibraryService() {
     private val cloudAudioCache by lazy { CloudAudioCache(this) }
 
     private var mediaSession: MediaLibrarySession? = null
+    private lateinit var notificationProvider: SpicaNotificationProvider
     private lateinit var exoPlayer: ExoPlayer
     private lateinit var sessionPlayer: Player
     private var audioSink: DefaultAudioSink? = null
@@ -347,9 +348,8 @@ class PlaybackService : MediaLibraryService() {
         Timber.tag("PlaybackService").i(
             "service-created sdk=${Build.VERSION.SDK_INT} device=${Build.MANUFACTURER}/${Build.MODEL}",
         )
-        setMediaNotificationProvider(
-            SpicaNotificationProvider(this),
-        )
+        notificationProvider = SpicaNotificationProvider(this)
+        setMediaNotificationProvider(notificationProvider)
         val initialHiFi =
             PlaybackAudioCapabilities.supportsFloatOutput() &&
                 settingsUseCases.getCachedBoolean(SettingsUseCases.Keys.HIFI_MODE, false)
@@ -754,8 +754,9 @@ class PlaybackService : MediaLibraryService() {
         desktopLyricsController.release()
         serviceScope.cancel()
         playerScope.cancel()
+        notificationProvider.cancel()
+        exoPlayer.release()
         mediaSession?.run {
-            exoPlayer.release()
             release()
             mediaSession = null
         }

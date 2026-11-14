@@ -321,7 +321,11 @@ private fun rememberEntrance(
     play: Boolean,
 ): Animatable<Float, AnimationVector1D> {
     val entrance = remember { Animatable(if (play) 0f else 1f) }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(play) {
+        if (!play) {
+            entrance.snapTo(1f)
+            return@LaunchedEffect
+        }
         if (entrance.value < 1f) {
             delay(order * ENTRANCE_STAGGER_MILLIS)
             entrance.animateTo(

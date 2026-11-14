@@ -997,4 +997,10 @@
   <string name="status_lyrics_notifications_needed">Allow app notifications to display Flyme lyrics.</string>
   <string name="status_lyrics_notifications_action">Manage notification permission</string>
   <string name="status_lyrics_notifications_unavailable">Open system app settings and allow notifications.</string>
+    <string name="progress_bar_style_glow_particle">Glow particles</string>
+    <string name="playlist_import_m3u">Import local M3U playlist</string>
+    <string name="playlist_export_m3u">Export local songs as M3U8</string>
+    <string name="playlist_export_result">Exported %1$d local songs (cloud songs are excluded).</string>
+    <string name="playlist_import_result">Added %1$d songs; %2$d unmatched; %3$d duplicates. Scan local songs before importing.</string>
+    <string name="playlist_transfer_failed">Could not transfer playlist. Use a UTF-8 M3U/M3U8 file up to 1 MB and a playlist containing local songs.</string>
 </resources>

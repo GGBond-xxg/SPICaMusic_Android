@@ -2,6 +2,8 @@
 
 SPICa Music is based on
 [yangSpica27/SPICaMusic_Android](https://github.com/yangSpica27/SPICaMusic_Android).
+The v1.8.0 compatibility update also adapts the MIT upstream glow particle seek bar
+and selected lyric/playback fixes; see [UPSTREAM_SYNC.md](UPSTREAM_SYNC.md).
 Its MIT license and original copyright notice are retained in the repository's
 [LICENSE](LICENSE) file.
 
@@ -23,7 +25,7 @@ Licensed under the Apache License, Version 2.0. You may obtain a copy at
 
 [r3n011/XiangsuPlayerHQ](https://github.com/r3n011/XiangsuPlayerHQ) was used as
 a product and interaction reference for cloud streaming, including the Bilibili
-audio source introduced in v1.7.0. The referenced repository currently declares
+audio source introduced in v1.7.0, and local M3U playlist interchange introduced in v1.8.0. The referenced repository currently declares
 GPL-3.0. The SPICa cloud adapters are implemented for this project; no
 XiangsuPlayerHQ source code or binary is bundled or redistributed.
 

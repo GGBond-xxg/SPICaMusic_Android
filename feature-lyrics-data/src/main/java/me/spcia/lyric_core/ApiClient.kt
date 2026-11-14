@@ -2,6 +2,7 @@ package me.spcia.lyric_core
 
 import android.content.Context
 import com.skydoves.sandwich.getOrNull
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import me.spcia.lyric_core.entity.SongLyrics
@@ -26,11 +27,11 @@ class ApiClient(
      * @param displayName 歌曲标题
      * @return 所有匹配的歌词结果列表，失败时返回空列表
      */
-    suspend fun searchAllLyrics(displayName: String): List<SongLyrics> = withContext(Dispatchers.IO) {
+    suspend fun searchAllLyrics(displayName: String, artist: String = ""): List<SongLyrics> = withContext(Dispatchers.IO) {
         Timber.tag("ApiClient").d("搜索所有歌词: $displayName")
 
         try {
-            val response = api.searchLyrics(displayName).getOrNull()
+            val response = api.searchLyrics(displayName.trim(), artist.trim()).getOrNull()
 
             if (response == null || response.code != 200) {
                 Timber.tag("ApiClient").w("API请求失败: ${response?.message}")
@@ -40,6 +41,8 @@ class ApiClient(
             val results = response.data ?: emptyList()
             Timber.tag("ApiClient").d("找到 ${results.size} 个歌词结果")
             return@withContext results
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Timber.tag("ApiClient").e(e, "搜索歌词失败")
             return@withContext emptyList()

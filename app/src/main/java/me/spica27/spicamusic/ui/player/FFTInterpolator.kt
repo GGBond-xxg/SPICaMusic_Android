@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
@@ -42,7 +43,7 @@ class FFTInterpolator(
 
     /**
      * 插值后的绘制数据 (31个频段, 0.0-1.0)
-     * 适合直接用于 UI 绘制，约120fps 平滑更新
+     * 适合直接用于 UI 绘制，约60fps 平滑更新
      */
     val interpolatedData: StateFlow<FloatArray> =
         flow {
@@ -90,7 +91,8 @@ class FFTInterpolator(
                     delay(FRAME_INTERVAL_MS)
                 }
             }
-        }.flowOn(Dispatchers.Default)
+        }.conflate()
+            .flowOn(Dispatchers.Default)
             .stateIn(
                 scope,
                 SharingStarted.WhileSubscribed(

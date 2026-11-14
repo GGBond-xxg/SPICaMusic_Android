@@ -304,6 +304,7 @@ fun LyricsEditorSheet(
                             DropdownChoice(
                                 title = localizedLyricSourceName(source),
                                 subtitle = localizedLyricSourceArtist(source),
+                                artwork = source.albumArt,
                                 selected = index == currentLyricSourceIndex,
                                 onClick = {
                                     PlayerHaptics.click()
@@ -533,13 +534,17 @@ private fun DropdownChoice(
     onClick: () -> Unit,
     subtitle: String? = null,
     leadingIcon: ImageVector? = null,
+    artwork: String? = null,
     onDelete: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = playerClick(onClick)).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (leadingIcon != null) {
+        if (artwork != null) {
+            LyricSourceArtwork(artwork)
+            Spacer(modifier = Modifier.width(12.dp))
+        } else if (leadingIcon != null) {
             Icon(leadingIcon, null, tint = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.width(12.dp))
         }

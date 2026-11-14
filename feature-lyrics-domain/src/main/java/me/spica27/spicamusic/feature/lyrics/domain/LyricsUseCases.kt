@@ -19,7 +19,7 @@ class LyricsUseCases(
             )
         }
 
-    suspend fun searchAllLyrics(title: String): List<SongLyrics> = apiClient.searchAllLyrics(title)
+    suspend fun searchAllLyrics(title: String, artist: String = ""): List<SongLyrics> = apiClient.searchAllLyrics(title, artist)
 
     suspend fun updateDelay(
         mediaStoreId: Long,

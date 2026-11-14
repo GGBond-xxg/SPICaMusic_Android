@@ -79,6 +79,7 @@ import me.spica27.spicamusic.ui.theme.glassSurface
 import me.spica27.spicamusic.ui.widget.audio_seekbar.AudioDynamicWaveSlider
 import me.spica27.spicamusic.ui.widget.audio_seekbar.AudioWaveSlider
 import me.spica27.spicamusic.ui.widget.audio_seekbar.ExpressiveWavySlider
+import me.spica27.spicamusic.ui.widget.audio_seekbar.GlowParticleSeekBar
 import me.spica27.spicamusic.ui.widget.audio_seekbar.SongStructureWaveSlider
 import me.spica27.spicamusic.ui.theme.GlassIconButton as IconButton
 
@@ -122,6 +123,16 @@ fun PlayerProgressSection(
                             isPlaying = isPlaying,
                             activeColor = MaterialTheme.colorScheme.onSurface,
                             inactiveColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+
+                    ProgressBarStyle.GlowParticle ->
+                        GlowParticleSeekBar(
+                            progress = progress,
+                            onProgressChange = onProgressChange,
+                            onProgressChangeFinished = onProgressChangeFinished,
+                            enabled = duration > 0L,
+                            animationsEnabled = isPlaying && !isSeeking,
                             modifier = Modifier.fillMaxSize(),
                         )
 
