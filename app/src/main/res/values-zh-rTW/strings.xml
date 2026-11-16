@@ -1003,9 +1003,6 @@
   <string name="sleep_timer_finish_song_hint">倒數計時結束後，等待目前歌曲播放完畢。</string>
   <string name="sleep_timer_waiting_for_song">等待目前歌曲播放結束</string>
     <string name="lyrics_current_position">目前歌詞位置</string>
-    <string name="lyrics_position_upper">靠上</string>
-    <string name="lyrics_position_center">置中</string>
-    <string name="lyrics_position_lower">靠下</string>
     <string name="lyrics_move_up">歌詞上移</string>
     <string name="lyrics_move_down">歌詞下移</string>
 </resources>

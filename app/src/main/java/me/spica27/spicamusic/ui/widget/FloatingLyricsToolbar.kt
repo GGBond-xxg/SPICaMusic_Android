@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -690,40 +689,12 @@ internal fun LyricsPositionControl(
     activeLinePosition: Float,
     onActiveLinePositionChange: (Float) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        androidx.compose.foundation.layout.FlowRow(
-            modifier = Modifier.fillMaxWidth().selectableGroup(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            listOf(
-                0.18f to R.string.lyrics_position_upper,
-                0.5f to R.string.lyrics_position_center,
-                0.7f to R.string.lyrics_position_lower,
-            ).forEach { (position, label) ->
-                LyricsPill(
-                    modifier =
-                        Modifier.heightIn(min = 48.dp).selectable(
-                            selected = kotlin.math.abs(activeLinePosition - position) < 0.005f,
-                            role = Role.RadioButton,
-                            onClick = { onActiveLinePositionChange(position) },
-                        ),
-                    containerColor =
-                        if (kotlin.math.abs(activeLinePosition - position) < 0.005f) {
-                            MaterialTheme.colorScheme.primaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.surfaceContainerHighest
-                        },
-                ) { Text(stringResource(label)) }
-            }
-        }
-        StepperRow(
-            value = stringResource(R.string.percentage_format, (activeLinePosition * 100).roundToInt()),
-            onDecrease = { onActiveLinePositionChange((activeLinePosition - 0.01f).coerceAtLeast(0.1f)) },
-            onReset = { onActiveLinePositionChange(0.18f) },
-            onIncrease = { onActiveLinePositionChange((activeLinePosition + 0.01f).coerceAtMost(0.75f)) },
-            decreaseDescription = stringResource(R.string.lyrics_move_up),
-            increaseDescription = stringResource(R.string.lyrics_move_down),
-        )
-    }
+    StepperRow(
+        value = stringResource(R.string.percentage_format, (activeLinePosition * 100).roundToInt()),
+        onDecrease = { onActiveLinePositionChange((activeLinePosition - 0.01f).coerceAtLeast(0.1f)) },
+        onReset = { onActiveLinePositionChange(0.18f) },
+        onIncrease = { onActiveLinePositionChange((activeLinePosition + 0.01f).coerceAtMost(0.75f)) },
+        decreaseDescription = stringResource(R.string.lyrics_move_up),
+        increaseDescription = stringResource(R.string.lyrics_move_down),
+    )
 }
