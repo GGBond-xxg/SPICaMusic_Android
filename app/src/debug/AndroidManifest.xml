@@ -2,5 +2,8 @@
     <application>
         <!-- Debug-only visual fixture; never present in release/withApi APKs. -->
         <activity android:name=".VisualRegressionActivity" android:exported="true" />
+        <service android:name=".PlaybackRestoreTestService" android:exported="false" android:foregroundServiceType="mediaPlayback">
+            <intent-filter><action android:name="androidx.media3.session.MediaLibraryService" /></intent-filter>
+        </service>
     </application>
 </manifest>

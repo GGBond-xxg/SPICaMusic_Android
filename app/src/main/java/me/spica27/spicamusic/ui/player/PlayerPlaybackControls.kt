@@ -28,16 +28,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
-import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Repeat
@@ -99,9 +96,6 @@ fun PlayerProgressSection(
     amplitudes: List<Int> = emptyList(),
     onProgressChange: (Float) -> Unit,
     onProgressChangeFinished: () -> Unit,
-    onAudioQualityClick: (() -> Unit)? = null,
-    audioQualityActionEnabled: Boolean = true,
-    audioQualityActionModifier: Modifier = Modifier,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
@@ -227,45 +221,6 @@ fun PlayerProgressSection(
                         .padding(vertical = 4.dp),
             )
         }
-        Box(Modifier.fillMaxWidth().padding(top = Spacing.Small), contentAlignment = Alignment.Center) {
-            onAudioQualityClick?.let { onClick ->
-                Row(
-                    modifier =
-                        Modifier
-                            .then(audioQualityActionModifier)
-                            .widthIn(max = 240.dp)
-                            .heightIn(min = 40.dp)
-                            .clip(
-                                CircleShape,
-                            ).glassSurface(
-                                CircleShape,
-                                MaterialTheme.colorScheme.tertiaryContainer,
-                                tint = MaterialTheme.colorScheme.tertiaryContainer,
-                                opacity = 0.7f,
-                            ).clickable(
-                                enabled = audioQualityActionEnabled,
-                                role = Role.Button,
-                                onClick = playerClick(onClick),
-                            ).padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.GraphicEq,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                        modifier = Modifier.size(15.dp),
-                    )
-                    Text(
-                        text = stringResource(R.string.player_audio_quality_and_effects),
-                        modifier = Modifier.weight(1f),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer,
-                    )
-                }
-            }
-        }
     }
 }
 
@@ -361,8 +316,6 @@ fun PlayerPlaybackBottomSection(
     amplitudes: List<Int> = emptyList(),
     onProgressChange: (Float) -> Unit,
     onProgressChangeFinished: () -> Unit,
-    onAudioQualityClick: (() -> Unit)? = null,
-    audioQualityActionEnabled: Boolean = true,
     onPlayPauseClick: () -> Unit,
     onPreviousClick: () -> Unit,
     onNextClick: () -> Unit,
@@ -376,7 +329,6 @@ fun PlayerPlaybackBottomSection(
     onSleepTimerFinishCurrentSongChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     progressModifier: Modifier = Modifier,
-    audioQualityActionModifier: Modifier = Modifier,
     controlsModifier: Modifier = Modifier,
     showControls: Boolean = true,
 ) {
@@ -393,9 +345,6 @@ fun PlayerPlaybackBottomSection(
             amplitudes = amplitudes,
             onProgressChange = onProgressChange,
             onProgressChangeFinished = onProgressChangeFinished,
-            onAudioQualityClick = onAudioQualityClick,
-            audioQualityActionEnabled = audioQualityActionEnabled,
-            audioQualityActionModifier = audioQualityActionModifier,
             modifier = progressModifier,
         )
         AnimatedVisibility(

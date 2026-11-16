@@ -221,6 +221,7 @@ class PlaybackService : MediaLibraryService() {
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
+                savePlaybackPosition()
                 Timber.tag("PlaybackService").i(
                     "is-playing=$isPlaying playWhenReady=${exoPlayer.playWhenReady} " +
                         "state=${exoPlayer.playbackState} suppression=${exoPlayer.playbackSuppressionReason}",
@@ -292,6 +293,11 @@ class PlaybackService : MediaLibraryService() {
                 player: Player,
                 events: Player.Events,
             ) {
+                if (events.contains(Player.EVENT_POSITION_DISCONTINUITY) ||
+                    events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION)
+                ) {
+                    savePlaybackPosition()
+                }
                 if (BuildConfig.DIAGNOSTIC_LOGGING) {
                     val eventCodes = (0 until events.size()).joinToString { events.get(it).toString() }
                     Timber.tag("PlaybackService").d(
@@ -418,6 +424,12 @@ class PlaybackService : MediaLibraryService() {
         startCacheTrimMonitor()
         startFadeMonitor()
         startDiagnosticMonitor()
+        playerScope.launch {
+            while (isActive) {
+                delay(5_000)
+                if (exoPlayer.isPlaying) savePlaybackPosition()
+            }
+        }
         topDisplayModeController.start(exoPlayer)
         desktopLyricsController.start(exoPlayer)
         sharedLyricsStore.start(exoPlayer)
@@ -724,7 +736,13 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
+    private fun savePlaybackPosition() {
+        val item = exoPlayer.currentMediaItem ?: return
+        playerKVUtils.savePlaybackPosition(item.mediaId, exoPlayer.currentMediaItemIndex, exoPlayer.currentPosition)
+    }
+
     override fun onTaskRemoved(rootIntent: Intent?) {
+        savePlaybackPosition()
         Timber.tag("PlaybackService").w(
             "task-removed backgroundPlayback=$backgroundPlaybackEnabled " +
                 "playing=${exoPlayer.isPlaying} playWhenReady=${exoPlayer.playWhenReady} " +
@@ -739,6 +757,7 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        savePlaybackPosition()
         Timber.tag("PlaybackService").w(
             "service-destroyed playing=${exoPlayer.isPlaying} " +
                 "playWhenReady=${exoPlayer.playWhenReady} state=${exoPlayer.playbackState}",

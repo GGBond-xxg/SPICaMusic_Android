@@ -69,7 +69,7 @@ class PlayerThemeRegressionTest {
         }
     }
 
-    @Test fun englishQualityActionDoesNotOverlapTimeOrClipAtLargeFont() {
+    @Test fun progressTimesStayReadableWithoutDuplicateQualityAction() {
         var style by mutableStateOf<ThemeColorStyle>(ThemeColorStyle.Glass)
         compose.setContent {
             EnglishLargeFont {
@@ -83,7 +83,6 @@ class PlayerThemeRegressionTest {
                         progressBarStyle = ProgressBarStyle.TimeDomainWaveform,
                         onProgressChange = {},
                         onProgressChangeFinished = {},
-                        onAudioQualityClick = {},
                         modifier = Modifier.width(210.dp),
                     )
                 }
@@ -91,12 +90,9 @@ class PlayerThemeRegressionTest {
         }
         for (next in listOf(ThemeColorStyle.Glass, ThemeColorStyle.Flat, ThemeColorStyle.Textured)) {
             compose.runOnIdle { style = next }
-            val action = compose.onNodeWithText("Quality & effects")
-            assertFullText(action)
-            val actionBounds = action.getUnclippedBoundsInRoot()
-            val timeBounds = compose.onNodeWithText("0:12").getUnclippedBoundsInRoot()
-            assertTrue(actionBounds.top >= timeBounds.bottom + 8.dp)
-            action.performClick()
+            compose.onNodeWithText("Quality & effects").assertDoesNotExist()
+            assertFullText(compose.onNodeWithText("0:12"))
+            assertFullText(compose.onNodeWithText("1:00"))
         }
     }
 

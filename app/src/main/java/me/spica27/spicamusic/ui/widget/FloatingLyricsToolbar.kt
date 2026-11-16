@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -92,6 +93,8 @@ fun LyricsEditorSheet(
     onAddFont: () -> Unit,
     onLyricSourceSelected: (Int) -> Unit,
     onDismiss: () -> Unit,
+    activeLinePosition: Float = 0.18f,
+    onActiveLinePositionChange: (Float) -> Unit = {},
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var expandedSection by remember { mutableStateOf<String?>(null) }
@@ -176,6 +179,16 @@ fun LyricsEditorSheet(
                         modifier = Modifier.weight(1f),
                     )
                 }
+            }
+
+            ExpandableEditorSection(
+                title = stringResource(R.string.lyrics_current_position),
+                value = stringResource(R.string.percentage_format, (activeLinePosition * 100).roundToInt()),
+                icon = Icons.Rounded.FormatLineSpacing,
+                expanded = expandedSection == "position",
+                onToggle = { expandedSection = if (expandedSection == "position") null else "position" },
+            ) {
+                LyricsPositionControl(activeLinePosition, onActiveLinePositionChange)
             }
 
             ExpandableEditorSection(
@@ -671,3 +684,46 @@ private const val MAX_LINE_SPACING = 1.8f
 private const val LINE_SPACING_STEP = 0.1f
 private const val LEGACY_LOCAL_LYRICS_NAME = "本地歌词"
 private const val LEGACY_LOCAL_LYRICS_ARTIST = "内嵌标签"
+
+@Composable
+internal fun LyricsPositionControl(
+    activeLinePosition: Float,
+    onActiveLinePositionChange: (Float) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        androidx.compose.foundation.layout.FlowRow(
+            modifier = Modifier.fillMaxWidth().selectableGroup(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            listOf(
+                0.18f to R.string.lyrics_position_upper,
+                0.5f to R.string.lyrics_position_center,
+                0.7f to R.string.lyrics_position_lower,
+            ).forEach { (position, label) ->
+                LyricsPill(
+                    modifier =
+                        Modifier.heightIn(min = 48.dp).selectable(
+                            selected = kotlin.math.abs(activeLinePosition - position) < 0.005f,
+                            role = Role.RadioButton,
+                            onClick = { onActiveLinePositionChange(position) },
+                        ),
+                    containerColor =
+                        if (kotlin.math.abs(activeLinePosition - position) < 0.005f) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHighest
+                        },
+                ) { Text(stringResource(label)) }
+            }
+        }
+        StepperRow(
+            value = stringResource(R.string.percentage_format, (activeLinePosition * 100).roundToInt()),
+            onDecrease = { onActiveLinePositionChange((activeLinePosition - 0.01f).coerceAtLeast(0.1f)) },
+            onReset = { onActiveLinePositionChange(0.18f) },
+            onIncrease = { onActiveLinePositionChange((activeLinePosition + 0.01f).coerceAtMost(0.75f)) },
+            decreaseDescription = stringResource(R.string.lyrics_move_up),
+            increaseDescription = stringResource(R.string.lyrics_move_down),
+        )
+    }
+}

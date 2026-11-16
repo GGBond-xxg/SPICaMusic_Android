@@ -1006,4 +1006,10 @@
   <string name="sleep_timer_finish_song">Finish current song</string>
   <string name="sleep_timer_finish_song_hint">When the timer expires, wait for the current song to finish.</string>
   <string name="sleep_timer_waiting_for_song">Waiting for the current song to finish</string>
+    <string name="lyrics_current_position">Current lyric position</string>
+    <string name="lyrics_position_upper">Upper</string>
+    <string name="lyrics_position_center">Center</string>
+    <string name="lyrics_position_lower">Lower</string>
+    <string name="lyrics_move_up">Move lyric up</string>
+    <string name="lyrics_move_down">Move lyric down</string>
 </resources>

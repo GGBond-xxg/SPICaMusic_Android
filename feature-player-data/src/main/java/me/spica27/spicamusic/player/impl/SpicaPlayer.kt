@@ -53,11 +53,11 @@ import kotlin.coroutines.CoroutineContext
 class SpicaPlayer(
     private val context: Context,
     private val playbackServiceClass: Class<*>,
+    private val playerKVUtils: PlayerKVUtils = getKoin().get(),
 ) : IMusicPlayer, CoroutineScope, Player.Listener, MediaBrowser.Listener {
 
     private val TAG = "SpicaPlayer"
 
-    private val playerKVUtils = getKoin().get<PlayerKVUtils>()
 
     // 播放历史仓库（延迟获取，避免循环依赖问题）
     private val playHistoryRepository by lazy { getKoin().get<IPlayHistoryRepository>() }
@@ -119,7 +119,7 @@ class SpicaPlayer(
     private val _currentPlaylistMetadata = MutableStateFlow<MediaMetadata?>(null)
     override val currentPlaylistMetadata: StateFlow<MediaMetadata?> = _currentPlaylistMetadata
 
-    private val _currentDuration = MutableStateFlow(0L)
+    private val _currentDuration = MutableStateFlow(cachedCurrentMediaItem?.mediaMetadata?.durationMs?.coerceAtLeast(0L) ?: 0L)
     override val currentDuration: StateFlow<Long> = _currentDuration
 
     private val _currentTimelineItems = MutableStateFlow<List<MediaItem>>(emptyList())
@@ -134,7 +134,7 @@ class SpicaPlayer(
         get() = runCatching {
             val future = _browserFuture
             if (future != null && future.isDone) future.get()?.currentPosition else null
-        }.getOrNull() ?: 0L
+        }.getOrNull() ?: playerKVUtils.getHistoryProgressMs()
 
     override fun isItemPlaying(mediaId: String): Boolean {
         if (!_isPlaying.value) return false
@@ -158,6 +158,14 @@ class SpicaPlayer(
                 val browser = getOrCreateBrowserFuture().await()
                 browserInstance = browser
                 browser.addListener(this@SpicaPlayer)
+                // A reconnect must keep the service's live queue, progress and playing state.
+                if (browser.mediaItemCount > 0) {
+                    onMediaMetadataChanged(browser.mediaMetadata)
+                    onPlaylistMetadataChanged(browser.playlistMetadata)
+                    updateItems(browser.currentTimeline)
+                    onIsPlayingChanged(browser.isPlaying)
+                    return@launch
+                }
 
                 val items = withContext(Dispatchers.IO) {
                     playerKVUtils.getHistoryMediaItems()
@@ -605,7 +613,7 @@ class SpicaPlayer(
         }
         playerKVUtils.setCurrentMediaId(mediaItem?.mediaId)
         if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
-            playerKVUtils.setHistoryProgressMs(0L)
+            playerKVUtils.setHistoryProgressMs(browserInstance?.currentPosition ?: 0L)
         }
         // 切歌时立即重置 duration，避免旧时长污染新歌曲的进度计算
         _currentDuration.value = 0L
@@ -661,6 +669,14 @@ class SpicaPlayer(
             browserDuration > 0 -> browserDuration
             else -> 0L
         }
+    }
+
+    override fun onEvents(player: Player, events: Player.Events) {
+        // Duration can arrive with timeline preparation without a metadata change.
+        _currentMediaItem.value = player.currentMediaItem
+        _currentMediaMetadata.value = player.mediaMetadata
+        _currentDuration.value = player.duration.takeIf { it > 0 }
+            ?: player.mediaMetadata.durationMs?.coerceAtLeast(0L) ?: 0L
     }
 
     override fun onPlaylistMetadataChanged(mediaMetadata: MediaMetadata) {

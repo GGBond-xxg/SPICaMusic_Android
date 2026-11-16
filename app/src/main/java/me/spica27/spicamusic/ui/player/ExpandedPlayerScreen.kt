@@ -387,6 +387,16 @@ fun ExpandedPlayerScreen(
                 audioQualityInfo = audioQualityInfo,
                 playerViewModel = viewModel,
                 onDismiss = { showAudioQualitySheet = false },
+                onPlaybackSourceClick =
+                    if (audioQualityInfo.cloudProvider != null) {
+                        {
+                            showAudioQualitySheet = false
+                            showPlaybackSourceDialog = true
+                            viewModel.refreshPlaybackSources()
+                        }
+                    } else {
+                        null
+                    },
             )
         }
         if (showPlaybackSourceDialog) {
@@ -425,6 +435,7 @@ fun ExpandedPlayerScreen(
                 isDarkMode = MaterialTheme.colorScheme.surface.luminance() < 0.5f,
                 coverUri = { playerArtworkUri },
                 active = dynamicEffectsActive && isAppInForeground,
+                foreground = isAppInForeground,
                 visibilityProgressProvider = {
                     val morph = morphProgressProvider()
                     ((morph - 0.04f) / 0.46f).coerceIn(0f, 1f)
@@ -507,15 +518,6 @@ fun ExpandedPlayerScreen(
                                             currentMediaItem = { currentMediaItem },
                                             audioQualityInfo = audioQualityInfo,
                                             onAudioQualityClick = { showAudioQualitySheet = true },
-                                            onPlaybackSourceClick =
-                                                if (audioQualityInfo.cloudProvider != null) {
-                                                    {
-                                                        showPlaybackSourceDialog = true
-                                                        viewModel.refreshPlaybackSources()
-                                                    }
-                                                } else {
-                                                    null
-                                                },
                                             realPositionProvider = { positionState.value.toFloat() },
                                             seekPositionProvider = { seekValueState.floatValue },
                                             duration = duration,
@@ -657,8 +659,6 @@ fun ExpandedPlayerScreen(
                                     viewModel.seekTo(seekValueState.floatValue.toLong())
                                     isSeekingState = false
                                 },
-                                onAudioQualityClick = { showAudioQualitySheet = true },
-                                audioQualityActionEnabled = lyricsTransitionProgressProvider() < 0.5f,
                                 onPlayPauseClick = viewModel::togglePlayPause,
                                 onPreviousClick = viewModel::skipToPrevious,
                                 onNextClick = viewModel::skipToNext,
@@ -680,15 +680,6 @@ fun ExpandedPlayerScreen(
                                             }
                                         },
                                 controlsModifier =
-                                    Modifier.graphicsLayer {
-                                        val progress = lyricsTransitionProgressProvider()
-                                        val exit = smoothStepProgress(progress)
-                                        alpha = 1f - exit
-                                        translationY = exit * SHARED_CONTROLS_EXIT_DP.dp.toPx()
-                                        scaleX = 1f - exit * 0.035f
-                                        scaleY = 1f - exit * 0.035f
-                                    },
-                                audioQualityActionModifier =
                                     Modifier.graphicsLayer {
                                         val progress = lyricsTransitionProgressProvider()
                                         val exit = smoothStepProgress(progress)
@@ -1025,7 +1016,6 @@ private fun PlayerPage(
     currentMediaItem: () -> MediaItem?,
     audioQualityInfo: AudioQualityInfo,
     onAudioQualityClick: () -> Unit,
-    onPlaybackSourceClick: (() -> Unit)?,
     seekPositionProvider: () -> Float,
     realPositionProvider: () -> Float,
     duration: Long,
@@ -1329,8 +1319,8 @@ private fun PlayerPage(
             onPlaybackVisualsChanged(progressBarStyle, ampState)
         }
         Spacer(modifier = Modifier.height(Spacing.Small))
-        // 歌曲质量标签：固定高度槽位保持版面节奏。音质与音效入口已移到时间中间，
-        // 避免把操作名称、采样率、码率和来源全部挤在同一个胶囊里。
+        // The quality summary is also the single entry to quality, effects and playback sources.
+        val qualityFallback = stringResource(R.string.player_audio_quality_and_effects)
         val qualityTags =
             buildList {
                 if (audioQualityInfo.sampleRate > 0) {
@@ -1349,11 +1339,12 @@ private fun PlayerPage(
                     if (isEmpty()) add(stringResource(R.string.cloud_streaming))
                     add(provider.cloudProviderLabel())
                 }
+                if (isEmpty()) add(qualityFallback)
             }
         Box(
             modifier =
                 Modifier
-                    .heightIn(min = 28.dp)
+                    .heightIn(min = 48.dp)
                     .graphicsLayer {
                         val tagsReveal =
                             calculateFadeAlpha(progressProvider(), TAGS_REVEAL_THRESHOLD)
@@ -1366,6 +1357,7 @@ private fun PlayerPage(
                 FlowRow(
                     modifier =
                         Modifier
+                            .heightIn(min = 48.dp)
                             .clip(
                                 CircleShape,
                             ).glassSurface(
@@ -1373,13 +1365,10 @@ private fun PlayerPage(
                                 MaterialTheme.colorScheme.tertiaryContainer,
                                 tint = MaterialTheme.colorScheme.tertiaryContainer,
                                 opacity = 0.7f,
-                            ).then(
-                                if (onPlaybackSourceClick != null) {
-                                    Modifier.clickHighlight(onClick = playerClick(onPlaybackSourceClick))
-                                } else {
-                                    Modifier
-                                },
-                            ).padding(horizontal = Spacing.Medium, vertical = 5.dp)
+                            ).clickable(
+                                role = androidx.compose.ui.semantics.Role.Button,
+                                onClick = playerClick(onAudioQualityClick),
+                            ).padding(horizontal = Spacing.Medium, vertical = 14.dp)
                             .animateContentSize(),
                     horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
                     verticalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall),
@@ -1412,6 +1401,7 @@ private fun PlayerPage(
 private fun PlayerAudioQualitySheet(
     audioQualityInfo: AudioQualityInfo,
     playerViewModel: PlayerViewModel,
+    onPlaybackSourceClick: (() -> Unit)?,
     onDismiss: () -> Unit,
 ) {
     val settingsViewModel: SettingsViewModel = koinActivityViewModel()
@@ -1454,6 +1444,21 @@ private fun PlayerAudioQualitySheet(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                }
+            }
+
+            if (onPlaybackSourceClick != null) {
+                item(key = "playback_source") {
+                    Text(
+                        text = stringResource(R.string.player_playback_source_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = playerClick(onPlaybackSourceClick))
+                                .padding(horizontal = Spacing.Large, vertical = 16.dp),
+                    )
                 }
             }
 

@@ -36,6 +36,16 @@ class PlayerKVUtils(
       private const val MAX_RESTORED_ITEMS = 10_000
     }
 
+    /** Keep the track identity and its position in one preference transaction. */
+    fun savePlaybackPosition(mediaId: String, index: Int, positionMs: Long) {
+        if (mediaId.isEmpty() || index < 0) return
+        sharedPreferences.edit {
+            putString(KEY_CURRENT_MEDIA_ID, mediaId)
+            putInt(KEY_HISTORY_POSITION, index)
+            putLong(KEY_HISTORY_PROGRESS_MS, positionMs.coerceAtLeast(0L))
+        }
+    }
+
     /**
      * 历史播放的id
      */

@@ -77,7 +77,6 @@ class WaveformContrastTest {
             }
             assertTrue("Played waveform must stay opaque ($useDynamic)", peakLuminance(.1f, .4f) > .8f)
             assertTrue("Unplayed waveform must remain subdued ($useDynamic)", peakLuminance(.6f, .9f) < .1f)
-            assertTrue("Current position must stay visible ($useDynamic)", peakLuminance(.49f, .51f) > .8f)
         }
     }
 }

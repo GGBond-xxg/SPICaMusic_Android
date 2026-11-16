@@ -114,7 +114,6 @@ private object LyricUIConstants {
 
     const val SCROLL_ANIMATION_DURATION = 550
     const val SCROLL_CORRECTION_DURATION = 250
-    const val SCROLL_VIEWPORT_OFFSET_RATIO = 0.18f
 
     const val BASE_TEXT_ALPHA = 0.24f
     const val TRANSLATION_TEXT_ALPHA = 0.72f
@@ -260,11 +259,13 @@ fun LyricsUI(
     textAlignment: LyricsTextAlignment = LyricsTextAlignment.Start,
     textScale: Float = 1f,
     activeLineScale: Float = 1.12f,
+    activeLinePosition: Float = 0.18f,
     lineSpacing: Float = 1f,
     fontFamily: FontFamily? = null,
     onSeekToTime: (Long) -> Unit = {},
     onUserScrollStateChanged: (Boolean) -> Unit = {},
 ) {
+    val anchorFraction = activeLinePosition.takeIf { it.isFinite() }?.coerceIn(0.1f, 0.75f) ?: 0.18f
     val lyricLines = remember(lyric) { lyric.sortedBy { it.time } }
 
     if (lyricLines.isEmpty()) {
@@ -380,7 +381,7 @@ fun LyricsUI(
     }
 
     BoxWithConstraints(modifier = modifier) {
-        LaunchedEffect(playingIndex, showSeekOverlay, lyricLines) {
+        LaunchedEffect(playingIndex, showSeekOverlay, lyricLines, anchorFraction, constraints.maxHeight, style) {
             val target = playingIndex
             if (showSeekOverlay || target == Int.MAX_VALUE || target !in lyricLines.indices) {
                 return@LaunchedEffect
@@ -391,12 +392,14 @@ fun LyricsUI(
                     lazyListState.slowScrollToIndex(
                         targetIndex = target,
                         viewportHeightPx = constraints.maxHeight,
+                        anchorFraction = anchorFraction,
                     )
                 } else {
                     // 首次同步：目标行大概率在视口外，动画+估算必然有落点偏差，直接精确跳转
                     lazyListState.snapToLyricIndex(
                         targetIndex = target,
                         viewportHeightPx = constraints.maxHeight,
+                        anchorFraction = anchorFraction,
                     )
                 }
                 hasSyncedInitialPosition = true
@@ -442,8 +445,10 @@ fun LyricsUI(
             verticalArrangement = Arrangement.spacedBy(style.itemSpacing),
             contentPadding =
                 PaddingValues(
-                    vertical = with(density) { constraints.maxHeight.toDp() / 2 },
-                    horizontal = LyricUIConstants.SEEK_PREVIEW_END_PADDING.dp,
+                    top = with(density) { constraints.maxHeight.toDp() * anchorFraction },
+                    bottom = with(density) { constraints.maxHeight.toDp() * (1f - anchorFraction) },
+                    start = LyricUIConstants.SEEK_PREVIEW_END_PADDING.dp,
+                    end = LyricUIConstants.SEEK_PREVIEW_END_PADDING.dp,
                 ),
             state = lazyListState,
         ) {
@@ -1109,15 +1114,17 @@ private fun SeekPreview(
 // ==================== 工具函数 ====================
 
 /**
- * 计算把目标行顶对齐到视口锚点(35% 高度处)所需的滚动距离
+ * 计算把目标行顶对齐到用户设置的视口锚点所需的滚动距离
  */
 private fun LazyListState.distanceToAnchor(
     itemOffset: Int,
     viewportHeightPx: Int,
+    anchorFraction: Float,
+    itemHeightPx: Int = 0,
 ): Float {
     val anchorY =
         layoutInfo.viewportStartOffset +
-            viewportHeightPx * LyricUIConstants.SCROLL_VIEWPORT_OFFSET_RATIO
+            (viewportHeightPx * anchorFraction).coerceAtMost((viewportHeightPx - itemHeightPx).coerceAtLeast(0).toFloat())
     return itemOffset - anchorY
 }
 
@@ -1130,11 +1137,12 @@ private fun LazyListState.distanceToAnchor(
 private suspend fun LazyListState.snapToLyricIndex(
     targetIndex: Int,
     viewportHeightPx: Int,
+    anchorFraction: Float,
 ) {
     if (viewportHeightPx <= 0 || targetIndex < 0) return
     scrollToItem(targetIndex)
     val targetItem = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex } ?: return
-    scrollBy(distanceToAnchor(targetItem.offset, viewportHeightPx))
+    scrollBy(distanceToAnchor(targetItem.offset, viewportHeightPx, anchorFraction, targetItem.size))
 }
 
 /**
@@ -1147,6 +1155,7 @@ private suspend fun LazyListState.snapToLyricIndex(
 private suspend fun LazyListState.slowScrollToIndex(
     targetIndex: Int,
     viewportHeightPx: Int,
+    anchorFraction: Float,
     durationMillis: Int = LyricUIConstants.SCROLL_ANIMATION_DURATION,
 ) {
     if (viewportHeightPx <= 0 || targetIndex < 0) return
@@ -1157,7 +1166,7 @@ private suspend fun LazyListState.slowScrollToIndex(
     val distance =
         if (targetItem != null) {
             // 目标行已可见：用真实偏移把行顶对齐到视口锚点
-            distanceToAnchor(targetItem.offset, viewportHeightPx)
+            distanceToAnchor(targetItem.offset, viewportHeightPx, anchorFraction, targetItem.size)
         } else {
             // 目标行不可见：以首个可见行的真实偏移为基准，按平均行高外推
             val averageItemSize =
@@ -1168,7 +1177,7 @@ private suspend fun LazyListState.slowScrollToIndex(
                     .takeIf { it > 0f } ?: (viewportHeightPx / 6f)
             val estimatedTargetOffset =
                 firstVisibleItem.offset + (targetIndex - firstVisibleItem.index) * averageItemSize
-            distanceToAnchor(estimatedTargetOffset.toInt(), viewportHeightPx)
+            distanceToAnchor(estimatedTargetOffset.toInt(), viewportHeightPx, anchorFraction)
         }
 
     if (abs(distance) >= 0.5f) {
@@ -1183,10 +1192,10 @@ private suspend fun LazyListState.slowScrollToIndex(
     // 估算滚动的落点校正：此时目标行应已可见，按真实偏移修正残差
     val settledItem = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex }
     if (settledItem == null) {
-        snapToLyricIndex(targetIndex, viewportHeightPx)
+        snapToLyricIndex(targetIndex, viewportHeightPx, anchorFraction)
         return
     }
-    val residual = distanceToAnchor(settledItem.offset, viewportHeightPx)
+    val residual = distanceToAnchor(settledItem.offset, viewportHeightPx, anchorFraction, settledItem.size)
     if (abs(residual) >= 0.5f) {
         animateScrollBy(
             value = residual,

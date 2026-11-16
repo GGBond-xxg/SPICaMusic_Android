@@ -167,10 +167,8 @@ class MainActivity :
             }
         }
         playExternalAudio(intent)
-        // SpicaPlayer exposes the cached item before MediaBrowser exists and every playback action
-        // initializes on demand. Avoid eagerly starting PlaybackService here: on a cold launch it
-        // restores and prepares the previous remote stream, doing several seconds of main-thread
-        // Media3 work even when the user only wants to browse the library.
+        // PlayerViewModel connects asynchronously and restores a paused queue as the UI is
+        // created. External playback requests share that initialization transaction.
     }
 
     private fun playExternalAudio(intent: Intent?) {

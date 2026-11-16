@@ -1,21 +1,9 @@
 package me.spica27.spicamusic.ui.widget
 
-import android.graphics.LinearGradient
-import android.graphics.Paint
-import android.graphics.PorterDuff
-import android.graphics.RectF
-import android.graphics.Shader
-import android.graphics.SurfaceTexture
 import android.net.Uri
-import android.view.TextureView
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -23,14 +11,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
@@ -42,38 +29,18 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kyant.backdrop.backdrops.LayerBackdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.skydoves.landscapist.components.rememberImageComponent
 import com.skydoves.landscapist.image.LandscapistImage
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.ExecutorCoroutineDispatcher
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.asCoroutineDispatcher
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import me.spica27.spicamusic.common.entity.DynamicSpectrumBackground
-import me.spica27.spicamusic.player.api.IFFTProcessor
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.settings.SettingsViewModel
 import me.spica27.spicamusic.utils.blurhash.BlurHashTransformationPlugin
 import org.koin.compose.viewmodel.koinViewModel
-import timber.log.Timber
-import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.PI
 import kotlin.math.max
 import kotlin.math.min
@@ -85,7 +52,7 @@ import kotlin.math.sin
  *
  * @param modifier 修饰符
  * @param coverColor 封面主色，用于色彩调整
- * @param active 页面当前是否可见；false 时停止动态渲染并保留纯色底。
+ * @param active 页面当前是否可见；false 时停止律动并保留已绘制背景。
  * @param isDarkMode 暗色模式（true）或亮色模式（false），null时自动判断
  */
 @Composable
@@ -95,6 +62,7 @@ fun FluidMusicBackground(
     isDarkMode: Boolean? = null,
     coverUri: () -> Uri? = { null },
     active: Boolean = true,
+    foreground: Boolean = true,
     visibilityProgressProvider: () -> Float = { 1f },
     glassBackdrop: LayerBackdrop? = null,
 ) {
@@ -105,20 +73,28 @@ fun FluidMusicBackground(
     val surfaceColor = MaterialTheme.colorScheme.surface
     val effectiveDarkMode = isDarkMode ?: (surfaceColor.luminance() < 0.5f)
 
-    // 动态效果暂停时不订阅 FFT。GL 背景本身会保留最后一帧，收起后只停止连续渲染。
+    // Compose effects are cheap to draw during the opening morph. Native GL modes still
+    // wait for the settled container; all modes stop sampling when hidden/backgrounded.
+    val canvasMode =
+        backgroundMode == DynamicSpectrumBackground.TopGlow ||
+            backgroundMode == DynamicSpectrumBackground.LiquidAurora
+    val effectActive = active || (canvasMode && foreground && visibilityProgressProvider() > 0f)
     val enableFft =
-        active &&
+        effectActive &&
             backgroundMode != DynamicSpectrumBackground.OFF &&
             backgroundMode != DynamicSpectrumBackground.BlurCover
     LaunchedEffect(enableFft) {
         playerViewModel.setFftSamplingEnabled(enableFft)
     }
+    // Retain the last spectrum while motion is paused; never replace it with an empty layer.
+    var retainedSpectrum by remember { mutableStateOf(FloatArray(31)) }
     val fftSnapshot =
         if (enableFft) {
-            val fftDrawData by playerViewModel.fftDrawData.collectAsStateWithLifecycle()
-            fftDrawData
+            val current by playerViewModel.fftDrawData.collectAsStateWithLifecycle()
+            SideEffect { retainedSpectrum = current }
+            current
         } else {
-            remember { FloatArray(IFFTProcessor.BAND_COUNT) }
+            retainedSpectrum
         }
 
     var dynamicReady by
@@ -128,20 +104,6 @@ fun FluidMusicBackground(
                     backgroundMode == DynamicSpectrumBackground.BlurCover,
             )
         }
-
-    // TextureView 模式在收起后会释放组合；下一次打开重新等待它的首帧。
-    // FluidWarp / EffectShader 则常驻并冻结最后一帧，不重置 ready。
-    LaunchedEffect(active, backgroundMode) {
-        if (
-            active &&
-            (
-                backgroundMode == DynamicSpectrumBackground.TopGlow ||
-                    backgroundMode == DynamicSpectrumBackground.LiquidAurora
-            )
-        ) {
-            dynamicReady = false
-        }
-    }
 
     val dynamicAlphaState =
         animateFloatAsState(
@@ -208,28 +170,23 @@ fun FluidMusicBackground(
 
                 when (backgroundMode) {
                     DynamicSpectrumBackground.TopGlow -> {
-                        if (active) {
-                            TopGlowBackground(
-                                modifier = Modifier.matchParentSize().blur(72.dp),
-                                fftDrawData = fftSnapshot,
-                                coverColor = coverColor,
-                                visualAlpha = dynamicAlphaState.value,
-                                onFirstFrame = { dynamicReady = true },
-                            )
-                        }
+                        TopGlowBackground(
+                            modifier = Modifier.matchParentSize().blur(72.dp),
+                            fftDrawData = fftSnapshot,
+                            coverColor = coverColor,
+                            visualAlpha = visibilityProgressProvider(),
+                        )
                     }
 
                     DynamicSpectrumBackground.LiquidAurora -> {
-                        if (active) {
-                            LiquidAuroraBackground(
-                                modifier = Modifier.matchParentSize().blur(40.dp),
-                                fftDrawData = fftSnapshot,
-                                coverColor = coverColor,
-                                isDarkMode = effectiveDarkMode,
-                                visualAlpha = dynamicAlphaState.value,
-                                onFirstFrame = { dynamicReady = true },
-                            )
-                        }
+                        LiquidAuroraBackground(
+                            modifier = Modifier.matchParentSize().blur(40.dp),
+                            fftDrawData = fftSnapshot,
+                            coverColor = coverColor,
+                            isDarkMode = effectiveDarkMode,
+                            visualAlpha = visibilityProgressProvider(),
+                            active = effectActive,
+                        )
                     }
 
                     DynamicSpectrumBackground.EffectShader -> {
@@ -399,298 +356,61 @@ private fun StaticPlayerBackdrop(
     )
 }
 
-private const val RENDER_FRAME_DELAY_MS = 16L
-
-private class TextureViewRenderLoop(
-    threadName: String,
-) {
-    private val surfaceActive = AtomicBoolean(false)
-    private val paused = AtomicBoolean(false)
-    private val generation = AtomicInteger(0)
-    private val stateLock = Any()
-    private val renderDispatcher: ExecutorCoroutineDispatcher =
-        Executors
-            .newSingleThreadExecutor { runnable ->
-                Thread(runnable, threadName).apply {
-                    priority = Thread.MIN_PRIORITY
-                }
-            }.asCoroutineDispatcher()
-    private val renderScope = CoroutineScope(renderDispatcher + SupervisorJob())
-    private var drawJob: Job? = null
-    private var textureView: TextureView? = null
-    private var drawFrame: ((android.graphics.Canvas) -> Unit)? = null
-
-    fun start(
-        textureView: TextureView,
-        drawFrame: (android.graphics.Canvas) -> Unit,
-    ) {
-        synchronized(stateLock) {
-            this.textureView = textureView
-            this.drawFrame = drawFrame
-        }
-        launchLoop()
-    }
-
-    private fun launchLoop() {
-        stop()
-        if (paused.get()) return
-        val targetView: TextureView
-        val targetDraw: (android.graphics.Canvas) -> Unit
-        synchronized(stateLock) {
-            targetView = textureView ?: return
-            targetDraw = drawFrame ?: return
-        }
-        surfaceActive.set(true)
-        val token = generation.incrementAndGet()
-
-        synchronized(stateLock) {
-            drawJob =
-                renderScope.launch {
-                    while (isActive && surfaceActive.get() && generation.get() == token) {
-                        val canvas =
-                            try {
-                                targetView.lockCanvas(null)
-                            } catch (e: IllegalStateException) {
-                                Timber
-                                    .tag("FluidMusicBackground")
-                                    .w(e, "TextureView lockCanvas failed, stopping render loop")
-                                break
-                            }
-
-                        if (canvas == null) {
-                            delay(RENDER_FRAME_DELAY_MS)
-                            continue
-                        }
-
-                        var shouldContinue = true
-                        try {
-                            if (!surfaceActive.get() || generation.get() != token) {
-                                shouldContinue = false
-                            } else {
-                                targetDraw(canvas)
-                            }
-                        } finally {
-                            try {
-                                targetView.unlockCanvasAndPost(canvas)
-                            } catch (e: IllegalStateException) {
-                                Timber
-                                    .tag("FluidMusicBackground")
-                                    .w(
-                                        e,
-                                        "TextureView unlockCanvasAndPost failed, stopping render loop",
-                                    )
-                                shouldContinue = false
-                            }
-                        }
-
-                        if (!shouldContinue) {
-                            break
-                        }
-
-                        delay(RENDER_FRAME_DELAY_MS)
-                    }
-                }
-        }
-    }
-
-    fun stop() {
-        surfaceActive.set(false)
-        generation.incrementAndGet()
-        synchronized(stateLock) {
-            drawJob.also { drawJob = null }
-        }?.cancel()
-    }
-
-    fun pause() {
-        paused.set(true)
-        stop()
-    }
-
-    fun resume() {
-        if (!paused.getAndSet(false)) return
-        launchLoop()
-    }
-
-    fun onSurfaceDestroyed() {
-        val job =
-            synchronized(stateLock) {
-                surfaceActive.set(false)
-                generation.incrementAndGet()
-                val currentJob = drawJob
-                drawJob = null
-                textureView = null
-                drawFrame = null
-                currentJob
-            }
-        job?.cancel()
-        if (job != null) {
-            runBlocking { job.join() }
-        }
-    }
-
-    fun release() {
-        stop()
-        synchronized(stateLock) {
-            textureView = null
-            drawFrame = null
-        }
-        renderScope.coroutineContext.cancel()
-        renderDispatcher.close()
-    }
-}
-
-/** 线程安全数据持有者，供 TopGlowBackground 绘制线程读取 */
-private class TopGlowHolder {
-    @Volatile
-    var fftData: FloatArray = FloatArray(0)
-
-    @Volatile
-    var colorA: Int = android.graphics.Color.BLUE
-
-    @Volatile
-    var colorB: Int = android.graphics.Color.TRANSPARENT
-
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    val rectF = RectF()
-}
-
+/** Compose draws a complete first frame during expansion, without waiting for a native surface. */
 @Composable
-private fun TopGlowBackground(
+internal fun TopGlowBackground(
     modifier: Modifier,
     fftDrawData: FloatArray,
     coverColor: Color,
     visualAlpha: Float,
-    onFirstFrame: () -> Unit,
 ) {
-    val holder = remember { TopGlowHolder() }
-    val renderLoop = remember { TextureViewRenderLoop("TopGlow-Renderer") }
-    val currentOnFirstFrame = rememberUpdatedState(onFirstFrame)
-    val firstFrameDispatched = remember { AtomicBoolean(false) }
-
-    SideEffect {
-        holder.fftData = fftDrawData
-        val luminance = calculateLuminance(coverColor)
-        val hueShift = if (luminance < 0.5f) 24f else -24f
-        holder.colorA = shiftHue(coverColor, hueShift).copy(alpha = 0.85f).toArgb()
-        holder.colorB = shiftHue(coverColor, hueShift * 1.6f).copy(alpha = 0.2f).toArgb()
-    }
-
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner, renderLoop) {
-        val observer =
-            LifecycleEventObserver { _, event ->
-                when (event) {
-                    Lifecycle.Event.ON_STOP -> renderLoop.pause()
-                    Lifecycle.Event.ON_START -> renderLoop.resume()
-                    else -> Unit
-                }
-            }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-            renderLoop.release()
+    val hueShift = if (calculateLuminance(coverColor) < 0.5f) 24f else -24f
+    val colorA = shiftHue(coverColor, hueShift).copy(alpha = 0.85f)
+    val colorB = shiftHue(coverColor, hueShift * 1.6f).copy(alpha = 0.2f)
+    Canvas(modifier.blur(45.dp).graphicsLayer { alpha = visualAlpha.coerceIn(0f, 1f) }) {
+        val count = fftDrawData.size.coerceAtLeast(1)
+        val bandWidth = size.width / count
+        val brush =
+            Brush.linearGradient(
+                listOf(colorA, colorB),
+                end =
+                    androidx.compose.ui.geometry
+                        .Offset(size.width, size.height),
+            )
+        repeat(count) { index ->
+            val energy = fftDrawData.getOrElse(index) { 0f }.coerceIn(0f, 1f)
+            drawRect(
+                brush = brush,
+                topLeft =
+                    androidx.compose.ui.geometry
+                        .Offset(index * bandWidth, 0f),
+                size =
+                    androidx.compose.ui.geometry
+                        .Size(max(1f, bandWidth * 0.9f), size.height * (0.8f * energy + 0.08f)),
+            )
         }
     }
-
-    AndroidView(
-        modifier = modifier.blur(45.dp),
-        factory = { ctx ->
-            TextureView(ctx).also { tv ->
-                tv.isOpaque = false
-                tv.alpha = visualAlpha.coerceIn(0f, 1f)
-                tv.surfaceTextureListener =
-                    object : TextureView.SurfaceTextureListener {
-                        override fun onSurfaceTextureAvailable(
-                            surface: SurfaceTexture,
-                            width: Int,
-                            height: Int,
-                        ) {
-                            renderLoop.start(tv) { canvas ->
-                                canvas.drawColor(
-                                    android.graphics.Color.TRANSPARENT,
-                                    PorterDuff.Mode.CLEAR,
-                                )
-                                val data = holder.fftData
-                                if (data.isEmpty()) return@start
-
-                                val w = canvas.width.toFloat()
-                                val h = canvas.height.toFloat()
-                                val bandWidth = w / data.size
-                                val blurRadius = (bandWidth * 1.5f).coerceAtLeast(4f)
-                                holder.paint.shader =
-                                    LinearGradient(
-                                        0f,
-                                        0f,
-                                        w,
-                                        h,
-                                        holder.colorA,
-                                        holder.colorB,
-                                        Shader.TileMode.CLAMP,
-                                    )
-
-                                data.forEachIndexed { index, magnitude ->
-                                    val energy = magnitude.coerceIn(0f, 1f)
-                                    val barHeight = h * 0.8f * energy + h * 0.08f
-                                    val left = index * bandWidth
-                                    holder.rectF.set(
-                                        left,
-                                        0f,
-                                        left + max(1f, bandWidth * 0.9f),
-                                        barHeight,
-                                    )
-                                    canvas.drawRect(holder.rectF, holder.paint)
-                                }
-                            }
-                        }
-
-                        override fun onSurfaceTextureSizeChanged(
-                            surface: SurfaceTexture,
-                            width: Int,
-                            height: Int,
-                        ) {
-                        }
-
-                        override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
-                            renderLoop.onSurfaceDestroyed()
-                            return true
-                        }
-
-                        override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {
-                            if (firstFrameDispatched.compareAndSet(false, true)) {
-                                currentOnFirstFrame.value.invoke()
-                            }
-                        }
-                    }
-            }
-        },
-        update = { textureView ->
-            textureView.alpha = visualAlpha.coerceIn(0f, 1f)
-        },
-    )
 }
 
 @Composable
-private fun LiquidAuroraBackground(
+internal fun LiquidAuroraBackground(
     modifier: Modifier,
     fftDrawData: FloatArray,
     coverColor: Color,
     isDarkMode: Boolean?,
     visualAlpha: Float,
-    onFirstFrame: () -> Unit,
+    active: Boolean,
 ) {
-    val currentOnFirstFrame = rememberUpdatedState(onFirstFrame)
-    val transition = rememberInfiniteTransition(label = "LiquidAuroraPhase")
-    val phaseDegrees by
-        transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec =
-                infiniteRepeatable(
-                    animation = tween(durationMillis = 20_000, easing = LinearEasing),
-                    repeatMode = RepeatMode.Restart,
-                ),
-            label = "LiquidAuroraPhaseValue",
-        )
+    var phaseDegrees by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(active) {
+        if (!active) return@LaunchedEffect
+        var lastFrame = withFrameNanos { it }
+        while (true) {
+            val frame = withFrameNanos { it }
+            phaseDegrees = (phaseDegrees + (frame - lastFrame) / 1_000_000_000f * 18f) % 360f
+            lastFrame = frame
+        }
+    }
     val layerColors =
         remember(coverColor, isDarkMode) {
             val alpha = if (isDarkMode == true) 0.9f else 0.75f
@@ -706,10 +426,6 @@ private fun LiquidAuroraBackground(
     // Android 16 builds (observed on vivo PD2352), translucent drawPath() calls then crashed in
     // libhwui's software SkRasterPipeline while reading the destination buffer. Keep all path
     // recording in Compose so HWUI owns both the canvas and its surface lifecycle.
-    LaunchedEffect(Unit) {
-        withFrameNanos { }
-        currentOnFirstFrame.value.invoke()
-    }
 
     Canvas(
         modifier =
@@ -717,13 +433,11 @@ private fun LiquidAuroraBackground(
                 alpha = visualAlpha.coerceIn(0f, 1f)
             },
     ) {
-        if (fftDrawData.isEmpty()) return@Canvas
-
         val layers = 3
-        val chunkSize = (fftDrawData.size / layers).coerceAtLeast(1)
+        val chunkSize = (fftDrawData.size.coerceAtLeast(layers) / layers).coerceAtLeast(1)
         repeat(layers) { layer ->
             val startIndex = layer * chunkSize
-            val endIndex = min(fftDrawData.size, startIndex + chunkSize)
+            val endIndex = min(fftDrawData.size.coerceAtLeast(layers), startIndex + chunkSize)
             if (startIndex >= endIndex) return@repeat
 
             val path = Path().apply { moveTo(0f, 0f) }
@@ -733,7 +447,7 @@ private fun LiquidAuroraBackground(
 
             for (index in 0 until steps) {
                 val progress = if (steps == 1) 0f else index / (steps - 1f)
-                val energy = fftDrawData[startIndex + index].coerceIn(0f, 1f)
+                val energy = fftDrawData.getOrElse(startIndex + index) { 0f }.coerceIn(0f, 1f)
                 val wave = sin(progress * 6f + phaseShift).toFloat()
                 val y =
                     size.height * 0.35f -

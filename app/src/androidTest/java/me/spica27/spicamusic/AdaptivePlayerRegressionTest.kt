@@ -94,7 +94,6 @@ class AdaptivePlayerRegressionTest {
                                 isLike = false,
                                 onProgressChange = {},
                                 onProgressChangeFinished = {},
-                                onAudioQualityClick = {},
                                 onPlayPauseClick = {},
                                 onPreviousClick = {},
                                 onNextClick = { nextClicks++ },
@@ -119,7 +118,7 @@ class AdaptivePlayerRegressionTest {
                 .performScrollTo()
                 .assertIsDisplayed()
                 .performClick()
-            compose.onNodeWithText("Quality & effects").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText("Quality & effects").assertDoesNotExist()
             compose.onNodeWithContentDescription("Sleep timer").performScrollTo().performClick()
             compose.onNodeWithText("Custom duration").performScrollTo().performClick()
             compose.onNode(hasText("20 minutes") and hasClickAction() and !hasText("Custom duration")).performScrollTo().performClick()

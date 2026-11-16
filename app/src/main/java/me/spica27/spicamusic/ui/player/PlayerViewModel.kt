@@ -200,6 +200,8 @@ class PlayerViewModel(
     // ==================== 基础播放控制 ====================
 
     init {
+        player.init()
+
         // 新波浪进度条发布时只迁移一次；之后尊重用户在设置页的手动选择。
         viewModelScope.launch {
             val migrationApplied =
