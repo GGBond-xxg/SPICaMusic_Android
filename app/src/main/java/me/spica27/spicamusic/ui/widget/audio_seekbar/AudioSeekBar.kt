@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -32,14 +33,17 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.DrawStyle
 import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.coerceIn
@@ -79,6 +83,7 @@ fun AudioWaveSlider(
     amplitudes: List<Int>,
     onProgressChange: (Float) -> Unit,
 ) {
+    val playheadColor = MaterialTheme.colorScheme.onSurface
     val progress =
         animateFloatAsState(
             progress.coerceIn(MinProgress, MaxProgress),
@@ -160,8 +165,10 @@ fun AudioWaveSlider(
                 canvasSize = size
                 spikes = size.width / spikeTotalWidth.toPx()
                 spikesAmplitudes.forEachIndexed { index, amplitude ->
-                    drawRoundRect(
-                        brush = waveformBrush,
+                    drawProgressSpike(
+                        waveformBrush = waveformBrush,
+                        progressBrush = progressBrush,
+                        progress = progress,
                         topLeft =
                             Offset(
                                 x = index * spikeTotalWidth.toPx(),
@@ -181,15 +188,7 @@ fun AudioWaveSlider(
                         style = style,
                     )
                 }
-                drawRect(
-                    brush = progressBrush,
-                    size =
-                        Size(
-                            width = progress * size.width,
-                            height = size.height,
-                        ),
-                    blendMode = BlendMode.SrcAtop,
-                )
+                drawWaveformPlayhead(progress, playheadColor)
             }
             if (thumbWidth.value > 0.dp) {
                 Box(
@@ -236,6 +235,7 @@ fun AudioDynamicWaveSlider(
     fftAmplitudes: FloatArray,
     onProgressChange: (Float) -> Unit,
 ) {
+    val playheadColor = MaterialTheme.colorScheme.onSurface
     val progress =
         animateFloatAsState(
             progress.coerceIn(MinProgress, MaxProgress),
@@ -321,8 +321,10 @@ fun AudioDynamicWaveSlider(
                     val amplitude =
                         (normalizedAmplitude * size.height)
                             .coerceIn(minAmplitude, size.height)
-                    drawRoundRect(
-                        brush = waveformBrush,
+                    drawProgressSpike(
+                        waveformBrush = waveformBrush,
+                        progressBrush = progressBrush,
+                        progress = progress,
                         topLeft =
                             Offset(
                                 x = index * (spikeWidthPx + spikePaddingPx),
@@ -344,15 +346,7 @@ fun AudioDynamicWaveSlider(
                     index++
                 }
 
-                drawRect(
-                    brush = progressBrush,
-                    size =
-                        Size(
-                            width = progress * size.width,
-                            height = size.height,
-                        ),
-                    blendMode = BlendMode.SrcAtop,
-                )
+                drawWaveformPlayhead(progress, playheadColor)
             }
             if (thumbWidth.value > 0.dp) {
                 Box(
@@ -381,6 +375,37 @@ fun AudioDynamicWaveSlider(
             isTouch = false
         },
     )
+}
+
+/** Draw each half independently: SrcAtop would inherit the inactive track's low alpha. */
+private fun DrawScope.drawProgressSpike(
+    waveformBrush: Brush,
+    progressBrush: Brush,
+    progress: Float,
+    topLeft: Offset,
+    size: Size,
+    cornerRadius: CornerRadius,
+    style: DrawStyle,
+) {
+    val boundary = progress * this.size.width
+    clipRect(left = boundary) {
+        drawRoundRect(waveformBrush, topLeft, size, cornerRadius, style = style)
+    }
+    clipRect(right = boundary) {
+        drawRoundRect(progressBrush, topLeft, size, cornerRadius, style = style)
+    }
+}
+
+private fun DrawScope.drawWaveformPlayhead(
+    progress: Float,
+    color: Color,
+) {
+    val x = (progress * size.width).coerceIn(2.dp.toPx(), size.width.coerceAtLeast(4.dp.toPx()) - 2.dp.toPx())
+    val top = Offset(x, 2.dp.toPx())
+    val bottom = Offset(x, size.height - 2.dp.toPx())
+    val outline = if (color.luminance() > 0.5f) Color.Black else Color.White
+    drawLine(outline.copy(alpha = 0.8f), top, bottom, 4.dp.toPx(), StrokeCap.Round)
+    drawLine(color, top, bottom, 2.dp.toPx(), StrokeCap.Round)
 }
 
 private fun List<Int>.toDrawableAmplitudes(

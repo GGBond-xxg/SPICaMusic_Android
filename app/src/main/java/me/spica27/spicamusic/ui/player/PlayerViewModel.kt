@@ -53,6 +53,7 @@ import me.spica27.spicamusic.feature.library.domain.SongUseCases
 import me.spica27.spicamusic.feature.player.domain.PlayerUseCases
 import me.spica27.spicamusic.player.api.PlayMode
 import me.spica27.spicamusic.player.api.PlayerAction
+import me.spica27.spicamusic.service.SleepTimerController
 import me.spica27.spicamusic.topdisplay.TopDisplayModeController
 import me.spica27.spicamusic.utils.albumCoverFallbackUri
 import me.spica27.spicamusic.utils.extractDominantColorFromUri
@@ -84,6 +85,7 @@ class PlayerViewModel(
     private val cloudAccountStore: CloudAccountStore,
     private val remoteMusicClients: RemoteMusicClientRegistry,
     private val remoteMusicStreamProxy: RemoteMusicStreamProxy,
+    private val sleepTimer: SleepTimerController,
 ) : ViewModel() {
     // ==================== 播放状态 ====================
 
@@ -191,11 +193,9 @@ class PlayerViewModel(
         )
     val playerThemeColor: StateFlow<Color> = _playerThemeColor.asStateFlow()
 
-    private val _sleepTimerRemainingMs = MutableStateFlow<Long?>(null)
-    val sleepTimerRemainingMs: StateFlow<Long?> = _sleepTimerRemainingMs.asStateFlow()
-    private val _sleepTimerDurationMs = MutableStateFlow<Long?>(null)
-    val sleepTimerDurationMs: StateFlow<Long?> = _sleepTimerDurationMs.asStateFlow()
-    private var sleepTimerJob: Job? = null
+    val sleepTimerRemainingMs = sleepTimer.remainingMs
+    val sleepTimerDurationMs = sleepTimer.durationMs
+    val sleepTimerFinishCurrentSong = sleepTimer.finishCurrentSong
 
     // ==================== 基础播放控制 ====================
 
@@ -280,36 +280,11 @@ class PlayerViewModel(
         player.doAction(PlayerAction.Pause)
     }
 
-    fun setSleepTimer(durationMinutes: Int) {
-        sleepTimerJob?.cancel()
-        if (durationMinutes <= 0) {
-            _sleepTimerDurationMs.value = null
-            _sleepTimerRemainingMs.value = null
-            return
-        }
-        val durationMs = durationMinutes * 60_000L
-        _sleepTimerDurationMs.value = durationMs
-        sleepTimerJob =
-            viewModelScope.launch {
-                val endAt = SystemClock.elapsedRealtime() + durationMs
-                while (true) {
-                    val remaining = (endAt - SystemClock.elapsedRealtime()).coerceAtLeast(0L)
-                    _sleepTimerRemainingMs.value = remaining
-                    if (remaining == 0L) break
-                    kotlinx.coroutines.delay(minOf(1_000L, remaining))
-                }
-                pause()
-                _sleepTimerDurationMs.value = null
-                _sleepTimerRemainingMs.value = null
-            }
-    }
+    fun setSleepTimer(durationMinutes: Int) = sleepTimer.start(durationMinutes)
 
-    fun cancelSleepTimer() {
-        sleepTimerJob?.cancel()
-        sleepTimerJob = null
-        _sleepTimerDurationMs.value = null
-        _sleepTimerRemainingMs.value = null
-    }
+    fun cancelSleepTimer() = sleepTimer.cancel()
+
+    fun setSleepTimerFinishCurrentSong(enabled: Boolean) = sleepTimer.setFinishCurrentSong(enabled)
 
     /**
      * 播放/暂停切换

@@ -156,6 +156,7 @@ class LyricScene(
         val duration by playerViewModel.currentDuration.collectAsStateWithLifecycle()
         val sleepTimerRemainingMs by playerViewModel.sleepTimerRemainingMs.collectAsStateWithLifecycle()
         val sleepTimerDurationMs by playerViewModel.sleepTimerDurationMs.collectAsStateWithLifecycle()
+        val sleepTimerFinishCurrentSong by playerViewModel.sleepTimerFinishCurrentSong.collectAsStateWithLifecycle()
         val playerColor by playerViewModel.playerThemeColor.collectAsStateWithLifecycle()
 
         Box(
@@ -229,6 +230,8 @@ class LyricScene(
                         sleepTimerDurationMs = sleepTimerDurationMs,
                         onSleepTimerSet = playerViewModel::setSleepTimer,
                         onSleepTimerCancel = playerViewModel::cancelSleepTimer,
+                        sleepTimerFinishCurrentSong = sleepTimerFinishCurrentSong,
+                        onSleepTimerFinishCurrentSongChange = playerViewModel::setSleepTimerFinishCurrentSong,
                     )
                 }
             }
@@ -330,6 +333,8 @@ private fun LyricsPlaybackControls(
     sleepTimerDurationMs: Long?,
     onSleepTimerSet: (Int) -> Unit,
     onSleepTimerCancel: () -> Unit,
+    sleepTimerFinishCurrentSong: Boolean,
+    onSleepTimerFinishCurrentSongChange: (Boolean) -> Unit,
 ) {
     var isSeeking by remember(mediaId) { mutableStateOf(false) }
     var seekProgress by remember(mediaId) { mutableFloatStateOf(0f) }
@@ -375,6 +380,8 @@ private fun LyricsPlaybackControls(
         sleepTimerDurationMs = sleepTimerDurationMs,
         onSleepTimerSet = onSleepTimerSet,
         onSleepTimerCancel = onSleepTimerCancel,
+        sleepTimerFinishCurrentSong = sleepTimerFinishCurrentSong,
+        onSleepTimerFinishCurrentSongChange = onSleepTimerFinishCurrentSongChange,
         showControls = true,
         controlsModifier =
             Modifier.graphicsLayer {

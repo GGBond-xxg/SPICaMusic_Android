@@ -999,4 +999,7 @@
     <string name="playlist_export_result">已匯出 %1$d 首本機歌曲（不含雲端歌曲）。</string>
     <string name="playlist_import_result">已新增 %1$d 首，未匹配 %2$d 首，重複 %3$d 首。請先掃描需要匯入的本機歌曲。</string>
     <string name="playlist_transfer_failed">操作失敗。請確認歌單含本機歌曲，檔案為 UTF-8 M3U/M3U8 且不超過 1 MB。</string>
+  <string name="sleep_timer_finish_song">播完目前歌曲再停止</string>
+  <string name="sleep_timer_finish_song_hint">倒數計時結束後，等待目前歌曲播放完畢。</string>
+  <string name="sleep_timer_waiting_for_song">等待目前歌曲播放結束</string>
 </resources>

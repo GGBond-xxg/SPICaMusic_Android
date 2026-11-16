@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -32,6 +33,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -52,6 +54,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -81,6 +84,8 @@ fun SleepTimerSheet(
     onSetTimer: (Int) -> Unit,
     onCancelTimer: () -> Unit,
     onDismiss: () -> Unit,
+    finishCurrentSong: Boolean = false,
+    onFinishCurrentSongChange: (Boolean) -> Unit = {},
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -332,6 +337,29 @@ fun SleepTimerSheet(
                     }
                 }
 
+                Spacer(Modifier.height(Spacing.Medium))
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(Shapes.ExtraLargeCornerBasedShape)
+                            .glassSurface(Shapes.ExtraLargeCornerBasedShape, MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .toggleable(value = finishCurrentSong, role = Role.Switch, onValueChange = onFinishCurrentSongChange)
+                            .padding(Spacing.Medium),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.sleep_timer_finish_song), style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            stringResource(R.string.sleep_timer_finish_song_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = finishCurrentSong, onCheckedChange = null)
+                }
+
                 AnimatedVisibility(visible = remainingMs != null) {
                     Button(
                         onClick = {
@@ -445,6 +473,7 @@ private fun SleepTimerHero(
             text =
                 when {
                     customExpanded -> stringResource(R.string.sleep_timer_custom_hint)
+                    remainingMs == 0L -> stringResource(R.string.sleep_timer_waiting_for_song)
                     remainingMs != null -> stringResource(R.string.sleep_timer_active_hint)
                     else -> stringResource(R.string.sleep_timer_dialog_subtitle)
                 },

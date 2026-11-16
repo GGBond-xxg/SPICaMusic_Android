@@ -79,6 +79,7 @@ class PlaybackService : MediaLibraryService() {
     private val player: IMusicPlayer by inject()
     private val topDisplayModeController: TopDisplayModeController by inject()
     private val desktopLyricsController: DesktopLyricsController by inject()
+    private val sleepTimer: SleepTimerController by inject()
     private val sharedLyricsStore: SharedLyricsStore by inject()
     private val cloudPlaybackItemResolver: CloudPlaybackItemResolver by inject()
     private val cloudRecentStore: CloudRecentStore by inject()
@@ -410,6 +411,7 @@ class PlaybackService : MediaLibraryService() {
                 ).setUsePlatformDiagnostics(false)
                 .build()
         exoPlayer.addListener(playbackListener)
+        sleepTimer.attach(exoPlayer, ::cancelPendingPlaybackForSleepTimer)
         sessionPlayer = FadeAwarePlayer(exoPlayer)
         audioManager.registerAudioDeviceCallback(audioDeviceCallback, Handler(Looper.getMainLooper()))
         startSettingsObservers()
@@ -749,6 +751,7 @@ class PlaybackService : MediaLibraryService() {
         cloudPrefetchJob?.cancel()
         diagnosticMonitorJob?.cancel()
         exoPlayer.removeListener(playbackListener)
+        sleepTimer.detach()
         sharedLyricsStore.release()
         topDisplayModeController.release()
         desktopLyricsController.release()
@@ -882,7 +885,6 @@ class PlaybackService : MediaLibraryService() {
             val mediaItems = List(oldPlayer.mediaItemCount) { oldPlayer.getMediaItemAt(it) }
             val currentIndex = oldPlayer.currentMediaItemIndex
             val initialPosition = oldPlayer.currentPosition
-            val playWhenReady = oldPlayer.playWhenReady
             val repeatMode = oldPlayer.repeatMode
             val shuffleModeEnabled = oldPlayer.shuffleModeEnabled
             val playbackParameters = oldPlayer.playbackParameters
@@ -921,9 +923,12 @@ class PlaybackService : MediaLibraryService() {
 
             // Seek to the position reached while the replacement was warming, then start it at
             // zero volume. The brief overlap masks the AudioTrack hand-off without pausing music.
+            // A sleep timer may have expired during preparation; never reuse the old play flag.
+            val playWhenReady = oldPlayer.playWhenReady
             replacement.seekTo(oldPlayer.currentPosition.coerceAtLeast(0L))
             replacement.volume = if (playWhenReady) 0f else oldPlayer.volume
             replacement.addListener(playbackListener)
+            replacement.pauseAtEndOfMediaItems = oldPlayer.pauseAtEndOfMediaItems
             replacement.playWhenReady = playWhenReady
             if (playWhenReady && mediaItems.isNotEmpty()) {
                 withTimeoutOrNull(800L) {
@@ -931,6 +936,8 @@ class PlaybackService : MediaLibraryService() {
                 }
             }
 
+            if (!oldPlayer.playWhenReady) replacement.pause()
+            sleepTimer.attach(replacement, ::cancelPendingPlaybackForSleepTimer)
             exoPlayer = replacement
             sessionPlayer = FadeAwarePlayer(replacement)
             mediaSession?.setPlayer(sessionPlayer)
@@ -953,6 +960,16 @@ class PlaybackService : MediaLibraryService() {
                 .tag("PlaybackService")
                 .i("Audio pipeline warm-swapped: Hi-Fi=$enableHiFi, EQ=${!enableHiFi}")
         }
+
+    private fun cancelPendingPlaybackForSleepTimer() {
+        // A queued retry, fade or headset reconnect must not restart music after timer expiry.
+        cloudErrorSkipJob?.cancel()
+        cloudSinkRecoveryJob?.cancel()
+        manualFadeJob?.cancel()
+        manualFadeActive = false
+        trackChangeFadePending = false
+        clearReconnectResume()
+    }
 
     private fun handleCloudPlaybackError(error: PlaybackException) {
         val failedItem = exoPlayer.currentMediaItem ?: return

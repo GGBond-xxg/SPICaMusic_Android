@@ -254,6 +254,7 @@ fun ExpandedPlayerScreen(
     val songLikeState by viewModel.currentSongIsLike.collectAsStateWithLifecycle()
     val sleepTimerRemainingMs by viewModel.sleepTimerRemainingMs.collectAsStateWithLifecycle()
     val sleepTimerDurationMs by viewModel.sleepTimerDurationMs.collectAsStateWithLifecycle()
+    val sleepTimerFinishCurrentSong by viewModel.sleepTimerFinishCurrentSong.collectAsStateWithLifecycle()
     // Seed the precomposed full player with the exact painter used by the mini player. Once the
     // full-size request completes, publish that painter back to the transition host so the mini
     // cover, morph overlay and destination all render the same decoded image.
@@ -667,6 +668,8 @@ fun ExpandedPlayerScreen(
                                 sleepTimerDurationMs = sleepTimerDurationMs,
                                 onSleepTimerSet = viewModel::setSleepTimer,
                                 onSleepTimerCancel = viewModel::cancelSleepTimer,
+                                sleepTimerFinishCurrentSong = sleepTimerFinishCurrentSong,
+                                onSleepTimerFinishCurrentSongChange = viewModel::setSleepTimerFinishCurrentSong,
                                 showControls = true,
                                 modifier =
                                     Modifier
@@ -2066,7 +2069,7 @@ private fun SeekBarSection(
                     },
                     waveformBrush =
                         SolidColor(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f)),
-                    progressBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    progressBrush = SolidColor(MaterialTheme.colorScheme.onSurface),
                     modifier =
                         Modifier
                             .fillMaxWidth()
@@ -2086,7 +2089,7 @@ private fun SeekBarSection(
                     },
                     waveformBrush =
                         SolidColor(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f)),
-                    progressBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    progressBrush = SolidColor(MaterialTheme.colorScheme.onSurface),
                     modifier =
                         Modifier
                             .fillMaxWidth()

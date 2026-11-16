@@ -49,6 +49,7 @@ import me.spica27.spicamusic.feature.settings.domain.SettingsUseCases
 import me.spica27.spicamusic.lyricon.LyriconProviderManager
 import me.spica27.spicamusic.service.DesktopLyricsController
 import me.spica27.spicamusic.service.SharedLyricsStore
+import me.spica27.spicamusic.service.SleepTimerController
 import me.spica27.spicamusic.topdisplay.MusicLiveUpdateManager
 import me.spica27.spicamusic.topdisplay.SystemStatusLyricsManager
 import me.spica27.spicamusic.topdisplay.TopDisplayModeController
@@ -111,6 +112,7 @@ object AppModule {
             single { DesktopLyricsController(androidContext()) }
             single { SystemStatusLyricsManager(androidContext()) }
             single { TopDisplayModeController(get(), get(), get(), get(), get()) }
+            single { SleepTimerController(androidContext()) }
             single { SharedLyricsStore(androidContext(), get(), get()) }
 
             single<OkHttpClient>(
@@ -244,6 +246,7 @@ object AppModule {
             viewModel {
                 PlayerViewModel(
                     player = get<PlayerUseCases>(),
+                    sleepTimer = get(),
                     songRepository = get<SongUseCases>(),
                     preferencesManager = get<PreferencesManager>(),
                     topDisplayModeController = get(),

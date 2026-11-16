@@ -1003,4 +1003,7 @@
     <string name="playlist_export_result">Exported %1$d local songs (cloud songs are excluded).</string>
     <string name="playlist_import_result">Added %1$d songs; %2$d unmatched; %3$d duplicates. Scan local songs before importing.</string>
     <string name="playlist_transfer_failed">Could not transfer playlist. Use a UTF-8 M3U/M3U8 file up to 1 MB and a playlist containing local songs.</string>
+  <string name="sleep_timer_finish_song">Finish current song</string>
+  <string name="sleep_timer_finish_song_hint">When the timer expires, wait for the current song to finish.</string>
+  <string name="sleep_timer_waiting_for_song">Waiting for the current song to finish</string>
 </resources>

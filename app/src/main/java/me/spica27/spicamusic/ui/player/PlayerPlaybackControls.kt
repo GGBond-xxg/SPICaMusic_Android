@@ -146,7 +146,7 @@ fun PlayerProgressSection(
                                 onProgressChangeFinished = {},
                                 waveformBrush =
                                     SolidColor(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f)),
-                                progressBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                progressBrush = SolidColor(MaterialTheme.colorScheme.onSurface),
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }
@@ -160,7 +160,7 @@ fun PlayerProgressSection(
                             onProgressChangeFinished = {},
                             waveformBrush =
                                 SolidColor(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f)),
-                            progressBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                            progressBrush = SolidColor(MaterialTheme.colorScheme.onSurface),
                             modifier = Modifier.fillMaxSize(),
                         )
 
@@ -372,6 +372,8 @@ fun PlayerPlaybackBottomSection(
     sleepTimerDurationMs: Long? = null,
     onSleepTimerSet: (Int) -> Unit = {},
     onSleepTimerCancel: () -> Unit = {},
+    sleepTimerFinishCurrentSong: Boolean = false,
+    onSleepTimerFinishCurrentSongChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     progressModifier: Modifier = Modifier,
     audioQualityActionModifier: Modifier = Modifier,
@@ -422,6 +424,8 @@ fun PlayerPlaybackBottomSection(
                     sleepTimerDurationMs = sleepTimerDurationMs,
                     onSleepTimerSet = onSleepTimerSet,
                     onSleepTimerCancel = onSleepTimerCancel,
+                    sleepTimerFinishCurrentSong = sleepTimerFinishCurrentSong,
+                    onSleepTimerFinishCurrentSongChange = onSleepTimerFinishCurrentSongChange,
                 )
             }
         }
@@ -605,12 +609,14 @@ fun PlayerTransportControls(
     sleepTimerDurationMs: Long? = null,
     onSleepTimerSet: (Int) -> Unit = {},
     onSleepTimerCancel: () -> Unit = {},
+    sleepTimerFinishCurrentSong: Boolean = false,
+    onSleepTimerFinishCurrentSongChange: (Boolean) -> Unit = {},
 ) {
     var activeButton by remember { mutableStateOf<TransportButtonType?>(null) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     val sleepTimerMinutes =
         sleepTimerRemainingMs?.let { remaining ->
-            ((remaining + 59_999L) / 60_000L).coerceAtLeast(1L)
+            ((remaining + 59_999L) / 60_000L).coerceAtLeast(0L)
         }
 
     if (showSleepTimerDialog) {
@@ -619,6 +625,8 @@ fun PlayerTransportControls(
             remainingMs = sleepTimerRemainingMs,
             onSetTimer = onSleepTimerSet,
             onCancelTimer = onSleepTimerCancel,
+            finishCurrentSong = sleepTimerFinishCurrentSong,
+            onFinishCurrentSongChange = onSleepTimerFinishCurrentSongChange,
             onDismiss = { showSleepTimerDialog = false },
         )
     }
@@ -916,11 +924,20 @@ fun PlayerTransportControls(
                     transitionSpec = { playbackControlIconTransform() },
                     label = "sleepTimerIcon",
                 ) { minutes ->
-                    if (minutes == null) {
+                    if (minutes == null || minutes == 0L) {
                         Icon(
                             imageVector = Icons.Rounded.Timer,
-                            contentDescription = stringResource(R.string.sleep_timer),
-                            tint = MaterialTheme.colorScheme.onSurface,
+                            contentDescription =
+                                stringResource(
+                                    if (minutes ==
+                                        0L
+                                    ) {
+                                        R.string.sleep_timer_waiting_for_song
+                                    } else {
+                                        R.string.sleep_timer
+                                    },
+                                ),
+                            tint = if (minutes == 0L) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(26.dp),
                         )
                     } else {
